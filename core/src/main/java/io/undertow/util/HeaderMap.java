@@ -101,21 +101,21 @@ public final class HeaderMap implements Iterable<String> {
     }
 
     public String getFirst(String headerName) {
-        final Deque<String> deque = values.get(headerName.toLowerCase(Locale.US));
+        final Deque<String> deque = values.get(headerName);
         return deque == null ? null : deque.peekFirst();
     }
 
     public String getLast(String headerName) {
-        final Deque<String> deque = values.get(headerName.toLowerCase(Locale.US));
+        final Deque<String> deque = values.get(headerName);
         return deque == null ? null : deque.peekLast();
     }
 
     public Deque<String> get(String headerName) {
-        return values.get(headerName.toLowerCase(Locale.US));
+        return values.get(headerName);
     }
 
     public void add(String headerName, String headerValue) {
-        final String key = headerName.toLowerCase(Locale.US);
+        final String key = headerName;
         final HeaderValue value = values.get(key);
         if (value == null) {
             values.put(key, new HeaderValue(headerName, headerValue));
@@ -125,7 +125,7 @@ public final class HeaderMap implements Iterable<String> {
     }
 
     public void addAll(String headerName, Collection<String> headerValues) {
-        final String key = headerName.toLowerCase(Locale.US);
+        final String key = headerName;
         final HeaderValue value = values.get(key);
         if (value == null) {
             values.put(key, new HeaderValue(headerName, headerValues));
@@ -156,13 +156,13 @@ public final class HeaderMap implements Iterable<String> {
     }
 
     public void put(String headerName, String headerValue) {
-        final String key = headerName.toLowerCase(Locale.US);
+        final String key = headerName;
         final HeaderValue value = new HeaderValue(headerName, headerValue);
         values.put(key, value);
     }
 
     public void putAll(String headerName, Collection<String> headerValues) {
-        final String key = headerName.toLowerCase(Locale.US);
+        final String key = headerName;
         final HeaderValue deque = new HeaderValue(headerName, headerValues);
         values.put(key, deque);
     }
@@ -179,7 +179,7 @@ public final class HeaderMap implements Iterable<String> {
     }
 
     public boolean contains(String headerName) {
-        final HeaderValue value = values.get(headerName.toLowerCase(Locale.US));
+        final HeaderValue value = values.get(headerName);
         return value != null && ! value.isEmpty();
     }
 
