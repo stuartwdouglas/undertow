@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import io.undertow.UndertowLogger;
@@ -43,7 +44,7 @@ public class InMemorySessionManager implements SessionManager {
 
     private volatile SessionIdGenerator sessionIdGenerator = new SecureRandomeSessionIdGenerator();
 
-    private final ConcurrentMap<String, InMemorySession> sessions = new SecureHashMap<String, InMemorySession>();
+    private final ConcurrentMap<String, InMemorySession> sessions = new ConcurrentHashMap<String, InMemorySessionManager.InMemorySession>();
 
     private volatile List<SessionListener> listeners = Collections.emptyList();
 

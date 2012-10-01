@@ -19,10 +19,13 @@
 package io.undertow.server;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
+import io.undertow.util.WorkerDispatcher;
 import org.xnio.ChannelListener;
 import org.xnio.OptionMap;
 import org.xnio.Pool;
@@ -43,6 +46,13 @@ public final class HttpOpenListener implements ChannelListener<ConnectedStreamCh
 
     private volatile OptionMap undertowOptions;
 
+    private final ThreadLocal<Executor> executors = new ThreadLocal<Executor>() {
+        @Override
+        protected Executor initialValue() {
+            return Executors.newFixedThreadPool(10);
+        }
+    };
+
     public HttpOpenListener(final Pool<ByteBuffer> pool) {
         this(pool, OptionMap.EMPTY);
     }
@@ -58,9 +68,15 @@ public final class HttpOpenListener implements ChannelListener<ConnectedStreamCh
         }
         final PushBackStreamChannel pushBackStreamChannel = new PushBackStreamChannel(channel);
         HttpServerConnection connection = new HttpServerConnection(channel, bufferPool, rootHandler, undertowOptions);
-        HttpReadListener readListener = new HttpReadListener(channel, connection);
+        final HttpReadListener readListener = new HttpReadListener(channel, connection);
         pushBackStreamChannel.getReadSetter().set(readListener);
-        readListener.handleEvent(pushBackStreamChannel);
+        executors.get().execute(new Runnable() {
+            @Override
+            public void run() {
+                readListener.handleEvent(pushBackStreamChannel);
+            }
+        });
+
     }
 
     public HttpHandler getRootHandler() {

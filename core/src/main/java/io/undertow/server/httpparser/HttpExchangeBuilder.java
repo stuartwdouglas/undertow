@@ -20,6 +20,7 @@ package io.undertow.server.httpparser;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.Map;
 
 import io.undertow.util.HeaderMap;
@@ -37,7 +38,7 @@ public class HttpExchangeBuilder {
     String protocol;
     String queryString;
     final HeaderMap headers = new HeaderMap();
-    final Map<String, Deque<String>> queryParameters = new SecureHashMap<String, java.util.Deque<String>>(0);
+    final Map<String, Deque<String>> queryParameters = new HashMap<String, java.util.Deque<String>>(0);
 
     public String getMethod() {
         return method;

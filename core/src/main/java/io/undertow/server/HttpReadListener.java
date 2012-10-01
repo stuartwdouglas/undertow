@@ -51,8 +51,8 @@ final class HttpReadListener implements ChannelListener<PushBackStreamChannel> {
 
     private final StreamSinkChannel responseChannel;
 
-    private volatile ParseState state;
-    private volatile HttpExchangeBuilder builder;
+    private ParseState state = new ParseState();
+    private HttpExchangeBuilder builder = new HttpExchangeBuilder();
 
     private final HttpServerConnection connection;
 
@@ -72,58 +72,64 @@ final class HttpReadListener implements ChannelListener<PushBackStreamChannel> {
         buffer.clear();
         boolean free = true;
         try {
-            final int res;
-            try {
-                res = channel.read(buffer);
-            } catch (IOException e) {
-                if (UndertowLogger.REQUEST_LOGGER.isDebugEnabled()) {
-                    UndertowLogger.REQUEST_LOGGER.debugf(e, "Connection closed with IOException");
-                }
-                safeClose(channel);
-                return;
-            }
-            if (res == 0) {
-                channel.resumeReads();
-                return;
-            }
-            if (res == -1) {
+            int res;
+            do {
                 try {
-                    channel.shutdownReads();
-                    final StreamSinkChannel responseChannel = this.responseChannel;
-                    responseChannel.shutdownWrites();
-                    // will return false if there's a response queued ahead of this one, so we'll set up a listener then
-                    if (!responseChannel.flush()) {
-                        responseChannel.getWriteSetter().set(ChannelListeners.flushingChannelListener(null, null));
-                        responseChannel.resumeWrites();
-                    }
+                    res = channel.read(buffer);
                 } catch (IOException e) {
                     if (UndertowLogger.REQUEST_LOGGER.isDebugEnabled()) {
-                        UndertowLogger.REQUEST_LOGGER.debugf(e, "Connection closed with IOException when attempting to shut down reads");
+                        UndertowLogger.REQUEST_LOGGER.debugf(e, "Connection closed with IOException");
                     }
-                    // fuck it, it's all ruined
-                    IoUtils.safeClose(channel);
+                    safeClose(channel);
                     return;
                 }
-                return;
-            }
-            //TODO: we need to handle parse errors
-            buffer.flip();
-            if (state == null) {
-                state = new ParseState();
-                builder = new HttpExchangeBuilder();
-            }
-            int remaining = HttpParser.INSTANCE.handle(buffer, res, state, builder);
-            if (remaining > 0) {
-                free = false;
-                channel.unget(pooled);
-            }
-            int total = read + res - remaining;
-            read = total;
-            if (read > maxRequestSize) {
-                UndertowLogger.REQUEST_LOGGER.requestHeaderWasTooLarge(connection.getPeerAddress(), maxRequestSize);
-                IoUtils.safeClose(connection);
-                return;
-            }
+                if (res == 0) {
+                    try {
+                        channel.awaitReadable();
+                        continue;
+                    } catch (IOException e) {
+                        if (UndertowLogger.REQUEST_LOGGER.isDebugEnabled()) {
+                            UndertowLogger.REQUEST_LOGGER.debugf(e, "Connection closed with IOException");
+                        }
+                        safeClose(channel);
+                        return;
+                    }
+                }
+                if (res == -1) {
+                    try {
+                        channel.shutdownReads();
+                        final StreamSinkChannel responseChannel = this.responseChannel;
+                        responseChannel.shutdownWrites();
+                        // will return false if there's a response queued ahead of this one, so we'll set up a listener then
+                        if (!responseChannel.flush()) {
+                            responseChannel.getWriteSetter().set(ChannelListeners.flushingChannelListener(null, null));
+                            responseChannel.resumeWrites();
+                        }
+                    } catch (IOException e) {
+                        if (UndertowLogger.REQUEST_LOGGER.isDebugEnabled()) {
+                            UndertowLogger.REQUEST_LOGGER.debugf(e, "Connection closed with IOException when attempting to shut down reads");
+                        }
+                        // fuck it, it's all ruined
+                        IoUtils.safeClose(channel);
+                        return;
+                    }
+                    return;
+                }
+                //TODO: we need to handle parse errors
+                buffer.flip();
+                int remaining = HttpParser.INSTANCE.handle(buffer, res, state, builder);
+                if (remaining > 0) {
+                    free = false;
+                    channel.unget(pooled);
+                }
+                int total = read + res - remaining;
+                read = total;
+                if (read > maxRequestSize) {
+                    UndertowLogger.REQUEST_LOGGER.requestHeaderWasTooLarge(connection.getPeerAddress(), maxRequestSize);
+                    IoUtils.safeClose(connection);
+                    return;
+                }
+            } while (!state.isComplete());
 
             if (state.isComplete()) {
                 // we remove ourselves as the read listener from the channel;

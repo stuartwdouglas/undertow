@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -126,7 +127,7 @@ public final class FormData implements Iterable<String> {
         }
     }
 
-    private final Map<String, Deque<FormValue>> values = new SecureHashMap<String, Deque<FormValue>>();
+    private final Map<String, Deque<FormValue>> values = new HashMap<String, java.util.Deque<FormValue>>();
 
     public Iterator<String> iterator() {
         return values.keySet().iterator();

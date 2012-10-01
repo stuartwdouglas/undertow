@@ -54,7 +54,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
     private final Pool<ByteBuffer> pool;
 
     @SuppressWarnings("unused")
-    private volatile int state = STATE_START;
+    private int state = STATE_START;
 
     private Iterator<String> nameIterator;
     private String string;
@@ -66,8 +66,6 @@ final class HttpResponseChannel implements StreamSinkChannel {
 
     private final ChannelListener.SimpleSetter<HttpResponseChannel> writeSetter = new ChannelListener.SimpleSetter<HttpResponseChannel>();
     private final ChannelListener.SimpleSetter<HttpResponseChannel> closeSetter = new ChannelListener.SimpleSetter<HttpResponseChannel>();
-
-    private static final AtomicIntegerFieldUpdater<HttpResponseChannel> stateUpdater = AtomicIntegerFieldUpdater.newUpdater(HttpResponseChannel.class, "state");
 
     private static final int STATE_BODY = 0; // Message body, normal pass-through operation
     private static final int STATE_START = 1; // No headers written yet
@@ -81,9 +79,9 @@ final class HttpResponseChannel implements StreamSinkChannel {
     private static final int STATE_HDR_FINAL_LF = 9; // Final LF
     private static final int STATE_BUF_FLUSH = 10; // flush the buffer and go to writing body
 
-    private static final int MASK_STATE         = 0x0000000F;
-    private static final int FLAG_ENTERED       = 0x00000010;
-    private static final int FLAG_SHUTDOWN      = 0x00000020;
+    private static final int MASK_STATE = 0x0000000F;
+    private static final int FLAG_ENTERED = 0x00000010;
+    private static final int FLAG_SHUTDOWN = 0x00000020;
 
     HttpResponseChannel(final StreamSinkChannel delegate, final Pool<ByteBuffer> pool, final HttpServerExchange exchange) {
         this.delegate = delegate;
@@ -125,7 +123,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
         }
         buffer.clear();
         // BUFFER IS NOW EMPTY FOR FILLING
-        for (;;) {
+        for (; ; ) {
             switch (state) {
                 case STATE_BODY: {
                     // shouldn't be possible, but might as well do the right thing anyway
@@ -137,7 +135,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                     assert buffer.remaining() >= 0x100;
                     string = exchange.getProtocol();
                     length = string.length();
-                    for (charIndex = 0; charIndex < length; charIndex ++) {
+                    for (charIndex = 0; charIndex < length; charIndex++) {
                         buffer.put((byte) string.charAt(charIndex));
                     }
                     buffer.put((byte) ' ');
@@ -149,13 +147,13 @@ final class HttpResponseChannel implements StreamSinkChannel {
                     buffer.put((byte) ' ');
                     string = "Put Response String Here"; // <-- TODO
                     length = string.length();
-                    for (charIndex = 0; charIndex < length; charIndex ++) {
+                    for (charIndex = 0; charIndex < length; charIndex++) {
                         buffer.put((byte) string.charAt(charIndex));
                     }
                     buffer.put((byte) '\r').put((byte) '\n');
                     HeaderMap headers = exchange.getResponseHeaders();
                     nameIterator = headers.iterator();
-                    if (! nameIterator.hasNext()) {
+                    if (!nameIterator.hasNext()) {
                         log.trace("No response headers");
                         buffer.put((byte) '\r').put((byte) '\n');
                         buffer.flip();
@@ -202,7 +200,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                     // fall thru
                 }
                 case STATE_HDR_D: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         buffer.flip();
                         do {
                             res = delegate.write(buffer);
@@ -222,7 +220,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                     // fall thru
                 }
                 case STATE_HDR_DS: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         buffer.flip();
                         do {
                             res = delegate.write(buffer);
@@ -239,7 +237,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                         buffer.clear();
                     }
                     buffer.put((byte) ' ');
-                    if(valueIterator == null) {
+                    if (valueIterator == null) {
                         valueIterator = exchange.getResponseHeaders().get(headerName).iterator();
                     }
                     assert valueIterator.hasNext();
@@ -271,8 +269,8 @@ final class HttpResponseChannel implements StreamSinkChannel {
                         }
                     }
                     charIndex = 0;
-                    if (! valueIterator.hasNext()) {
-                        if (! buffer.hasRemaining()) {
+                    if (!valueIterator.hasNext()) {
+                        if (!buffer.hasRemaining()) {
                             buffer.flip();
                             do {
                                 res = delegate.write(buffer);
@@ -284,7 +282,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                             buffer.clear();
                         }
                         buffer.put((byte) 13); // CR
-                        if (! buffer.hasRemaining()) {
+                        if (!buffer.hasRemaining()) {
                             buffer.flip();
                             do {
                                 res = delegate.write(buffer);
@@ -302,7 +300,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                             state = STATE_HDR_NAME;
                             break;
                         } else {
-                            if (! buffer.hasRemaining()) {
+                            if (!buffer.hasRemaining()) {
                                 buffer.flip();
                                 do {
                                     res = delegate.write(buffer);
@@ -314,7 +312,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                                 buffer.clear();
                             }
                             buffer.put((byte) 13); // CR
-                            if (! buffer.hasRemaining()) {
+                            if (!buffer.hasRemaining()) {
                                 buffer.flip();
                                 do {
                                     res = delegate.write(buffer);
@@ -348,7 +346,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                 }
                 // Clean-up states
                 case STATE_HDR_EOL_CR: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         buffer.flip();
                         do {
                             res = delegate.write(buffer);
@@ -362,7 +360,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                     buffer.put((byte) 13); // CR
                 }
                 case STATE_HDR_EOL_LF: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         buffer.flip();
                         do {
                             res = delegate.write(buffer);
@@ -374,10 +372,10 @@ final class HttpResponseChannel implements StreamSinkChannel {
                         buffer.clear();
                     }
                     buffer.put((byte) 10); // LF
-                    if(valueIterator.hasNext()) {
+                    if (valueIterator.hasNext()) {
                         state = STATE_HDR_NAME;
                         break;
-                    }else  if (nameIterator.hasNext()) {
+                    } else if (nameIterator.hasNext()) {
                         string = nameIterator.next();
                         valueIterator = null;
                         state = STATE_HDR_NAME;
@@ -386,7 +384,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                     // fall thru
                 }
                 case STATE_HDR_FINAL_CR: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         buffer.flip();
                         do {
                             res = delegate.write(buffer);
@@ -401,7 +399,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                     // fall thru
                 }
                 case STATE_HDR_FINAL_LF: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         buffer.flip();
                         do {
                             res = delegate.write(buffer);
@@ -442,13 +440,12 @@ final class HttpResponseChannel implements StreamSinkChannel {
     public int write(final ByteBuffer src) throws IOException {
         log.trace("write");
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_ENTERED)) {
-                throw new ConcurrentStreamChannelAccessException();
-            }
-            newVal = oldVal | FLAG_ENTERED;
-        } while (! stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_ENTERED)) {
+            throw new ConcurrentStreamChannelAccessException();
+        }
+        newVal = oldVal | FLAG_ENTERED;
+        this.state = newVal;
         int state = oldVal & MASK_STATE;
         try {
             if (state != 0) {
@@ -458,10 +455,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                 }
                 oldVal = newVal;
                 newVal = oldVal & ~MASK_STATE | state;
-                while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                    oldVal = this.state;
-                    newVal = oldVal & ~MASK_STATE | state;
-                }
+                this.state = newVal;
                 if (allAreSet(oldVal, FLAG_SHUTDOWN)) {
                     delegate.shutdownWrites();
                     throw new ClosedChannelException();
@@ -471,10 +465,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
         } finally {
             oldVal = newVal;
             newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                oldVal = this.state;
-                newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            }
+            this.state = newVal;
         }
     }
 
@@ -488,13 +479,12 @@ final class HttpResponseChannel implements StreamSinkChannel {
             return 0L;
         }
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_ENTERED)) {
-                throw new ConcurrentStreamChannelAccessException();
-            }
-            newVal = oldVal | FLAG_ENTERED;
-        } while (! stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_ENTERED)) {
+            throw new ConcurrentStreamChannelAccessException();
+        }
+        newVal = oldVal | FLAG_ENTERED;
+        this.state = newVal;
         int state = oldVal & MASK_STATE;
         try {
             if (state != 0) {
@@ -504,10 +494,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                 }
                 oldVal = newVal;
                 newVal = oldVal & ~MASK_STATE | state;
-                while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                    oldVal = this.state;
-                    newVal = oldVal & ~MASK_STATE | state;
-                }
+                this.state = newVal;
                 if (allAreSet(oldVal, FLAG_SHUTDOWN)) {
                     delegate.shutdownWrites();
                     throw new ClosedChannelException();
@@ -517,10 +504,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
         } finally {
             oldVal = newVal;
             newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                oldVal = this.state;
-                newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            }
+            this.state = newVal;
         }
     }
 
@@ -530,13 +514,12 @@ final class HttpResponseChannel implements StreamSinkChannel {
             return 0L;
         }
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_ENTERED)) {
-                throw new ConcurrentStreamChannelAccessException();
-            }
-            newVal = oldVal | FLAG_ENTERED;
-        } while (! stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_ENTERED)) {
+            throw new ConcurrentStreamChannelAccessException();
+        }
+        newVal = oldVal | FLAG_ENTERED;
+        this.state = newVal;
         int state = oldVal & MASK_STATE;
         try {
             if (state != 0) {
@@ -546,10 +529,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                 }
                 oldVal = newVal;
                 newVal = oldVal & ~MASK_STATE | state;
-                while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                    oldVal = this.state;
-                    newVal = oldVal & ~MASK_STATE | state;
-                }
+                this.state = newVal;
                 if (allAreSet(oldVal, FLAG_SHUTDOWN)) {
                     delegate.shutdownWrites();
                     throw new ClosedChannelException();
@@ -559,10 +539,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
         } finally {
             oldVal = newVal;
             newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                oldVal = this.state;
-                newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            }
+            this.state = newVal;
         }
     }
 
@@ -573,13 +550,12 @@ final class HttpResponseChannel implements StreamSinkChannel {
             return 0L;
         }
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_ENTERED)) {
-                throw new ConcurrentStreamChannelAccessException();
-            }
-            newVal = oldVal | FLAG_ENTERED;
-        } while (! stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_ENTERED)) {
+            throw new ConcurrentStreamChannelAccessException();
+        }
+        newVal = oldVal | FLAG_ENTERED;
+        this.state = newVal;
         int state = oldVal & MASK_STATE;
         try {
             if (state != 0) {
@@ -589,10 +565,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                 }
                 oldVal = newVal;
                 newVal = oldVal & ~MASK_STATE | state;
-                while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                    oldVal = this.state;
-                    newVal = oldVal & ~MASK_STATE | state;
-                }
+                this.state = newVal;
                 if (allAreSet(oldVal, FLAG_SHUTDOWN)) {
                     delegate.shutdownWrites();
                     throw new ClosedChannelException();
@@ -602,24 +575,20 @@ final class HttpResponseChannel implements StreamSinkChannel {
         } finally {
             oldVal = newVal;
             newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                oldVal = this.state;
-                newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            }
+            this.state = newVal;
         }
     }
 
     public boolean flush() throws IOException {
         log.trace("flush");
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_ENTERED)) {
-                log.trace("Flush false due to reentry");
-                return false;
-            }
-            newVal = oldVal | FLAG_ENTERED;
-        } while (! stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_ENTERED)) {
+            log.trace("Flush false due to reentry");
+            return false;
+        }
+        newVal = oldVal | FLAG_ENTERED;
+        this.state = newVal;
         int state = oldVal & MASK_STATE;
         try {
             if (state != 0) {
@@ -630,10 +599,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
                 }
                 oldVal = newVal;
                 newVal = oldVal & ~MASK_STATE | state;
-                while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                    oldVal = this.state;
-                    newVal = oldVal & ~MASK_STATE | state;
-                }
+                this.state = newVal;
                 if (allAreSet(oldVal, FLAG_SHUTDOWN)) {
                     delegate.shutdownWrites();
                     // fall out to the flush
@@ -644,10 +610,7 @@ final class HttpResponseChannel implements StreamSinkChannel {
         } finally {
             oldVal = newVal;
             newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            while (! stateUpdater.compareAndSet(this, oldVal, newVal)) {
-                oldVal = this.state;
-                newVal = oldVal & ~FLAG_ENTERED & ~MASK_STATE | state;
-            }
+            this.state = newVal;
         }
     }
 
@@ -673,14 +636,13 @@ final class HttpResponseChannel implements StreamSinkChannel {
     public void shutdownWrites() throws IOException {
         log.trace("shutdown");
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreClear(oldVal, MASK_STATE)) {
-                delegate.shutdownWrites();
-                return;
-            }
-            newVal = oldVal | FLAG_SHUTDOWN;
-        } while (! stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreClear(oldVal, MASK_STATE)) {
+            delegate.shutdownWrites();
+            return;
+        }
+        newVal = oldVal | FLAG_SHUTDOWN;
+        this.state = newVal;
         // just return
     }
 
@@ -699,21 +661,20 @@ final class HttpResponseChannel implements StreamSinkChannel {
     public void close() throws IOException {
         log.trace("close");
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreClear(oldVal, MASK_STATE)) {
-                try {
-                    delegate.close();
-                } finally {
-                    if(pooledBuffer != null) {
-                        pooledBuffer.free();
-                        pooledBuffer = null;
-                    }
+        oldVal = state;
+        if (allAreClear(oldVal, MASK_STATE)) {
+            try {
+                delegate.close();
+            } finally {
+                if (pooledBuffer != null) {
+                    pooledBuffer.free();
+                    pooledBuffer = null;
                 }
-                return;
             }
-            newVal = oldVal & ~MASK_STATE | FLAG_SHUTDOWN | STATE_BODY;
-        } while (! stateUpdater.compareAndSet(this, oldVal, newVal));
+            return;
+        }
+        newVal = oldVal & ~MASK_STATE | FLAG_SHUTDOWN | STATE_BODY;
+        this.state = newVal;
         // atomic close called but response not fully written
         // this blows out the connection completely, so nothing we can do but bail
         IoUtils.safeClose(delegate);

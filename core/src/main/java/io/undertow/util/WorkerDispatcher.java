@@ -38,7 +38,7 @@ public class WorkerDispatcher {
     public static void dispatch( final HttpServerExchange exchange, final Runnable runnable) {
         Executor executor = exchange.getAttachment(EXECUTOR_ATTACHMENT_KEY);
         Boolean executing = executingInWorker.get();
-        if (executing != null && executing) {
+        if (0==0 || executing != null && executing) {
             runnable.run();
         } else {
             (executor != null ? executor : exchange.getConnection().getWorker()).execute(new Runnable() {
