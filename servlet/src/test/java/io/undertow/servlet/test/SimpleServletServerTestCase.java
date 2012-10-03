@@ -75,8 +75,10 @@ public class SimpleServletServerTestCase {
     }
 
     @Test
-    public void testSimpleHttpServlet() throws IOException {
+    public void testSimpleHttpServlet() throws IOException, InterruptedException {
         DefaultHttpClient client = new DefaultHttpClient();
+
+        Thread.sleep(100000000);
         try {
             HttpGet get = new HttpGet(ServletServer.getDefaultServerAddress() + "/servletContext/aa");
             HttpResponse result = client.execute(get);

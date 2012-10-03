@@ -77,35 +77,35 @@ public final class HttpServerExchange extends AbstractAttachable {
 
     // mutable state
 
-    private volatile int state = 200;
-    private volatile HttpString requestMethod;
-    private volatile String requestScheme;
+    private int state = 200;
+    private HttpString requestMethod;
+    private String requestScheme;
     /**
      * The original request URI. This will include the host name if it was specified by the client
      */
-    private volatile String requestURI;
+    private String requestURI;
     /**
      * The original request path.
      */
-    private volatile String requestPath;
+    private String requestPath;
     /**
      * The canonical version of the original path.
      */
-    private volatile String canonicalPath;
+    private String canonicalPath;
     /**
      * The remaining unresolved portion of the canonical path.
      */
-    private volatile String relativePath;
+    private String relativePath;
 
     /**
      * The resolved part of the canonical path.
      */
-    private volatile String resolvedPath = "/";
+    private String resolvedPath = "/";
 
     /**
      * the query string
      */
-    private volatile String queryString;
+    private String queryString;
 
     private boolean complete = false;
 
@@ -117,8 +117,6 @@ public final class HttpServerExchange extends AbstractAttachable {
 
     private static final AtomicReferenceFieldUpdater<HttpServerExchange, ChannelWrapper[]> requestWrappersUpdater = AtomicReferenceFieldUpdater.newUpdater(HttpServerExchange.class, ChannelWrapper[].class, "requestWrappers");
     private static final AtomicReferenceFieldUpdater<HttpServerExchange, ChannelWrapper[]> responseWrappersUpdater = AtomicReferenceFieldUpdater.newUpdater(HttpServerExchange.class, ChannelWrapper[].class, "responseWrappers");
-
-    private static final AtomicIntegerFieldUpdater<HttpServerExchange> stateUpdater = AtomicIntegerFieldUpdater.newUpdater(HttpServerExchange.class, "state");
 
     private static final int MASK_RESPONSE_CODE = intBitMask(0, 9);
     private static final int FLAG_RESPONSE_SENT = 1 << 10;
@@ -468,14 +466,13 @@ public final class HttpServerExchange extends AbstractAttachable {
      */
     void terminateRequest() {
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_REQUEST_TERMINATED)) {
-                // idempotent
-                return;
-            }
-            newVal = oldVal | FLAG_REQUEST_TERMINATED;
-        } while (!stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_REQUEST_TERMINATED)) {
+            // idempotent
+            return;
+        }
+        newVal = oldVal | FLAG_REQUEST_TERMINATED;
+        this.state = newVal;
         requestTerminateAction.run();
     }
 
@@ -553,13 +550,12 @@ public final class HttpServerExchange extends AbstractAttachable {
             throw new IllegalArgumentException("Invalid response code");
         }
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_RESPONSE_SENT)) {
-                throw UndertowMessages.MESSAGES.responseAlreadyStarted();
-            }
-            newVal = oldVal & ~MASK_RESPONSE_CODE | responseCode & MASK_RESPONSE_CODE;
-        } while (!stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_RESPONSE_SENT)) {
+            throw UndertowMessages.MESSAGES.responseAlreadyStarted();
+        }
+        newVal = oldVal & ~MASK_RESPONSE_CODE | responseCode & MASK_RESPONSE_CODE;
+        this.state = newVal;
     }
 
     /**
@@ -617,14 +613,13 @@ public final class HttpServerExchange extends AbstractAttachable {
      */
     void terminateResponse() {
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_RESPONSE_TERMINATED)) {
-                // idempotent
-                return;
-            }
-            newVal = oldVal | FLAG_RESPONSE_TERMINATED;
-        } while (!stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_RESPONSE_TERMINATED)) {
+            // idempotent
+            return;
+        }
+        newVal = oldVal | FLAG_RESPONSE_TERMINATED;
+        this.state = newVal;
         if (responseTerminateAction != null) {
             responseTerminateAction.run();
         }
@@ -651,13 +646,12 @@ public final class HttpServerExchange extends AbstractAttachable {
      */
     void startResponse() throws IllegalStateException {
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_RESPONSE_SENT)) {
-                throw UndertowMessages.MESSAGES.responseAlreadyStarted();
-            }
-            newVal = oldVal | FLAG_RESPONSE_SENT;
-        } while (!stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_RESPONSE_SENT)) {
+            throw UndertowMessages.MESSAGES.responseAlreadyStarted();
+        }
+        newVal = oldVal | FLAG_RESPONSE_SENT;
+        this.state = newVal;
 
         log.tracef("Starting to write response for %s using channel %s", this, underlyingResponseChannel);
         final HeaderMap responseHeaders = this.responseHeaders;
@@ -677,13 +671,12 @@ public final class HttpServerExchange extends AbstractAttachable {
         // consume the request body nicely, send whatever HTTP response we have, and close down the connection.
         complete = true;
         int oldVal, newVal;
-        do {
-            oldVal = state;
-            if (allAreSet(oldVal, FLAG_CLEANUP)) {
-                return;
-            }
-            newVal = oldVal | FLAG_CLEANUP | FLAG_REQUEST_TERMINATED | FLAG_RESPONSE_TERMINATED;
-        } while (!stateUpdater.compareAndSet(this, oldVal, newVal));
+        oldVal = state;
+        if (allAreSet(oldVal, FLAG_CLEANUP)) {
+            return;
+        }
+        newVal = oldVal | FLAG_CLEANUP | FLAG_REQUEST_TERMINATED | FLAG_RESPONSE_TERMINATED;
+        this.state = newVal;
         final StreamSourceChannel requestChannel = underlyingRequestChannel;
         final StreamSinkChannel responseChannel = underlyingResponseChannel;
         if (allAreSet(oldVal, FLAG_REQUEST_TERMINATED | FLAG_RESPONSE_TERMINATED)) {

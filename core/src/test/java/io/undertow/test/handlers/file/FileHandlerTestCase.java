@@ -20,18 +20,25 @@ package io.undertow.test.handlers.file;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
+import io.undertow.server.HttpCompletionHandler;
+import io.undertow.server.HttpHandler;
+import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.CanonicalPathHandler;
 import io.undertow.server.handlers.PathHandler;
 import io.undertow.server.handlers.file.FileHandler;
 import io.undertow.test.utils.DefaultServer;
 import io.undertow.test.utils.HttpClientUtils;
+import io.undertow.util.Headers;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.xnio.ChannelListener;
+import org.xnio.channels.StreamSinkChannel;
 
 /**
  * @author Stuart Douglas
@@ -40,8 +47,14 @@ import org.junit.runner.RunWith;
 public class FileHandlerTestCase {
 
 
+    final ByteBuffer buf = ByteBuffer.allocateDirect(11);
+    {
+    buf.put("hello world".getBytes());
+        buf.flip();
+    }
+
     @Test
-    public void testFileIsServed() throws IOException {
+    public void testFileIsServed() throws IOException, InterruptedException {
         DefaultHttpClient client = new DefaultHttpClient();
         try {
             final FileHandler handler = new FileHandler(new File(getClass().getResource("page.html").getFile()).getParentFile());
@@ -50,7 +63,46 @@ public class FileHandlerTestCase {
             path.addPath("/path", handler);
             final CanonicalPathHandler root = new CanonicalPathHandler();
             root.setNext(path);
-            DefaultServer.setRootHandler(root);
+            DefaultServer.setRootHandler(new HttpHandler() {
+                @Override
+                public void handleRequest(HttpServerExchange exchange, final HttpCompletionHandler completionHandler) {
+                    exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, "11");
+                    final StreamSinkChannel streamSinkChannel = exchange.getResponseChannelFactory().create();
+                    final ByteBuffer duplicate = buf.duplicate();
+                    try {
+                        int res = 0;
+                        do{
+                            res = streamSinkChannel.write(duplicate);
+                            if(res == 0) {
+                                streamSinkChannel.getWriteSetter().set(new ChannelListener<StreamSinkChannel>() {
+
+                                    @Override
+                                    public void handleEvent(StreamSinkChannel channel) {
+                                        int a = 0;
+                                        do {
+                                            try {
+                                                a = streamSinkChannel.write(duplicate);
+                                            } catch (IOException e) {
+                                                e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                                            }
+                                            if(a == 0) {
+                                                return;
+                                            }
+                                        } while (duplicate.hasRemaining());
+                                        completionHandler.handleComplete();
+                                    }
+                                });
+                                return;
+                            }
+                        } while (duplicate.hasRemaining());
+                        completionHandler.handleComplete();
+                    } catch (IOException e) {
+                        e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                    }
+                }
+            });
+
+            Thread.sleep(100000000);
 
             HttpGet get = new HttpGet(DefaultServer.getDefaultServerAddress() + "/path/page.html");
             HttpResponse result = client.execute(get);

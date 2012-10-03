@@ -87,7 +87,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
             try {
                 worker = xnio.createWorker(OptionMap.builder()
                         .set(Options.WORKER_WRITE_THREADS, 4)
-                        .set(Options.WORKER_READ_THREADS, 4)
+                        .set(Options.WORKER_READ_THREADS, 8)
                         .set(Options.CONNECTION_HIGH_WATER, 1000000)
                         .set(Options.CONNECTION_LOW_WATER, 1000000)
                         .set(Options.WORKER_TASK_CORE_THREADS, 10)

@@ -152,6 +152,7 @@ public class DirectBufferCache {
 
         private final String path;
         private final int size;
+        private final String sizeString;
         private final DirectBufferCache cache;
         private volatile PooledByteBuffer[] buffers = INIT_BUFFERS;
         private volatile int refs = 1;
@@ -163,10 +164,15 @@ public class DirectBufferCache {
             this.path = path;
             this.size = size;
             this.cache = cache;
+            this.sizeString = Integer.toString(size);
         }
 
         public int size() {
             return size;
+        }
+
+        public String getSizeString() {
+            return sizeString;
         }
 
         public PooledByteBuffer[] buffers() {

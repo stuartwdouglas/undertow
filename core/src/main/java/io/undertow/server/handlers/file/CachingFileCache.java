@@ -91,7 +91,7 @@ public class CachingFileCache implements FileCache {
             return;
         }
 
-        exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, Long.toString(entry.size()));
+        exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, entry.getSizeString());
         if (method.equals(Methods.HEAD)) {
             completionHandler.handleComplete();
             return;
