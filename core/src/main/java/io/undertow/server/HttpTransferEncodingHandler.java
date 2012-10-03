@@ -40,7 +40,6 @@ import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
 import org.xnio.channels.ChannelFactory;
 import org.xnio.channels.EmptyStreamSourceChannel;
-import org.xnio.channels.FixedLengthStreamSinkChannel;
 import org.xnio.channels.FixedLengthStreamSourceChannel;
 import org.xnio.channels.PushBackStreamChannel;
 import org.xnio.channels.StreamSinkChannel;
