@@ -127,4 +127,13 @@ public interface UndertowServletMessages {
 
     @Message(id = 10027, value = "Not implemented")
     IllegalStateException notImplemented();
+
+    @Message(id = 10028, value = "No login method specified")
+    IllegalStateException noLoginMethodSpecified();
+
+    @Message(id = 10029, value = "Unsupported authentication method %s")
+    IllegalStateException unsupportedLoginMethod(String method);
+
+    @Message(id = 10029, value = "No login callback handler specified")
+    IllegalStateException noCallbackHandlerSpecified();
 }

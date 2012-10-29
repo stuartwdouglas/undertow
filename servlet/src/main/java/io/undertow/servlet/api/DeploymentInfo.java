@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
+import javax.security.auth.callback.CallbackHandler;
 import javax.servlet.DispatcherType;
 
 import io.undertow.servlet.UndertowServletMessages;
@@ -52,6 +53,8 @@ public class DeploymentInfo implements Cloneable {
     private volatile InstanceFactory<Executor> executorFactory;
     private volatile InstanceFactory<Executor> asyncExecutorFactory;
     private volatile File tempDir;
+    private volatile LoginConfigInfo loginConfigInfo;
+    private volatile CallbackHandler authenticationCallbackHandler;
     private final Map<String, ServletInfo> servlets = new HashMap<String, ServletInfo>();
     private final Map<String, FilterInfo> filters = new HashMap<String, FilterInfo>();
     private final List<FilterMappingInfo> filterServletNameMappings = new ArrayList<FilterMappingInfo>();
@@ -64,6 +67,7 @@ public class DeploymentInfo implements Cloneable {
     private final List<String> welcomePages = new ArrayList<String>();
     private final List<ErrorPage> errorPages = new ArrayList<ErrorPage>();
     private final List<MimeMapping> mimeMappings = new ArrayList<MimeMapping>();
+    private final List<SecurityConstraintInfo> securityConstraints = new ArrayList<SecurityConstraintInfo>();
 
     public void validate() {
         if (deploymentName == null) {
@@ -140,6 +144,15 @@ public class DeploymentInfo implements Cloneable {
 
     public DeploymentInfo setClassIntrospecter(final ClassIntrospecter classIntrospecter) {
         this.classIntrospecter = classIntrospecter;
+        return this;
+    }
+
+    public LoginConfigInfo getLoginConfigInfo() {
+        return loginConfigInfo;
+    }
+
+    public DeploymentInfo setLoginConfigInfo(final LoginConfigInfo loginConfigInfo) {
+        this.loginConfigInfo = loginConfigInfo;
         return this;
     }
 
@@ -396,6 +409,34 @@ public class DeploymentInfo implements Cloneable {
         this.tempDir = tempDir;
     }
 
+    public DeploymentInfo addSecurityConstraint(final SecurityConstraintInfo securityConstraint) {
+        this.securityConstraints.add(securityConstraint);
+        return this;
+    }
+
+    public DeploymentInfo addSecurityConstraints(final SecurityConstraintInfo ... securityConstraints) {
+        this.securityConstraints.addAll(Arrays.asList(securityConstraints));
+        return this;
+    }
+
+    public DeploymentInfo addSecurityConstraints(final Collection<SecurityConstraintInfo> securityConstraints) {
+        this.securityConstraints.addAll(securityConstraints);
+        return this;
+    }
+
+    public List<SecurityConstraintInfo> getSecurityConstraints() {
+        return Collections.unmodifiableList(securityConstraints);
+    }
+
+    public CallbackHandler getAuthenticationCallbackHandler() {
+        return authenticationCallbackHandler;
+    }
+
+    public DeploymentInfo setAuthenticationCallbackHandler(final CallbackHandler authenticationCallbackHandler) {
+        this.authenticationCallbackHandler = authenticationCallbackHandler;
+        return this;
+    }
+
     @Override
     public DeploymentInfo clone() {
         final DeploymentInfo info = new DeploymentInfo()
@@ -427,6 +468,9 @@ public class DeploymentInfo implements Cloneable {
         info.executorFactory = executorFactory;
         info.asyncExecutorFactory = asyncExecutorFactory;
         info.tempDir = tempDir;
+        info.loginConfigInfo = loginConfigInfo.clone();
+        info.securityConstraints.addAll(securityConstraints);
+        info.authenticationCallbackHandler = authenticationCallbackHandler;
         return info;
     }
 

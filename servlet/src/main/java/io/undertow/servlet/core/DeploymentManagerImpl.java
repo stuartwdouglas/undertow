@@ -20,6 +20,7 @@ package io.undertow.servlet.core;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,6 +38,11 @@ import javax.servlet.ServletException;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.handlers.AttachmentHandler;
 import io.undertow.server.handlers.blocking.BlockingHttpHandler;
+import io.undertow.server.handlers.security.AuthenticationCallHandler;
+import io.undertow.server.handlers.security.AuthenticationMechanism;
+import io.undertow.server.handlers.security.AuthenticationMechanismsHandler;
+import io.undertow.server.handlers.security.BasicAuthenticationMechanism;
+import io.undertow.server.handlers.security.SecurityInitialHandler;
 import io.undertow.servlet.UndertowServletMessages;
 import io.undertow.servlet.api.Deployment;
 import io.undertow.servlet.api.DeploymentInfo;
@@ -47,6 +53,7 @@ import io.undertow.servlet.api.FilterMappingInfo;
 import io.undertow.servlet.api.HandlerChainWrapper;
 import io.undertow.servlet.api.InstanceHandle;
 import io.undertow.servlet.api.ListenerInfo;
+import io.undertow.servlet.api.LoginConfigInfo;
 import io.undertow.servlet.api.MimeMapping;
 import io.undertow.servlet.api.ServletContainer;
 import io.undertow.servlet.api.ServletContainerInitializerInfo;
@@ -133,7 +140,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
 
             ServletPathMatches matches = setupServletChains(servletContext, threadSetupAction, listeners);
             deployment.setServletPaths(matches);
-            deployment.setServletHandler(new ServletMatchingHandler(matches));
+            deployment.setServletHandler(setupSecurity(new ServletMatchingHandler(matches)));
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
@@ -142,7 +149,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
     }
 
     private void initializeTempDir(final ServletContextImpl servletContext, final DeploymentInfo deploymentInfo) {
-        if(deploymentInfo.getTempDir() != null) {
+        if (deploymentInfo.getTempDir() != null) {
             servletContext.setAttribute(ServletContext.TEMPDIR, deploymentInfo.getTempDir());
         } else {
             servletContext.setAttribute(ServletContext.TEMPDIR, new File(SecurityActions.getSystemProperty("java.io.tmpdir")));
@@ -151,7 +158,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
 
     private void initializeMimeMappings(final DeploymentImpl deployment, final DeploymentInfo deploymentInfo) {
         final Map<String, String> mappings = new HashMap<String, String>();
-        for(MimeMapping mapping : deploymentInfo.getMimeMappings()) {
+        for (MimeMapping mapping : deploymentInfo.getMimeMappings()) {
             mappings.put(mapping.getExtension(), mapping.getMimeType());
         }
         deployment.setMimeExtensionMappings(mappings);
@@ -161,8 +168,8 @@ public class DeploymentManagerImpl implements DeploymentManager {
         final Map<Integer, String> codes = new HashMap<Integer, String>();
         final Map<Class<? extends Throwable>, String> exceptions = new HashMap<Class<? extends Throwable>, String>();
 
-        for(final ErrorPage page : deploymentInfo.getErrorPages()) {
-            if(page.getExceptionType() != null) {
+        for (final ErrorPage page : deploymentInfo.getErrorPages()) {
+            if (page.getExceptionType() != null) {
                 exceptions.put(page.getExceptionType(), page.getLocation());
             } else {
                 codes.put(page.getErrorCode(), page.getLocation());
@@ -437,6 +444,38 @@ public class DeploymentManagerImpl implements DeploymentManager {
         return servlet;
     }
 
+    /**
+     * Sets up the security handlers as a wrapper around the servlet handlers.
+     *
+     * @param initialServletHandler The initial handler
+     * @return the new handler chain
+     */
+    private HttpHandler setupSecurity(final HttpHandler initialServletHandler) {
+        HttpHandler current = initialServletHandler;
+        final DeploymentInfo deploymentInfo = deployment.getDeploymentInfo();
+        final LoginConfigInfo loginConfigInfo = deploymentInfo.getLoginConfigInfo();
+        if (loginConfigInfo == null && deploymentInfo.getSecurityConstraints().isEmpty()) {
+            return initialServletHandler;
+        }
+        current = new AuthenticationCallHandler(current);
+
+        if(loginConfigInfo != null) {
+            if(loginConfigInfo.getMethod() == null) {
+                throw UndertowServletMessages.MESSAGES.noLoginMethodSpecified();
+            } else if(deploymentInfo.getAuthenticationCallbackHandler() == null) {
+                throw UndertowServletMessages.MESSAGES.noCallbackHandlerSpecified();
+            }
+            if(loginConfigInfo.getMethod().equalsIgnoreCase("BASIC")) {
+                BasicAuthenticationMechanism mechanism = new BasicAuthenticationMechanism(loginConfigInfo.getRealm(), deploymentInfo.getAuthenticationCallbackHandler());
+                current = new AuthenticationMechanismsHandler(current, Collections.<AuthenticationMechanism>singletonList(mechanism));
+            } else {
+                throw UndertowServletMessages.MESSAGES.unsupportedLoginMethod(loginConfigInfo.getMethod());
+            }
+        }
+
+        return new SecurityInitialHandler(current);
+    }
+
     private boolean isFilterApplicable(final String path, final String filterPath) {
         if (path.isEmpty()) {
             return filterPath.equals("/*") || filterPath.equals("/");
@@ -474,8 +513,8 @@ public class DeploymentManagerImpl implements DeploymentManager {
                     throw new RuntimeException(e);
                 }
             }
-
         }
+
 
 
         return root;
@@ -491,7 +530,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
             if (executor != null) {
                 executor.release();
             }
-            if(asyncExecutor != null) {
+            if (asyncExecutor != null) {
                 asyncExecutor.release();
             }
             executor = null;
