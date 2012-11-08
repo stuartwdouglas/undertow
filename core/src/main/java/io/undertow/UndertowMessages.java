@@ -26,6 +26,8 @@ import org.jboss.logging.Message;
 import org.jboss.logging.MessageBundle;
 import org.jboss.logging.Messages;
 
+import javax.security.auth.callback.Callback;
+
 /**
  * @author Stuart Douglas
  */
@@ -107,4 +109,6 @@ public interface UndertowMessages {
     @Message(id = 26, value = "Invalid header received.")
     IllegalArgumentException invalidHeader();
 
+    @Message(id = 27, value = "This handler requires support for %s however it is not provided by this authentcation handler")
+    IllegalArgumentException missingAuthenticationMechanism(Class<? extends Callback>[] require);
 }

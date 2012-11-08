@@ -23,6 +23,7 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.security.AuthenticationCallHandler;
 import io.undertow.server.handlers.security.AuthenticationConstraintHandler;
+import io.undertow.server.handlers.security.AuthenticationHandler;
 import io.undertow.server.handlers.security.AuthenticationMechanism;
 import io.undertow.server.handlers.security.AuthenticationMechanismsHandler;
 import io.undertow.server.handlers.security.SecurityInitialHandler;
@@ -31,6 +32,8 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,16 +57,16 @@ import org.junit.Test;
  */
 public abstract class UsernamePasswordAuthenticationTestBase {
 
-    protected static final CallbackHandler callbackHandler;
+    protected static final AuthenticationHandler callbackHandler;
 
     static {
         final Map<String, char[]> users = new HashMap<String, char[]>(2);
         users.put("userOne", "passwordOne".toCharArray());
         users.put("userTwo", "passwordTwo".toCharArray());
-        callbackHandler = new CallbackHandler() {
+        callbackHandler = new AuthenticationHandler() {
 
             @Override
-            public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+            public boolean authenticate(Collection<Callback> callbacks) throws UnsupportedCallbackException {
                 NameCallback ncb = null;
                 PasswordCallback pcb = null;
                 for (Callback current : callbacks) {
@@ -76,11 +79,22 @@ public abstract class UsernamePasswordAuthenticationTestBase {
                     }
                 }
 
-                char[] password = users.get(ncb.getDefaultName());
+                char[] password = users.get(ncb.getName());
                 if (password == null) {
-                    throw new IOException("User not found");
+                    return false;
                 }
-                pcb.setPassword(password);
+                return pcb.getPassword().equals(password);
+
+            }
+
+            @Override
+            public Collection<Class<? extends Callback>> getSupportedCallbacks() {
+                return Arrays.<Class<? extends Callback>>asList(new Class[]{NameCallback.class, PasswordCallback.class});
+            }
+
+            @Override
+            public Collection<Callback> createCallbacks() {
+                return Arrays.asList(new Callback[] {new NameCallback("Name"), new PasswordCallback("Password", false)});
             }
         };
     }

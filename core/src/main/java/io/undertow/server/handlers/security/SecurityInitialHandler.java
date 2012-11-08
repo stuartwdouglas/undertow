@@ -23,14 +23,16 @@ import io.undertow.server.HttpServerConnection;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.session.Session;
 
+import javax.security.auth.callback.CallbackHandler;
+
 /**
- * The security handler responsible for attaching the SecurityContext to the current {@link HttpServerExchange}.
+ * The security handler responsible for attaching the SecurityContextImpl to the current {@link HttpServerExchange}.
  *
  * This handler is called early in the processing of the incoming request, subsequently supported authentication mechanisms will
  * be added to the context, a decision will then be made if authentication is required or optional and the associated mechanisms
  * will be called.
  *
- * If any existing {@link SecurityContext} has been set it will be replaced and then restored as the the
+ * If any existing {@link SecurityContextImpl} has been set it will be replaced and then restored as the the
  * {@link HttpCompletionHandler} is called, this allows for a general security configuration to be applied to a server and then
  * replaced with a context specific config.
  *
@@ -43,9 +45,15 @@ import io.undertow.server.session.Session;
 public class SecurityInitialHandler implements HttpHandler {
 
     private final HttpHandler next;
+    private final CallbackHandler defaultCallbackHandler;
 
     public SecurityInitialHandler(final HttpHandler next) {
+        this(next, null);
+    }
+
+    public SecurityInitialHandler(final HttpHandler next, CallbackHandler defaultCallbackHandler) {
         this.next = next;
+        this.defaultCallbackHandler = defaultCallbackHandler;
     }
 
     /**
@@ -54,9 +62,9 @@ public class SecurityInitialHandler implements HttpHandler {
      */
     @Override
     public void handleRequest(HttpServerExchange exchange, HttpCompletionHandler completionHandler) {
-        SecurityContext existingContext = exchange.getAttachment(SecurityContext.ATTACHMENT_KEY);
-        SecurityContext newContext = new SecurityContext();
-        exchange.putAttachment(SecurityContext.ATTACHMENT_KEY, newContext);
+        SecurityContext existingContext = exchange.getAttachment(SecurityContextImpl.ATTACHMENT_KEY);
+        SecurityContext newContext = new SecurityContextImpl(defaultCallbackHandler);
+        exchange.putAttachment(SecurityContextImpl.ATTACHMENT_KEY, newContext);
 
         HttpCompletionHandler wrapperHandler = new InitialCompletionHandler(exchange, existingContext, completionHandler);
         next.handleRequest(exchange, wrapperHandler);
@@ -76,7 +84,7 @@ public class SecurityInitialHandler implements HttpHandler {
         }
 
         public void handleComplete() {
-            exchange.putAttachment(SecurityContext.ATTACHMENT_KEY, originalSecurityContext);
+            exchange.putAttachment(SecurityContextImpl.ATTACHMENT_KEY, originalSecurityContext);
             next.handleComplete();
         }
 

@@ -425,7 +425,7 @@ public class ServletContextImpl implements ServletContext {
     public <T extends EventListener> void addListener(final T t) {
         ListenerInfo listener = new ListenerInfo(t.getClass(), new ImmediateInstanceFactory<EventListener>(t));
         deploymentInfo.addListener(listener);
-        deployment.getApplicationListeners().addListener(new ManagedListener(listener, deployment.getServletContext()));
+        deployment.getApplicationListeners().addListener(new ManagedListener(listener));
     }
 
     @Override
@@ -438,7 +438,7 @@ public class ServletContextImpl implements ServletContext {
         }
         final ListenerInfo listener = new ListenerInfo(listenerClass, factory);
         deploymentInfo.addListener(listener);
-        deployment.getApplicationListeners().addListener(new ManagedListener(listener, deployment.getServletContext()));
+        deployment.getApplicationListeners().addListener(new ManagedListener(listener));
     }
 
     @Override

@@ -38,6 +38,7 @@ import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
@@ -89,7 +90,7 @@ public class DigestAuthenticationMechanism implements AuthenticationMechanism {
     private final String qopString;
     private final String realmName; // TODO - Will offer choice once backing store API/SPI is in.
     private final byte[] realmBytes;
-    private final CallbackHandler callbackHandler;
+    private final AuthenticationHandler authenticationHandler;
     private final NonceManager nonceManager;
 
     // Where do session keys fit? Do we just hang onto a session key or keep visiting the user store to check if the password
@@ -97,13 +98,13 @@ public class DigestAuthenticationMechanism implements AuthenticationMechanism {
     // Maybe even support registration of a session so it can be invalidated?
 
     public DigestAuthenticationMechanism(final List<DigestAlgorithm> supportedAlgorithms, final List<DigestQop> supportedQops,
-            final String realmName, final CallbackHandler callbackHandler, final NonceManager nonceManager) {
+            final String realmName, final AuthenticationHandler authenticationHandler, final NonceManager nonceManager) {
         this.supportedAlgorithms = supportedAlgorithms;
         this.supportedQops = supportedQops;
         this.realmName = realmName;
         this.realmBytes = realmName.getBytes(UTF_8);
-        this.callbackHandler = callbackHandler;
         this.nonceManager = nonceManager;
+        this.authenticationHandler = authenticationHandler;
 
         if (supportedQops.size() > 0) {
             StringBuilder sb = new StringBuilder();
@@ -303,7 +304,7 @@ public class DigestAuthenticationMechanism implements AuthenticationMechanism {
             }
 
             byte[] providedResponse = parsedHeader.get(DigestAuthorizationToken.RESPONSE).getBytes(UTF_8);
-            if (MessageDigest.isEqual(requestDigest, providedResponse) == false) {
+            if (!MessageDigest.isEqual(requestDigest, providedResponse)) {
                 // TODO - We should look at still marking the nonce as used, a failure in authentication due to say a failure
                 // looking up the users password would leave it open to the packet being replayed.
                 REQUEST_LOGGER.authenticationFailed(parsedHeader.get(DigestAuthorizationToken.USERNAME), DIGEST.toString());
@@ -312,7 +313,7 @@ public class DigestAuthenticationMechanism implements AuthenticationMechanism {
             }
 
             // Step 3 - Verify that the nonce was eligible to be used.
-            if (validateNonceUse() == false) {
+            if (!validateNonceUse()) {
                 // TODO - This is the right place to make use of the decision but the check needs to be much much sooner otherwise a failure server
                 // side could leave a packet that could be 're-played' after the failed auth.
                 // The username and password verification passed but for some reason we do not like the nonce.
@@ -349,21 +350,6 @@ public class DigestAuthenticationMechanism implements AuthenticationMechanism {
             context.setNonce(suppliedNonce);
             // TODO - A replay attempt will need an exception.
             return (nonceManager.validateNonce(suppliedNonce, nonceCount));
-        }
-
-        private byte[] getExpectedPassword() throws AuthenticationException {
-            NameCallback ncb = new NameCallback("Username", parsedHeader.get(DigestAuthorizationToken.USERNAME));
-            PasswordCallback pcp = new PasswordCallback("Password", false);
-
-            try {
-                callbackHandler.handle(new Callback[] { ncb, pcp });
-            } catch (IOException e) {
-                throw new AuthenticationException(e);
-            } catch (UnsupportedCallbackException e) {
-                throw new AuthenticationException(e);
-            }
-
-            return new String(pcp.getPassword()).getBytes(UTF_8);
         }
 
         private byte[] createHA1() throws AuthenticationException {

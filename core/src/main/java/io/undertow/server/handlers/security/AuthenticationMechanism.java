@@ -126,7 +126,7 @@ public interface AuthenticationMechanism {
     class Util {
 
         static boolean shouldChallenge(final HttpServerExchange exchange) {
-            SecurityContext context = exchange.getAttachment(SecurityContext.ATTACHMENT_KEY);
+            SecurityContext context = exchange.getAttachment(SecurityContextImpl.ATTACHMENT_KEY);
 
             return context.getAuthenticationState() != AuthenticationState.AUTHENTICATED;
         }

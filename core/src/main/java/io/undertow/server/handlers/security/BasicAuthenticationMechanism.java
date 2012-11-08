@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.security.Principal;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Deque;
 
 import javax.security.auth.callback.Callback;
@@ -50,15 +51,16 @@ public class BasicAuthenticationMechanism implements AuthenticationMechanism {
     private static Charset UTF_8 = Charset.forName("UTF-8");
 
     private final String challenge;
-    private final CallbackHandler callbackHandler;
+    private final AuthenticationHandler authenticationHandler;
 
     private static final String BASIC_PREFIX = BASIC + " ";
     private static final int PREFIX_LENGTH = BASIC_PREFIX.length();
     private static final String COLON = ":";
 
-    public BasicAuthenticationMechanism(final String realmName, final CallbackHandler callbackHandler) {
+    public BasicAuthenticationMechanism(final String realmName, final AuthenticationHandler authenticationHandler) {
         this.challenge = BASIC_PREFIX + "realm=\"" + realmName + "\"";
-        this.callbackHandler = callbackHandler;
+        this.authenticationHandler = authenticationHandler;
+        AuthenticationMechanisms.require(authenticationHandler.getSupportedCallbacks(), NameCallback.class, PasswordCallback.class);
     }
 
     /**
@@ -118,15 +120,17 @@ public class BasicAuthenticationMechanism implements AuthenticationMechanism {
         @Override
         public void run() {
             // To reach this point we must have been supplied a username and password.
-
-            // TODO - This section will be re-worked to plug in a more appropriate identity repo style API / SPI.
-            NameCallback ncb = new NameCallback("Username", userName);
-            PasswordCallback pcp = new PasswordCallback("Password", false);
-
             try {
-                callbackHandler.handle(new Callback[] { ncb, pcp });
+                final Collection<Callback> callbacks = authenticationHandler.createCallbacks();
+                for(final Callback callback : callbacks) {
+                    if(callback instanceof NameCallback) {
+                        ((NameCallback)callback).setName(userName);
+                    } else if(callback instanceof PasswordCallback) {
+                        ((PasswordCallback)callback).setPassword(password);
+                    }
+                }
 
-                if (Arrays.equals(password, pcp.getPassword())) {
+                if (authenticationHandler.authenticate(callbacks)) {
 
                     Principal principal = (new Principal() {
 
@@ -138,7 +142,6 @@ public class BasicAuthenticationMechanism implements AuthenticationMechanism {
                     result.setResult(new AuthenticationResult(principal, AuthenticationOutcome.AUTHENTICATED));
                 }
 
-            } catch (IOException e) {
             } catch (UnsupportedCallbackException e) {
             }
             result.setResult(new AuthenticationResult(null, AuthenticationOutcome.NOT_AUTHENTICATED));

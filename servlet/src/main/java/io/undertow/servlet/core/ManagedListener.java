@@ -33,15 +33,12 @@ import io.undertow.servlet.api.ListenerInfo;
 public class ManagedListener implements Lifecycle {
 
     private final ListenerInfo listenerInfo;
-    private final ServletContext servletContext;
 
     private volatile boolean started = false;
-    private volatile EventListener listener;
     private volatile InstanceHandle<? extends EventListener> handle;
 
-    public ManagedListener(final ListenerInfo listenerInfo, final ServletContext servletContext) {
+    public ManagedListener(final ListenerInfo listenerInfo) {
         this.listenerInfo = listenerInfo;
-        this.servletContext = servletContext;
     }
 
     public synchronized void start() throws ServletException {
@@ -51,7 +48,6 @@ public class ManagedListener implements Lifecycle {
             } catch (Exception e) {
                 throw UndertowServletMessages.MESSAGES.couldNotInstantiateComponent(listenerInfo.getListenerClass().getName(), e);
             }
-            listener = handle.getInstance();
             started = true;
         }
     }

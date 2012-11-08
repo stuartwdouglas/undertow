@@ -53,6 +53,11 @@ public class SessionAttachmentHandler implements HttpHandler {
     private volatile boolean discardOnExit = false;
     private volatile boolean secure = false;
     private volatile String cookieName = SessionCookieConfig.DEFAULT_SESSION_ID;
+    /**
+     * The session prefix appended to the beginning of the session id string retrieved
+     * from the cookie.
+     */
+    private volatile String prefix = "";
 
     public SessionAttachmentHandler(final SessionManager sessionManager) {
         if (sessionManager == null) {
@@ -78,7 +83,7 @@ public class SessionAttachmentHandler implements HttpHandler {
         if (sessionId == null) {
             HttpHandlers.executeHandler(next, exchange, completionHandler);
         } else {
-            final IoFuture<Session> session = sessionManager.getSession(exchange, sessionId);
+            final IoFuture<Session> session = sessionManager.getSession(exchange, prefix + sessionId);
             final UpdateLastAccessTimeCompletionHandler handler = new UpdateLastAccessTimeCompletionHandler(completionHandler, sessionManager, sessionId);
             session.addNotifier(new IoFuture.Notifier<Session, Session>() {
                 @Override
@@ -167,6 +172,14 @@ public class SessionAttachmentHandler implements HttpHandler {
         this.secure = secure;
     }
 
+    public String getPrefix() {
+        return prefix;
+    }
+
+    public void setPrefix(String prefix) {
+        this.prefix = prefix;
+    }
+
     private static class UpdateLastAccessTimeCompletionHandler implements HttpCompletionHandler {
 
         private final HttpCompletionHandler completionHandler;
@@ -183,6 +196,35 @@ public class SessionAttachmentHandler implements HttpHandler {
         public void handleComplete() {
             sessionManager.updateLastAccessedTime(sessionId);
             completionHandler.handleComplete();
+        }
+    }
+
+    private static final class SessionManagerWraper implements SessionManager {
+
+        @Override
+        public IoFuture<Session> createSession(HttpServerExchange serverExchange) {
+            return null;
+        }
+
+        @Override
+        public IoFuture<Session> getSession(HttpServerExchange serverExchange, String sessionId) {
+            return null;
+        }
+
+        @Override
+        public void registerSessionListener(SessionListener listener) {
+        }
+
+        @Override
+        public void removeSessionListener(SessionListener listener) {
+        }
+
+        @Override
+        public void setDefaultSessionTimeout(int timeout) {
+        }
+
+        @Override
+        public void updateLastAccessedTime(String sessionId) {
         }
     }
 
