@@ -129,4 +129,7 @@ public interface UndertowLogger extends BasicLogger {
     @Message(id = 5021, value = "Verification of authentication tokens for user '%s' has failed using mechanism '%s'.")
     void authenticationFailed(final String userName, final String mechanism);
 
+    @LogMessage(level = Logger.Level.DEBUG)
+    @Message(id = 5022, value = "Failed to set option")
+    void failedToSetOption(@Cause IOException e);
 }

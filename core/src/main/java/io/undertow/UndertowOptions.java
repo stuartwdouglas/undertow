@@ -50,6 +50,20 @@ public class UndertowOptions {
      */
     public static Option<Integer> MAX_REQUESTS_PER_CONNECTION = Option.simple(UndertowOptions.class, "MAX_REQUESTS_PER_CONNECTION", Integer.class);
 
+    /**
+     * The read timeout in milliseconds. Defaults to 10000. If this is -1 read timeout is disabled
+     */
+    public static Option<Integer> READ_TIMEOUT = Option.simple(UndertowOptions.class, "READ_TIMEOUT", Integer.class);
+
+    public static final int DEFAULT_READ_TIMEOUT = 10000;
+
+    /*
+    * The write timeout in milliseconds. Defaults to 10000. If this is -1 srite timeout is disabled
+    */
+    public static Option<Integer> WRITE_TIMEOUT = Option.simple(UndertowOptions.class, "WRITE_TIMEOUT", Integer.class);
+
+    public static final int DEFAULT_WRITE_TIMEOUT = 10000;
+
     private UndertowOptions() {
 
     }

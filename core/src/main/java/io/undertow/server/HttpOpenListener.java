@@ -18,12 +18,16 @@
 
 package io.undertow.server;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
+import io.undertow.UndertowOptions;
 import org.xnio.ChannelListener;
+import org.xnio.Option;
 import org.xnio.OptionMap;
+import org.xnio.Options;
 import org.xnio.Pool;
 import org.xnio.channels.ConnectedStreamChannel;
 import org.xnio.channels.PushBackStreamChannel;
@@ -42,6 +46,10 @@ public final class HttpOpenListener implements ChannelListener<ConnectedStreamCh
 
     private volatile OptionMap undertowOptions;
 
+    private volatile int readTimeout;
+
+    private volatile int writeTimeout;
+
     public HttpOpenListener(final Pool<ByteBuffer> pool) {
         this(pool, OptionMap.EMPTY);
     }
@@ -49,6 +57,8 @@ public final class HttpOpenListener implements ChannelListener<ConnectedStreamCh
     public HttpOpenListener(final Pool<ByteBuffer> pool, final OptionMap undertowOptions) {
         this.undertowOptions = undertowOptions;
         this.bufferPool = pool;
+        readTimeout = undertowOptions.contains(UndertowOptions.READ_TIMEOUT) ? undertowOptions.get(UndertowOptions.READ_TIMEOUT) : UndertowOptions.DEFAULT_READ_TIMEOUT;
+        writeTimeout = undertowOptions.contains(UndertowOptions.WRITE_TIMEOUT) ? undertowOptions.get(UndertowOptions.WRITE_TIMEOUT) : UndertowOptions.DEFAULT_WRITE_TIMEOUT;
     }
 
     public void handleEvent(final ConnectedStreamChannel channel) {
@@ -59,6 +69,20 @@ public final class HttpOpenListener implements ChannelListener<ConnectedStreamCh
         HttpServerConnection connection = new HttpServerConnection(channel, bufferPool, rootHandler, undertowOptions);
         HttpReadListener readListener = new HttpReadListener(channel, pushBackStreamChannel, connection);
         pushBackStreamChannel.getReadSetter().set(readListener);
+        if(writeTimeout > 0) {
+            try {
+                channel.setOption(Options.WRITE_TIMEOUT, writeTimeout);
+            } catch (IOException e) {
+                UndertowLogger.REQUEST_LOGGER.failedToSetOption(e);
+            }
+        }
+        if(readTimeout > 0) {
+            try {
+                channel.setOption(Options.READ_TIMEOUT, readTimeout);
+            } catch (IOException e) {
+                UndertowLogger.REQUEST_LOGGER.failedToSetOption(e);
+            }
+        }
         readListener.handleEvent(pushBackStreamChannel);
     }
 
@@ -79,5 +103,7 @@ public final class HttpOpenListener implements ChannelListener<ConnectedStreamCh
             throw UndertowMessages.MESSAGES.argumentCannotBeNull();
         }
         this.undertowOptions = undertowOptions;
+        writeTimeout = undertowOptions.contains(UndertowOptions.READ_TIMEOUT) ? undertowOptions.get(UndertowOptions.READ_TIMEOUT) : UndertowOptions.DEFAULT_READ_TIMEOUT;
+        writeTimeout = undertowOptions.contains(UndertowOptions.WRITE_TIMEOUT) ? undertowOptions.get(UndertowOptions.WRITE_TIMEOUT) : UndertowOptions.DEFAULT_WRITE_TIMEOUT;
     }
 }
