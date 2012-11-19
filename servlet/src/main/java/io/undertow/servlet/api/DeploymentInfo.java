@@ -67,6 +67,7 @@ public class DeploymentInfo implements Cloneable {
     private final List<String> welcomePages = new ArrayList<String>();
     private final List<ErrorPage> errorPages = new ArrayList<ErrorPage>();
     private final List<MimeMapping> mimeMappings = new ArrayList<MimeMapping>();
+    private final List<SecurityConstraint> securityConstraints = new ArrayList<SecurityConstraint>();
 
 
     public void validate() {
@@ -342,7 +343,6 @@ public class DeploymentInfo implements Cloneable {
         return Collections.unmodifiableList(errorPages);
     }
 
-
     public DeploymentInfo addMimeMapping(final MimeMapping mimeMappings) {
         this.mimeMappings.add(mimeMappings);
         return this;
@@ -362,6 +362,26 @@ public class DeploymentInfo implements Cloneable {
         return Collections.unmodifiableList(mimeMappings);
     }
 
+
+    public DeploymentInfo addSecurityConstraint(final SecurityConstraint securityConstraint) {
+        this.securityConstraints.add(securityConstraint);
+        return this;
+    }
+
+    public DeploymentInfo addSecurityConstraints(final SecurityConstraint ... securityConstraints) {
+        this.securityConstraints.addAll(Arrays.asList(securityConstraints));
+        return this;
+    }
+
+    public DeploymentInfo addSecurityConstraints(final Collection<SecurityConstraint> securityConstraints) {
+        this.securityConstraints.addAll(securityConstraints);
+        return this;
+    }
+
+    public List<SecurityConstraint> getSecurityConstraints() {
+        return Collections.unmodifiableList(securityConstraints);
+    }
+
     public InstanceFactory<Executor> getExecutorFactory() {
         return executorFactory;
     }
@@ -377,17 +397,17 @@ public class DeploymentInfo implements Cloneable {
     public void setExecutorFactory(final InstanceFactory<Executor> executorFactory) {
         this.executorFactory = executorFactory;
     }
+    public InstanceFactory<Executor> getAsyncExecutorFactory() {
+        return asyncExecutorFactory;
+    }
+
     /**
      * Sets the factory that is used to create the {@link ExecutorService} that is used to run async tasks.
      *
      * If this is null then {@link #executorFactory} is used, if this is also null then the default is used
      *
-     * @param executorFactory The executor factory
+     * @param asyncExecutorFactory The executor factory
      */
-    public InstanceFactory<Executor> getAsyncExecutorFactory() {
-        return asyncExecutorFactory;
-    }
-
     public void setAsyncExecutorFactory(final InstanceFactory<Executor> asyncExecutorFactory) {
         this.asyncExecutorFactory = asyncExecutorFactory;
     }
@@ -449,6 +469,7 @@ public class DeploymentInfo implements Cloneable {
         info.tempDir = tempDir;
         info.loginConfig = loginConfig;
         info.loginCallbackHandler = loginCallbackHandler;
+        info.securityConstraints.addAll(securityConstraints);
         return info;
     }
 
