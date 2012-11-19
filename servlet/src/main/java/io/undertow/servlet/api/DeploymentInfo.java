@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
+import javax.security.auth.callback.CallbackHandler;
 import javax.servlet.DispatcherType;
 
 import io.undertow.servlet.UndertowServletMessages;
@@ -52,6 +53,8 @@ public class DeploymentInfo implements Cloneable {
     private volatile InstanceFactory<Executor> executorFactory;
     private volatile InstanceFactory<Executor> asyncExecutorFactory;
     private volatile File tempDir;
+    private volatile LoginConfig loginConfig;
+    private volatile CallbackHandler loginCallbackHandler;
     private final Map<String, ServletInfo> servlets = new HashMap<String, ServletInfo>();
     private final Map<String, FilterInfo> filters = new HashMap<String, FilterInfo>();
     private final List<FilterMappingInfo> filterServletNameMappings = new ArrayList<FilterMappingInfo>();
@@ -64,6 +67,7 @@ public class DeploymentInfo implements Cloneable {
     private final List<String> welcomePages = new ArrayList<String>();
     private final List<ErrorPage> errorPages = new ArrayList<ErrorPage>();
     private final List<MimeMapping> mimeMappings = new ArrayList<MimeMapping>();
+
 
     public void validate() {
         if (deploymentName == null) {
@@ -396,6 +400,22 @@ public class DeploymentInfo implements Cloneable {
         this.tempDir = tempDir;
     }
 
+    public LoginConfig getLoginConfig() {
+        return loginConfig;
+    }
+
+    public void setLoginConfig(LoginConfig loginConfig) {
+        this.loginConfig = loginConfig;
+    }
+
+    public CallbackHandler getLoginCallbackHandler() {
+        return loginCallbackHandler;
+    }
+
+    public void setLoginCallbackHandler(CallbackHandler loginCallbackHandler) {
+        this.loginCallbackHandler = loginCallbackHandler;
+    }
+
     @Override
     public DeploymentInfo clone() {
         final DeploymentInfo info = new DeploymentInfo()
@@ -427,6 +447,8 @@ public class DeploymentInfo implements Cloneable {
         info.executorFactory = executorFactory;
         info.asyncExecutorFactory = asyncExecutorFactory;
         info.tempDir = tempDir;
+        info.loginConfig = loginConfig;
+        info.loginCallbackHandler = loginCallbackHandler;
         return info;
     }
 

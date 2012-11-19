@@ -20,6 +20,7 @@ package io.undertow.servlet.core;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,6 +38,11 @@ import javax.servlet.ServletException;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.handlers.AttachmentHandler;
 import io.undertow.server.handlers.blocking.BlockingHttpHandler;
+import io.undertow.server.handlers.security.AuthenticationMechanism;
+import io.undertow.server.handlers.security.AuthenticationMechanismsHandler;
+import io.undertow.server.handlers.security.BasicAuthenticationMechanism;
+import io.undertow.server.handlers.security.DigestAuthenticationMechanism;
+import io.undertow.server.handlers.security.SecurityInitialHandler;
 import io.undertow.servlet.UndertowServletMessages;
 import io.undertow.servlet.api.Deployment;
 import io.undertow.servlet.api.DeploymentInfo;
@@ -47,6 +53,7 @@ import io.undertow.servlet.api.FilterMappingInfo;
 import io.undertow.servlet.api.HandlerChainWrapper;
 import io.undertow.servlet.api.InstanceHandle;
 import io.undertow.servlet.api.ListenerInfo;
+import io.undertow.servlet.api.LoginConfig;
 import io.undertow.servlet.api.MimeMapping;
 import io.undertow.servlet.api.ServletContainer;
 import io.undertow.servlet.api.ServletContainerInitializerInfo;
@@ -109,7 +116,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
         final CompositeThreadSetupAction threadSetupAction = new CompositeThreadSetupAction(setup);
         deployment.setThreadSetupAction(threadSetupAction);
 
-        //TODO: this is just a temporary hack, this will probably change a lot
+
         ThreadSetupAction.Handle handle = threadSetupAction.setup(null);
         try {
 
@@ -133,7 +140,9 @@ public class DeploymentManagerImpl implements DeploymentManager {
 
             ServletPathMatches matches = setupServletChains(servletContext, threadSetupAction, listeners);
             deployment.setServletPaths(matches);
-            deployment.setServletHandler(new ServletMatchingHandler(matches));
+            final ServletMatchingHandler servletMatchingHandler = new ServletMatchingHandler(matches);
+
+            deployment.setServletHandler(setupSecurityHandlers(servletMatchingHandler));
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
@@ -141,8 +150,31 @@ public class DeploymentManagerImpl implements DeploymentManager {
         }
     }
 
+    /**
+     * sets up the outer security handlers.
+     *
+     * @param initialHandler The handler to wrap with security handlers
+     */
+    private HttpHandler setupSecurityHandlers(HttpHandler initialHandler) {
+        HttpHandler current = initialHandler;
+        final DeploymentInfo deploymentInfo = deployment.getDeploymentInfo();
+        final LoginConfig loginConfig = deploymentInfo.getLoginConfig();
+        if (loginConfig != null) {
+            if (loginConfig.getAuthMethod().equalsIgnoreCase("BASIC")) {
+                AuthenticationMechanismsHandler basic = new AuthenticationMechanismsHandler(current, Collections.<AuthenticationMechanism>singletonList(new BasicAuthenticationMechanism(loginConfig.getRealmName(), deploymentInfo.getLoginCallbackHandler())));
+                current = basic;
+            } else {
+                throw new RuntimeException("not yet implemented");
+            }
+        }
+
+        current = new SecurityInitialHandler(current);
+
+        return current;
+    }
+
     private void initializeTempDir(final ServletContextImpl servletContext, final DeploymentInfo deploymentInfo) {
-        if(deploymentInfo.getTempDir() != null) {
+        if (deploymentInfo.getTempDir() != null) {
             servletContext.setAttribute(ServletContext.TEMPDIR, deploymentInfo.getTempDir());
         } else {
             servletContext.setAttribute(ServletContext.TEMPDIR, new File(SecurityActions.getSystemProperty("java.io.tmpdir")));
@@ -151,7 +183,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
 
     private void initializeMimeMappings(final DeploymentImpl deployment, final DeploymentInfo deploymentInfo) {
         final Map<String, String> mappings = new HashMap<String, String>();
-        for(MimeMapping mapping : deploymentInfo.getMimeMappings()) {
+        for (MimeMapping mapping : deploymentInfo.getMimeMappings()) {
             mappings.put(mapping.getExtension(), mapping.getMimeType());
         }
         deployment.setMimeExtensionMappings(mappings);
@@ -161,8 +193,8 @@ public class DeploymentManagerImpl implements DeploymentManager {
         final Map<Integer, String> codes = new HashMap<Integer, String>();
         final Map<Class<? extends Throwable>, String> exceptions = new HashMap<Class<? extends Throwable>, String>();
 
-        for(final ErrorPage page : deploymentInfo.getErrorPages()) {
-            if(page.getExceptionType() != null) {
+        for (final ErrorPage page : deploymentInfo.getErrorPages()) {
+            if (page.getExceptionType() != null) {
                 exceptions.put(page.getExceptionType(), page.getLocation());
             } else {
                 codes.put(page.getErrorCode(), page.getLocation());
@@ -410,7 +442,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
 
     private ServletInitialHandler servletChain(BlockingHttpHandler next, final CompositeThreadSetupAction setupAction, final ApplicationListeners applicationListeners, final ManagedServlet managedServlet) {
         BlockingHttpHandler servletHandler = new RequestListenerHandler(applicationListeners, next);
-        for(HandlerChainWrapper wrapper : managedServlet.getServletInfo().getHandlerChainWrappers()) {
+        for (HandlerChainWrapper wrapper : managedServlet.getServletInfo().getHandlerChainWrappers()) {
             servletHandler = wrapper.wrap(servletHandler);
         }
         return new ServletInitialHandler(servletHandler, setupAction, deployment.getServletContext(), managedServlet);
@@ -491,7 +523,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
             if (executor != null) {
                 executor.release();
             }
-            if(asyncExecutor != null) {
+            if (asyncExecutor != null) {
                 asyncExecutor.release();
             }
             executor = null;
