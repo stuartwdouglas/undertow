@@ -22,10 +22,17 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.ArrayList;
+import java.util.List;
 
+import io.undertow.websockets.ChannelFunction;
 import io.undertow.websockets.StreamSourceFrameChannel;
 import io.undertow.websockets.WebSocketChannel;
 import io.undertow.websockets.WebSocketFrameType;
+import io.undertow.websockets.wrapper.Masker;
+import io.undertow.websockets.wrapper.UTF8Checker;
+import io.undertow.websockets.wrapper.ChannelFunctionFileChannel;
+import io.undertow.websockets.wrapper.ChannelFunctionStreamSinkChannel;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
 
@@ -36,14 +43,17 @@ import org.xnio.channels.StreamSourceChannel;
  */
 public abstract class WebSocketFixedPayloadFrameSourceChannel extends StreamSourceFrameChannel {
 
-    protected long readBytes;
+    protected volatile long readBytes;
+    private final List<ChannelFunction> functions;
 
-    protected WebSocketFixedPayloadFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocketChannel wsChannel, WebSocketFrameType type, long payloadSize, int rsv, boolean finalFragment) {
+    protected WebSocketFixedPayloadFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocketChannel wsChannel, WebSocketFrameType type, long payloadSize, int rsv, boolean finalFragment, List<ChannelFunction> functions) {
         super(streamSourceChannelControl, channel, wsChannel, type, payloadSize, rsv, finalFragment);
+        this.functions = functions;
     }
 
-    protected WebSocketFixedPayloadFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocketChannel wsChannel, WebSocketFrameType type, long payloadSize) {
+    protected WebSocketFixedPayloadFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocketChannel wsChannel, WebSocketFrameType type, long payloadSize, List<ChannelFunction> functions) {
         super(streamSourceChannelControl, channel, wsChannel, type, payloadSize);
+        this.functions = functions;
     }
 
     @Override
@@ -57,7 +67,7 @@ public abstract class WebSocketFixedPayloadFrameSourceChannel extends StreamSour
             count = toRead;
         }
 
-        long r = channel.transferTo(position, count, target);
+        long r = channel.transferTo(position, count, new ChannelFunctionFileChannel(target, functions));
         if (r > 0) {
             readBytes += r;
         }
@@ -113,7 +123,7 @@ public abstract class WebSocketFixedPayloadFrameSourceChannel extends StreamSour
 
         // use this because of XNIO bug
         // See https://issues.jboss.org/browse/XNIO-185
-        return transfer(this, count, throughBuffer, target);
+        return transfer(this, count, throughBuffer,new ChannelFunctionStreamSinkChannel(target, functions));
     }
 
     @Override
@@ -135,6 +145,9 @@ public abstract class WebSocketFixedPayloadFrameSourceChannel extends StreamSour
             return r;
         } finally {
             dst.limit(old);
+            for(final ChannelFunction function : functions) {
+                function.afterRead(dst);
+            }
         }
     }
 
@@ -171,6 +184,9 @@ public abstract class WebSocketFixedPayloadFrameSourceChannel extends StreamSour
         } finally {
             for (int i = offset; i < length; i++) {
                 dsts[i].limit(old[i - offset]);
+                for(final ChannelFunction function : functions) {
+                    function.afterRead(dsts[i]);
+                }
             }
         }
     }
@@ -183,5 +199,22 @@ public abstract class WebSocketFixedPayloadFrameSourceChannel extends StreamSour
     protected boolean isComplete() {
         assert readBytes <= getPayloadSize();
         return readBytes == getPayloadSize();
+    }
+
+    protected static List<ChannelFunction> functions(final boolean masked, final int mask, final UTF8Checker checker) {
+        final ArrayList<ChannelFunction> ret = new ArrayList<ChannelFunction>(2);
+        if(masked) {
+            ret.add(new Masker(mask));
+        }
+        ret.add(checker);
+        return ret;
+    }
+
+    protected static List<ChannelFunction> functions(final boolean masked, final int mask) {
+        final ArrayList<ChannelFunction> ret = new ArrayList<ChannelFunction>(2);
+        if(masked) {
+            ret.add(new Masker(mask));
+        }
+        return ret;
     }
 }

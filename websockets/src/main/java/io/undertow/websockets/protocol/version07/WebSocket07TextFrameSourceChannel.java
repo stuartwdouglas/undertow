@@ -19,22 +19,18 @@ package io.undertow.websockets.protocol.version07;
 
 import io.undertow.websockets.WebSocketChannel;
 import io.undertow.websockets.WebSocketFrameType;
-import io.undertow.websockets.utf8.UTF8Checker;
-import io.undertow.websockets.utf8.UTF8FixedPayloadMaskedFrameSourceChannel;
+import io.undertow.websockets.protocol.WebSocketFixedPayloadFrameSourceChannel;
+import io.undertow.websockets.wrapper.UTF8Checker;
 
 import org.xnio.channels.StreamSourceChannel;
 
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public class WebSocket07TextFrameSourceChannel extends UTF8FixedPayloadMaskedFrameSourceChannel {
-
-    public WebSocket07TextFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocket07Channel wsChannel, long payloadSize, int rsv, boolean finalFragment, final boolean masked, final int mask) {
-        this(streamSourceChannelControl, channel, wsChannel, payloadSize, rsv, finalFragment, masked, mask, new UTF8Checker());
-    }
-
+public class WebSocket07TextFrameSourceChannel extends WebSocketFixedPayloadFrameSourceChannel {
 
     public WebSocket07TextFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocket07Channel wsChannel, long payloadSize, int rsv, boolean finalFragment, final boolean masked, final int mask, UTF8Checker checker) {
-        super(streamSourceChannelControl, channel, wsChannel, WebSocketFrameType.TEXT, payloadSize, rsv, finalFragment, masked, mask, checker);
+        super(streamSourceChannelControl, channel, wsChannel, WebSocketFrameType.TEXT, payloadSize, rsv, finalFragment, functions(masked, mask, checker));
     }
+
 }

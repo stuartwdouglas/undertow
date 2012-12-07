@@ -15,12 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.undertow.websockets.utf8;
+package io.undertow.websockets.wrapper;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
+import io.undertow.websockets.ChannelFunction;
 import io.undertow.websockets.WebSocketMessages;
 
 /**
@@ -30,7 +31,7 @@ import io.undertow.websockets.WebSocketMessages;
  *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public final class UTF8Checker {
+public final class UTF8Checker implements ChannelFunction {
 
 
     private static final int UTF8_ACCEPT = 0;
@@ -96,11 +97,9 @@ public final class UTF8Checker {
     }
 
     public void checkUTF8AfterRead(ByteBuffer buf) throws UnsupportedEncodingException{
-        checkUTF8(buf, true);
     }
 
     public void checkUTF8BeforeWrite(ByteBuffer buf) throws UnsupportedEncodingException{
-        checkUTF8(buf, false);
     }
 
     /**
@@ -112,5 +111,15 @@ public final class UTF8Checker {
         if (state != UTF8_ACCEPT) {
             throw WebSocketMessages.MESSAGES.invalidTextFrameEncoding();
         }
+    }
+
+    @Override
+    public void afterRead(ByteBuffer buf) throws IOException {
+        checkUTF8(buf, true);
+    }
+
+    @Override
+    public void beforeWrite(ByteBuffer buf) throws IOException{
+        checkUTF8(buf, false);
     }
 }

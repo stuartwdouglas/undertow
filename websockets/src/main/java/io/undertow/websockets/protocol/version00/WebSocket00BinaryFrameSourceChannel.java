@@ -18,10 +18,13 @@
 package io.undertow.websockets.protocol.version00;
 
 
+import io.undertow.websockets.ChannelFunction;
 import io.undertow.websockets.WebSocketChannel;
 import io.undertow.websockets.WebSocketFrameType;
 import io.undertow.websockets.protocol.WebSocketFixedPayloadFrameSourceChannel;
 import org.xnio.channels.StreamSourceChannel;
+
+import java.util.Collections;
 
 /**
  *
@@ -30,6 +33,6 @@ import org.xnio.channels.StreamSourceChannel;
 public class WebSocket00BinaryFrameSourceChannel extends WebSocketFixedPayloadFrameSourceChannel {
 
     WebSocket00BinaryFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocketChannel wsChannel, long payloadSize) {
-        super(streamSourceChannelControl, channel, wsChannel, WebSocketFrameType.BINARY, payloadSize);
+        super(streamSourceChannelControl, channel, wsChannel, WebSocketFrameType.BINARY, payloadSize, Collections.<ChannelFunction>emptyList());
     }
 }

@@ -15,14 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.undertow.websockets.masking;
+package io.undertow.websockets.wrapper;
 
+import io.undertow.websockets.ChannelFunction;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public final class Masker {
+public final class Masker implements ChannelFunction {
 
     private final byte[] maskingKey;
     int m = 0;
@@ -54,11 +57,13 @@ public final class Masker {
         }
     }
 
-    public void maskAfterRead(ByteBuffer buf) {
-        mask(buf, true);
+    @Override
+    public void afterRead(ByteBuffer buffer) throws IOException {
+        mask(buffer, true);
     }
 
-    public void maskBeforeWrite(ByteBuffer buf) {
-        mask(buf, false);
+    @Override
+    public void beforeWrite(ByteBuffer buffer) throws IOException {
+        mask(buffer, false);
     }
 }

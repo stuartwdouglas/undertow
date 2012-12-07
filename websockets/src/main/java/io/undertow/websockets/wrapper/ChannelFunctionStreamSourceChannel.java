@@ -15,39 +15,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.undertow.websockets.masking;
+package io.undertow.websockets.wrapper;
 
-import io.undertow.websockets.wrapper.AbstractStreamSourceChannelWrapper;
+import io.undertow.websockets.ChannelFunction;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.List;
 
 /**
+ * StreamSourceChannel which checks if all read / transfered data contains only UTF-8 bytes.
+ * If non-UTF8 is detected it will throw an {@link java.io.UnsupportedEncodingException}.
+ *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public class MaskingStreamSourceChannel extends AbstractStreamSourceChannelWrapper {
-    private final Masker masker;
+public class ChannelFunctionStreamSourceChannel extends AbstractStreamSourceChannelWrapper {
+    private final List<ChannelFunction> functions;
 
-    public MaskingStreamSourceChannel(StreamSourceChannel channel, Masker masker) {
+    public ChannelFunctionStreamSourceChannel(StreamSourceChannel channel, List<ChannelFunction> functions) {
         super(channel);
-        this.masker = masker;
+        this.functions = functions;
     }
 
     @Override
     protected void afterReading(ByteBuffer buffer) throws IOException {
-        masker.maskAfterRead(buffer);
+        for(ChannelFunction function : functions) {
+            function.afterRead(buffer);
+        }
     }
 
     @Override
     protected StreamSinkChannel wrapStreamSinkChannel(StreamSinkChannel channel) {
-        return new MaskingStreamSinkChannel(channel, masker);
+        return new ChannelFunctionStreamSinkChannel(channel, functions);
     }
 
     @Override
     protected FileChannel wrapFileChannel(FileChannel channel) {
-        return new MaskingFileChannel(channel, masker);
+        return new ChannelFunctionFileChannel(channel, functions);
     }
+
 }

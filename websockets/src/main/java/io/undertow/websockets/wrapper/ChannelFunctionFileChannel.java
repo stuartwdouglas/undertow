@@ -15,49 +15,54 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.undertow.websockets.masking;
+package io.undertow.websockets.wrapper;
 
-import io.undertow.websockets.wrapper.AbstractFileChannelWrapper;
+import io.undertow.websockets.ChannelFunction;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.List;
 
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public class MaskingFileChannel extends AbstractFileChannelWrapper  {
-    private final Masker masker;
+public final class ChannelFunctionFileChannel extends AbstractFileChannelWrapper {
+    private final List<ChannelFunction> functions;
 
-    public MaskingFileChannel(FileChannel fc, Masker masker) {
+    public ChannelFunctionFileChannel(FileChannel fc, List<ChannelFunction> functions) {
         super(fc);
-        this.masker = masker;
+        this.functions = functions;
     }
 
     @Override
     protected void beforeWriting(ByteBuffer buffer) throws IOException {
-        masker.maskBeforeWrite(buffer);
+        for (ChannelFunction function : functions) {
+            function.beforeWrite(buffer);
+        }
     }
 
     @Override
     protected void afterReading(ByteBuffer buffer) throws IOException {
-        masker.maskAfterRead(buffer);
+        for (ChannelFunction function : functions) {
+            function.afterRead(buffer);
+        }
     }
 
     @Override
     protected ReadableByteChannel wrapReadableByteChannel(ReadableByteChannel channel) {
-        return new MaskingReadableByteChannel(channel, masker);
+        return new ChannelFunctionReadableByteChannel(channel, functions);
     }
 
     @Override
     protected WritableByteChannel wrapWritableByteChannel(WritableByteChannel channel) {
-        return new MaskingWritableByteChannel(channel, masker);
+        return new ChannelFunctionWritableByteChannel(channel, functions);
     }
 
     @Override
     protected AbstractFileChannelWrapper wrapFileChannel(FileChannel channel) {
-        return new MaskingFileChannel(channel, masker);
+        return new ChannelFunctionFileChannel(channel, functions);
     }
 }

@@ -20,11 +20,10 @@ package io.undertow.websockets.protocol.version07;
 import io.undertow.websockets.WebSocketChannel;
 import io.undertow.websockets.WebSocketFrameType;
 import io.undertow.websockets.WebSocketMessages;
-import io.undertow.websockets.utf8.UTF8Checker;
-import io.undertow.websockets.utf8.UTF8FixedPayloadMaskedFrameSourceChannel;
+import io.undertow.websockets.protocol.WebSocketFixedPayloadFrameSourceChannel;
+import io.undertow.websockets.wrapper.UTF8Checker;
 import org.xnio.Pooled;
 import org.xnio.channels.PushBackStreamChannel;
-import org.xnio.channels.StreamSinkChannel;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -33,7 +32,7 @@ import java.nio.channels.FileChannel;
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public class WebSocket07CloseFrameSourceChannel extends UTF8FixedPayloadMaskedFrameSourceChannel {
+public class WebSocket07CloseFrameSourceChannel extends WebSocketFixedPayloadFrameSourceChannel {
     private final ByteBuffer status = ByteBuffer.allocate(2);
     private boolean statusValidated;
     enum State {
@@ -44,7 +43,7 @@ public class WebSocket07CloseFrameSourceChannel extends UTF8FixedPayloadMaskedFr
 
     WebSocket07CloseFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, PushBackStreamChannel channel, WebSocket07Channel wsChannel, long payloadSize, int rsv, final boolean masked, final int mask) {
         // no fragmentation allowed per spec
-        super(streamSourceChannelControl, channel, wsChannel, WebSocketFrameType.CLOSE, payloadSize, rsv, true, masked, mask, new UTF8Checker());
+        super(streamSourceChannelControl, channel, wsChannel, WebSocketFrameType.CLOSE, payloadSize, rsv, true, functions(masked, mask, new UTF8Checker()));
     }
 
     @Override
@@ -190,14 +189,5 @@ public class WebSocket07CloseFrameSourceChannel extends UTF8FixedPayloadMaskedFr
                 return State.VALIDATE;
             }
         }
-    }
-
-    @Override
-    protected final void checkUTF8(ByteBuffer buffer) throws IOException {
-        // not check for utf8 when read the status code
-        if (!statusValidated) {
-            return;
-        }
-        super.checkUTF8(buffer);
     }
 }

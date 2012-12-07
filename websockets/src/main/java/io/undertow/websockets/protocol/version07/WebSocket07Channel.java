@@ -29,7 +29,7 @@ import io.undertow.websockets.WebSocketLogger;
 import io.undertow.websockets.WebSocketMessages;
 import io.undertow.websockets.WebSocketVersion;
 import io.undertow.websockets.protocol.version08.WebSocket08Channel;
-import io.undertow.websockets.utf8.UTF8Checker;
+import io.undertow.websockets.wrapper.UTF8Checker;
 import org.xnio.IoUtils;
 import org.xnio.Pool;
 import org.xnio.channels.ConnectedStreamChannel;

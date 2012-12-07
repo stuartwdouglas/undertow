@@ -15,32 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.undertow.websockets.utf8;
+package io.undertow.websockets.wrapper;
 
-import io.undertow.websockets.wrapper.ChannelWrapper;
+import io.undertow.websockets.ChannelFunction;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
+import java.util.List;
 
 /**
- * WritableByteChannel which checks if any the data that should be written/transfered contain non-UTF8 data.
- *
- * If any non-UTF8 data is found it will throw an {@link java.io.UnsupportedEncodingException}
- *
- * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public class UTF8WritableByteChannel extends ChannelWrapper<WritableByteChannel> implements WritableByteChannel {
-    protected final UTF8Checker checker;
+public class ChannelFunctionWritableByteChannel extends ChannelWrapper<WritableByteChannel> implements WritableByteChannel {
 
-    public UTF8WritableByteChannel(WritableByteChannel channel, UTF8Checker checker) {
+    private final List<ChannelFunction> functions;
+
+    public ChannelFunctionWritableByteChannel(WritableByteChannel channel, List<ChannelFunction> functions) {
         super(channel);
-        this.checker = checker;
+        this.functions = functions;
     }
 
     @Override
     public int write(ByteBuffer src) throws IOException {
-        checker.checkUTF8BeforeWrite(src);
+        for(ChannelFunction function : functions) {
+            function.beforeWrite(src);
+        }
         return channel.write(src);
     }
 }

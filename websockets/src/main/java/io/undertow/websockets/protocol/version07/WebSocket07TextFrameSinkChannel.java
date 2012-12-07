@@ -20,11 +20,13 @@ package io.undertow.websockets.protocol.version07;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Collections;
 
+import io.undertow.websockets.ChannelFunction;
 import io.undertow.websockets.WebSocketFrameType;
-import io.undertow.websockets.utf8.UTF8Checker;
-import io.undertow.websockets.utf8.UTF8FileChannel;
-import io.undertow.websockets.utf8.UTF8StreamSourceChannel;
+import io.undertow.websockets.wrapper.UTF8Checker;
+import io.undertow.websockets.wrapper.ChannelFunctionFileChannel;
+import io.undertow.websockets.wrapper.ChannelFunctionStreamSourceChannel;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
 
@@ -84,7 +86,7 @@ public class WebSocket07TextFrameSinkChannel extends WebSocket07FrameSinkChannel
         if (checker == null) {
             return super.transferFrom0(src, position, count);
         }
-        return super.transferFrom0(new UTF8FileChannel(src, checker), position, count);
+        return super.transferFrom0(new ChannelFunctionFileChannel(src, Collections.<ChannelFunction>singletonList(checker)), position, count);
     }
 
     @Override
@@ -92,6 +94,6 @@ public class WebSocket07TextFrameSinkChannel extends WebSocket07FrameSinkChannel
         if (checker == null) {
             return super.transferFrom0(source, count, throughBuffer);
         }
-        return super.transferFrom0(new UTF8StreamSourceChannel(source, checker), count, throughBuffer);
+        return super.transferFrom0(new ChannelFunctionStreamSourceChannel(source, Collections.<ChannelFunction>singletonList(checker)), count, throughBuffer);
     }
 }

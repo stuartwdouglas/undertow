@@ -17,17 +17,21 @@
  */
 package io.undertow.websockets.protocol.version07;
 
+import io.undertow.websockets.ChannelFunction;
 import io.undertow.websockets.WebSocketChannel;
 import io.undertow.websockets.WebSocketFrameType;
-import io.undertow.websockets.protocol.WebSocketFixedPayloadMaskedFrameSourceChannel;
+import io.undertow.websockets.wrapper.Masker;
+import io.undertow.websockets.protocol.WebSocketFixedPayloadFrameSourceChannel;
 import org.xnio.channels.StreamSourceChannel;
+
+import java.util.Collections;
 
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public class WebSocket07PingFrameSourceChannel extends WebSocketFixedPayloadMaskedFrameSourceChannel {
+public class WebSocket07PingFrameSourceChannel extends WebSocketFixedPayloadFrameSourceChannel {
     public WebSocket07PingFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocketChannel wsChannel, long payloadSize, int rsv, final boolean masked, final int mask) {
         // can not be fragmented
-        super(streamSourceChannelControl, channel, wsChannel, WebSocketFrameType.PING, payloadSize, rsv, true, masked, mask);
+        super(streamSourceChannelControl, channel, wsChannel, WebSocketFrameType.PING, payloadSize, rsv, true, masked ? Collections.<ChannelFunction>singletonList(new Masker(mask)) : Collections.<ChannelFunction>emptyList());
     }
 }
