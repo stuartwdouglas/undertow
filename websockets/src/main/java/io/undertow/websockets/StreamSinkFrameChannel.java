@@ -52,7 +52,7 @@ public abstract class StreamSinkFrameChannel implements StreamSinkChannel {
     /**
      * The number of payload bytes that have been written. Does not include protocol bytes
      */
-    private long written;
+    private volatile long written;
 
     private final Object writeWaitLock = new Object();
     private int waiters = 0;

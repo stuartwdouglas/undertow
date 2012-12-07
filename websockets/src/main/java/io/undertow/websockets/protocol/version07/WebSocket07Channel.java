@@ -66,7 +66,7 @@ public class WebSocket07Channel extends WebSocketChannel {
     private int fragmentedFramesCount;
     private ByteBuffer lengthBuffer = ByteBuffer.allocate(8);
 
-    private UTF8Checker checker;
+    private volatile UTF8Checker checker;
 
     protected static final byte OPCODE_CONT = 0x0;
     protected static final byte OPCODE_TEXT = 0x1;

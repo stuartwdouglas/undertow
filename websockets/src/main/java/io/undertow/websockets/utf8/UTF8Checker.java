@@ -54,8 +54,8 @@ public final class UTF8Checker {
             12, 36, 12, 12, 12, 36, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12, 12, 36, 12, 12, 12, 12,
             12, 12, 12, 12, 12, 12};
 
-    private int state = UTF8_ACCEPT;
-    private int codep;
+    private volatile int state = UTF8_ACCEPT;
+    private volatile int codep;
 
     /**
      * Check if the given byte is UTF-8 data.
