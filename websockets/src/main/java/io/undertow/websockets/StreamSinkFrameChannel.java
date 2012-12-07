@@ -261,20 +261,15 @@ public abstract class StreamSinkFrameChannel implements StreamSinkChannel {
                     }
                 } else {
                     //if the underlying channel has closed then we just invoke the write listener directly
-                    queueWriteListener();
+                    invokeWriteListener();
                 }
             }
         }
     }
 
-    private void queueWriteListener() {
-        getWriteThread().execute(new Runnable() {
-            @Override
-            public void run() {
-                WebSocketLogger.REQUEST_LOGGER.debugf("Invoking directly queued write listener");
-                ChannelListeners.invokeChannelListener(StreamSinkFrameChannel.this, writeSetter.get());
-            }
-        });
+    private void invokeWriteListener() {
+        WebSocketLogger.REQUEST_LOGGER.debugf("Invoking directly queued write listener");
+        ChannelListeners.invokeChannelListener(StreamSinkFrameChannel.this, writeSetter.get());
     }
 
     /**
@@ -512,7 +507,7 @@ public abstract class StreamSinkFrameChannel implements StreamSinkChannel {
         if (state == ChannelState.ACTIVE || state == ChannelState.SHUTDOWN) {
             channel.resumeWrites();
         } else if(state == ChannelState.CLOSED) {
-            queueWriteListener();
+            invokeWriteListener();
         }
     }
 
@@ -530,7 +525,7 @@ public abstract class StreamSinkFrameChannel implements StreamSinkChannel {
 
     @Override
     public void wakeupWrites() {
-        queueWriteListener();
+        invokeWriteListener();
         resumeWrites();
     }
 
