@@ -172,8 +172,9 @@ public class AjpParser {
             case AjpParseState.READING_REQUEST_URI: {
                 StringHolder result = parseString(buf, state, false);
                 if (result.readComplete) {
-                    exchange.setRequestPath(result.value);
-                    exchange.setRelativePath(result.value);
+                    String res = result.value;
+                    exchange.setRequestPath(res);
+                    exchange.setRelativePath(res);
                 } else {
                     state.state = AjpParseState.READING_REQUEST_URI;
                     return;
@@ -286,8 +287,35 @@ public class AjpParser {
                     }
                     StringHolder result = parseString(buf, state, false);
                     if (!result.readComplete) {
-                        state.state = AjpParseState.READING_HEADERS;
+                        state.state = AjpParseState.READING_ATTRIBUTES;
                         return;
+                    }
+                    //query string.
+                    if(state.currentAttribute.equals(ATTRIBUTES[5])) {
+                        String res = result.value;
+                        exchange.setQueryString(res);
+                        int stringStart = 0;
+                        String attrName = null;
+                        for (int i = 0; i < res.length(); ++i) {
+                            char c = res.charAt(i);
+                            if(c == '=' && attrName == null) {
+                                attrName = res.substring(stringStart, i);
+                                stringStart = i+1;
+                            } else if(c == '&') {
+                                if(attrName != null) {
+                                    exchange.addQueryParam(attrName, res.substring(stringStart, i));
+                                } else {
+                                    exchange.addQueryParam(res.substring(stringStart, i), "");
+                                }
+                                stringStart = i+1;
+                                attrName = null;
+                            }
+                        }
+                        if(attrName != null) {
+                            exchange.addQueryParam(attrName, res.substring(stringStart, res.length()));
+                        } else if(res.length() != stringStart) {
+                            exchange.addQueryParam(res.substring(stringStart, res.length()), "");
+                        }
                     }
                     //TODO: do something with the attributes
                     state.currentAttribute = null;

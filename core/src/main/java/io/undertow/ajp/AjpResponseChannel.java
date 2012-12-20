@@ -18,6 +18,7 @@
 
 package io.undertow.ajp;
 
+import io.undertow.UndertowLogger;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
@@ -36,10 +37,8 @@ import org.xnio.channels.StreamSourceChannel;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -98,7 +97,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
      * <p/>
      * While this field is set attempts to write will always return 0.
      */
-    private volatile AjpRequestChannel activeRequestChannel;
+    private volatile ByteBuffer readBodyChunkBuffer;
 
     private boolean writesResumed = false;
 
@@ -132,7 +131,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
         this.pool = pool;
         this.exchange = exchange;
         delegate.getCloseSetter().set(ChannelListeners.delegatingChannelListener(this, closeSetter));
-        delegate.getWriteSetter().set(new AjpResponseChannelDelegatingListener(writeSetter));
+        delegate.getWriteSetter().set(ChannelListeners.delegatingChannelListener(this, writeSetter));
         state = FLAG_START;
     }
 
@@ -156,35 +155,6 @@ final class AjpResponseChannel implements StreamSinkChannel {
             buf.put((byte) value.charAt(i));
         }
         buf.put((byte) 0);
-    }
-
-    /**
-     * Initiates sending of a GET_REQUEST_BODY message. This sets the
-     *
-     * @param channel
-     * @return
-     * @throws IOException
-     */
-    boolean beginGetRequestBodyChunk(final AjpRequestChannel channel) throws IOException {
-        this.activeRequestChannel = channel;
-        return continueSendRequestBodyChunk();
-    }
-
-    boolean continueSendRequestBodyChunk() throws IOException {
-        if (!processWrite()) {
-            return false;
-        }
-        exitWrite();
-        return true;
-    }
-
-    /**
-     * Direct write to the underlying channel, with no thread safety guards.
-     * <p/>
-     * This should be called indirectly by AjpRequestChannel, but only in a callback from this channel.
-     */
-    int directWrite(final ByteBuffer buffer) throws IOException {
-        return delegate.write(buffer);
     }
 
     /**
@@ -250,14 +220,16 @@ final class AjpResponseChannel implements StreamSinkChannel {
 
         //now delegate writing to the active request channel, so it can send
         //its messages
-        AjpRequestChannel active = activeRequestChannel;
-        if (active != null) {
-            if (!active.writeRequestBodyChunkMessage()) {
-                stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
-                return false;
-            } else {
-                activeRequestChannel = null;
-            }
+        ByteBuffer readBuffer = readBodyChunkBuffer;
+        if (readBuffer != null) {
+            do {
+                int res = delegate.write(readBuffer);
+                if (res == 0) {
+                    stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
+                    return false;
+                }
+            } while (readBodyChunkBuffer.hasRemaining());
+            readBodyChunkBuffer = null;
         }
 
         if (anyAreSet(state, FLAG_SHUTDOWN) && allAreClear(state, FLAG_CLOSE_QUEUED)) {
@@ -271,7 +243,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
             buffer.put((byte) 0);
             buffer.put((byte) 2);
             buffer.put((byte) 5);
-            buffer.put((byte) 1); //reuse
+            buffer.put((byte) 0); //reuse
             buffer.flip();
             if (!writeCurrentBuffer()) {
                 stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
@@ -326,7 +298,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
                 do {
                     r = delegate.write(buffers);
                     total += r;
-                    toWrite -=r;
+                    toWrite -= r;
                     if (r == -1) {
                         throw new ClosedChannelException();
                     } else if (r == 0) {
@@ -345,7 +317,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
 
                         return writeSize;
                     }
-                } while (toWrite >0 );
+                } while (toWrite > 0);
                 return total;
             } finally {
                 src.limit(limit);
@@ -387,7 +359,6 @@ final class AjpResponseChannel implements StreamSinkChannel {
     }
 
     public long write(final ByteBuffer[] srcs, final int offset, final int length) throws IOException {
-        //TODO: real gathering write implementation
         long total = 0;
         for (int i = offset; i < offset + length; ++i) {
             while (srcs[i].hasRemaining()) {
@@ -456,7 +427,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
             newState = oldState | FLAG_SHUTDOWN;
         } while (!stateUpdater.compareAndSet(this, oldState, newState));
         if (allAreClear(oldState, FLAG_START) &&
-                activeRequestChannel == null &&
+                readBodyChunkBuffer == null &&
                 packetHeaderAndDataBuffer == null) {
             delegate.shutdownWrites();
             newState |= FLAG_DELEGATE_SHUTDOWN;
@@ -503,33 +474,39 @@ final class AjpResponseChannel implements StreamSinkChannel {
         return delegate.setOption(option, value);
     }
 
-    AjpRequestChannel getActiveRequestChannel() {
-        return activeRequestChannel;
-    }
-
-    void setActiveRequestChannel(AjpRequestChannel activeRequestChannel) {
-        this.activeRequestChannel = activeRequestChannel;
-    }
-
-    private class AjpResponseChannelDelegatingListener implements ChannelListener<StreamSinkChannel> {
-
-        private final SimpleSetter<AjpResponseChannel> setter;
-
-        public AjpResponseChannelDelegatingListener(final SimpleSetter<AjpResponseChannel> setter) {
-            this.setter = setter;
+    public boolean doGetRequestBodyChunk(ByteBuffer buffer, final AjpRequestChannel requestChannel) throws IOException {
+        this.readBodyChunkBuffer = buffer;
+        boolean result = processWrite();
+        if (result) {
+            exitWrite();
+        } else {
+            //if this write does not work we spawn a thread to force it out.
+            //this is not great, but there is not really a great deal we can do here
+            //there is probably a better way to deal with this, but I am not really sure what it is
+            this.exchange.getConnection().getWorker().submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        while (AjpResponseChannel.this.readBodyChunkBuffer != null) {
+                            delegate.awaitWritable();
+                            boolean result = processWrite();
+                            if (result) {
+                                exitWrite();
+                            }
+                        }
+                    } catch (IOException e) {
+                        if (requestChannel.isReadResumed()) {
+                            requestChannel.wakeupReads();
+                        }
+                        if (isWriteResumed()) {
+                            delegate.wakeupWrites();
+                        }
+                        UndertowLogger.REQUEST_LOGGER.debug("Error writing get request body chunk");
+                    }
+                }
+            });
         }
 
-        public void handleEvent(final StreamSinkChannel channel) {
-            ChannelListener<? super AjpResponseChannel> listener = setter.get();
-            if (listener != null) {
-                ChannelListeners.invokeChannelListener(AjpResponseChannel.this, listener);
-            } else if (activeRequestChannel != null) {
-                activeRequestChannel.doWriteFromListener();
-            }
-        }
-
-        public String toString() {
-            return "Setter delegating channel listener -> " + setter;
-        }
+        return result;
     }
 }

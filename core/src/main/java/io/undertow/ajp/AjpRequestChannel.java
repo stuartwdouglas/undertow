@@ -70,21 +70,14 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
      */
     private static final long STATE_SEND_REQUIRED = 1L << 62L;
     /**
-     * We are in the process of sending a GET_BODY_CHUNK message
-     */
-    private static final long STATE_SENDING = 1L << 61L;
-
-    /**
      * read is done
      */
-    private static final long STATE_FINISHED = 1L << 60L;
+    private static final long STATE_FINISHED = 1L << 61L;
 
     /**
      * The remaining bits are used to store the remaining chunk size.
      */
-    private static final long STATE_MASK = longBitMask(0, 55);
-
-    private volatile ByteBuffer readBody;
+    private static final long STATE_MASK = longBitMask(0, 60);
 
     public AjpRequestChannel(final StreamSourceChannel delegate, AjpResponseChannel ajpResponseChannel, Long size) {
         super(delegate);
@@ -93,29 +86,12 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
         if (size == null) {
             state = STATE_SEND_REQUIRED;
             remaining = -1;
-            remaining = 0;
         } else if (size == 0) {
             state = STATE_FINISHED;
             remaining = 0;
         } else {
             state = STATE_READING;
             remaining = size;
-        }
-    }
-
-    boolean writeRequestBodyChunkMessage() throws IOException {
-        ByteBuffer readBody = this.readBody;
-        if (readBody == null) {
-            return true;
-        }
-        ajpResponseChannel.directWrite(readBody);
-
-        if (!readBody.hasRemaining()) {
-            this.readBody = null;
-            state = STATE_READING;
-            return true;
-        } else {
-            return false;
         }
     }
 
@@ -155,19 +131,13 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
     @Override
     public int read(ByteBuffer dst) throws IOException {
         long state = this.state;
-        if (anyAreSet(state, STATE_SEND_REQUIRED)) {
-            readBody = READ_BODY_CHUNK.duplicate();
-            if (!ajpResponseChannel.beginGetRequestBodyChunk(this)) {
-                this.state = (state & STATE_MASK) | STATE_SENDING;
-                return 0;
-            } else {
-                state = this.state = (state & STATE_MASK) | STATE_READING;
-            }
-        } else if (anyAreSet(state, STATE_SENDING)) {
-            if (!ajpResponseChannel.continueSendRequestBodyChunk()) {
+        if(anyAreSet(state, STATE_FINISHED)) {
+            return -1;
+        } else if (anyAreSet(state, STATE_SEND_REQUIRED)) {
+            state = this.state = (state & STATE_MASK) | STATE_READING;
+            if (!ajpResponseChannel.doGetRequestBodyChunk(READ_BODY_CHUNK.duplicate(), this)) {
                 return 0;
             }
-            this.state = (state & STATE_MASK) | STATE_READING;
         }
         //we might have gone into state_reading above
         if (anyAreSet(state, STATE_READING)) {
@@ -186,7 +156,7 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
             return -1;
         }
         long chunkRemaining;
-        if (headerRead < HEADER_LENGTH) {
+        if (headerRead != HEADER_LENGTH) {
             int read = delegate.read(headerBuffer);
             if (read == -1) {
                 return read;
@@ -203,6 +173,11 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
                 b1 = headerBuffer.get();
                 b2 = headerBuffer.get();
                 chunkRemaining = ((b1 & 0xFF) << 8) | (b2 & 0xFF);
+                if(chunkRemaining == 0) {
+                    this.remaining = 0;
+                    this.state = STATE_FINISHED;
+                    return -1;
+                }
             }
         } else {
             chunkRemaining = this.state & ~STATE_MASK;
@@ -215,7 +190,9 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
             }
             int read = delegate.read(dst);
             chunkRemaining -= read;
-            remaining -= read;
+            if(remaining != -1) {
+                remaining -= read;
+            }
             if (remaining == 0) {
                 this.state = STATE_FINISHED;
             } else if (chunkRemaining == 0) {
@@ -233,20 +210,16 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
 
     @Override
     public void awaitReadable() throws IOException {
-        if (!anyAreSet(state, STATE_FINISHED)) {
+        if (anyAreSet(state, STATE_READING)) {
             delegate.awaitReadable();
         }
     }
 
     @Override
     public void awaitReadable(long time, TimeUnit timeUnit) throws IOException {
-        if (!anyAreSet(state, STATE_FINISHED)) {
+        if (anyAreSet(state, STATE_READING)) {
             delegate.awaitReadable(time, timeUnit);
         }
     }
 
-
-    public void doWriteFromListener() {
-
-    }
 }

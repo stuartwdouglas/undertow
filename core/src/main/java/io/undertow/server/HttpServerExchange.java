@@ -420,7 +420,7 @@ public final class HttpServerExchange extends AbstractAttachable {
         return queryParameters;
     }
 
-    void addQueryParam(final String name, final String param) {
+    public void addQueryParam(final String name, final String param) {
         Deque<String> list = queryParameters.get(name);
         if (list == null) {
             queryParameters.put(name, list = new ArrayDeque<String>());

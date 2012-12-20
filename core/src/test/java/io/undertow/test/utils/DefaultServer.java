@@ -31,11 +31,14 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpOpenListener;
 import io.undertow.server.HttpTransferEncodingHandler;
 import io.undertow.server.OpenListener;
+import org.junit.Ignore;
+import org.junit.internal.runners.model.EachTestNotifier;
 import org.junit.runner.Description;
 import org.junit.runner.Result;
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.BlockJUnit4ClassRunner;
+import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
 import org.xnio.BufferAllocator;
 import org.xnio.ByteBufferSlicePool;
@@ -190,6 +193,16 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
         }
     }
 
+    @Override
+    protected void runChild(FrameworkMethod method, RunNotifier notifier) {
+        if(ajp && (method.getAnnotation(AjpIgnore.class) != null || method.getMethod().getDeclaringClass().isAnnotationPresent(AjpIgnore.class))) {
+            return;
+        } else {
+            super.runChild(method, notifier);
+        }
+    }
+
+
     /**
      * Sets the root handler for the default web server
      *
@@ -237,5 +250,9 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
             runInternal(notifier);
             super.run(notifier);
         }
+    }
+
+    public static boolean isAjp() {
+        return ajp;
     }
 }
