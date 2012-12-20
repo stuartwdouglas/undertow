@@ -85,7 +85,7 @@ public class FixedLengthRequestTestCase {
     }
 
     @Test
-    public void testChunkedRequest() throws IOException {
+    public void testFixedLengthRequest() throws IOException {
         connection = null;
         HttpPost post = new HttpPost(DefaultServer.getDefaultServerAddress() + "/path");
         TestHttpClient client = new TestHttpClient();

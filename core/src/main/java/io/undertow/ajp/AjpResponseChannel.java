@@ -69,6 +69,9 @@ final class AjpResponseChannel implements StreamSinkChannel {
     private final StreamSinkChannel delegate;
     private final Pool<ByteBuffer> pool;
 
+    /**
+     * State flags
+     */
     @SuppressWarnings("unused")
     private volatile int state = FLAG_START;
 
@@ -157,6 +160,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
 
     /**
      * Initiates sending of a GET_REQUEST_BODY message. This sets the
+     *
      * @param channel
      * @return
      * @throws IOException
@@ -167,7 +171,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
     }
 
     boolean continueSendRequestBodyChunk() throws IOException {
-        if(!processWrite()) {
+        if (!processWrite()) {
             return false;
         }
         exitWrite();
@@ -176,7 +180,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
 
     /**
      * Direct write to the underlying channel, with no thread safety guards.
-     *
+     * <p/>
      * This should be called indirectly by AjpRequestChannel, but only in a callback from this channel.
      */
     int directWrite(final ByteBuffer buffer) throws IOException {
@@ -267,7 +271,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
             buffer.put((byte) 0);
             buffer.put((byte) 2);
             buffer.put((byte) 5);
-            buffer.put((byte) 0); //reuse
+            buffer.put((byte) 1); //reuse
             buffer.flip();
             if (!writeCurrentBuffer()) {
                 stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
@@ -281,6 +285,10 @@ final class AjpResponseChannel implements StreamSinkChannel {
     }
 
     private boolean writeCurrentBuffer() throws IOException {
+        long toWrite = 0;
+        for (ByteBuffer b : this.packetHeaderAndDataBuffer) {
+            toWrite += b.remaining();
+        }
         long r = 0;
         do {
             r = delegate.write(this.packetHeaderAndDataBuffer);
@@ -289,7 +297,8 @@ final class AjpResponseChannel implements StreamSinkChannel {
             } else if (r == 0) {
                 return false;
             }
-        } while (currentDataBuffer.getResource().hasRemaining());
+            toWrite -= r;
+        } while (toWrite > 0);
         currentDataBuffer.free();
         this.currentDataBuffer = null;
         return true;
@@ -308,34 +317,35 @@ final class AjpResponseChannel implements StreamSinkChannel {
                 }
                 final int writeSize = src.remaining();
                 final ByteBuffer[] buffers = createHeader(src);
-                final ByteBuffer headerBuffer = buffers[0];
-
+                int toWrite = 0;
+                for (ByteBuffer buffer : buffers) {
+                    toWrite += buffer.remaining();
+                }
                 int total = 0;
                 long r = 0;
                 do {
                     r = delegate.write(buffers);
                     total += r;
+                    toWrite -=r;
                     if (r == -1) {
                         throw new ClosedChannelException();
                     } else if (r == 0) {
-                        //ok, we need to
-                        if (headerBuffer.remaining() == 4) {
-                            //noting written out, we can just return
-                            return 0;
-                        }
                         //we need to copy all the remaining bytes
                         Pooled<ByteBuffer> newPooledBuffer = pool.allocate();
                         while (src.hasRemaining()) {
                             newPooledBuffer.getResource().put(src);
                         }
-                        ByteBuffer[] savedBuffers = new ByteBuffer[buffers.length];
-                        System.arraycopy(buffers, 0, savedBuffers, 0, buffers.length);
+                        newPooledBuffer.getResource().flip();
+                        ByteBuffer[] savedBuffers = new ByteBuffer[3];
+                        savedBuffers[0] = buffers[0];
+                        savedBuffers[1] = newPooledBuffer.getResource();
+                        savedBuffers[2] = buffers[2];
                         this.packetHeaderAndDataBuffer = savedBuffers;
                         this.currentDataBuffer = newPooledBuffer;
 
                         return writeSize;
                     }
-                } while (src.hasRemaining());
+                } while (toWrite >0 );
                 return total;
             } finally {
                 src.limit(limit);
@@ -444,7 +454,7 @@ final class AjpResponseChannel implements StreamSinkChannel {
                 return;
             }
             newState = oldState | FLAG_SHUTDOWN;
-        } while (stateUpdater.compareAndSet(this, oldState, newState));
+        } while (!stateUpdater.compareAndSet(this, oldState, newState));
         if (allAreClear(oldState, FLAG_START) &&
                 activeRequestChannel == null &&
                 packetHeaderAndDataBuffer == null) {

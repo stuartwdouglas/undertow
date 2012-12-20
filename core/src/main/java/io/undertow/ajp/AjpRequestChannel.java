@@ -41,13 +41,24 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
     /**
      * The size of the incoming request. A size of 0 indicates that the request is using chunked encoding
      */
-    private final Integer size;
+    private final Long size;
+
+    private static final int HEADER_LENGTH = 6;
 
     /**
      * byte buffer that is used to hold header data
      */
-    private final ByteBuffer headerBuffer = ByteBuffer.allocateDirect(4);
+    private final ByteBuffer headerBuffer = ByteBuffer.allocateDirect(HEADER_LENGTH);
 
+
+    /**
+     * The total amount of remaining data. If this is unknown it is -1.
+     */
+    private long remaining;
+
+    /**
+     * State flags, with the chunk remaining stored in the low bytes
+     */
     private long state;
 
     /**
@@ -75,16 +86,20 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
 
     private volatile ByteBuffer readBody;
 
-    public AjpRequestChannel(final StreamSourceChannel delegate, AjpResponseChannel ajpResponseChannel, Integer size) {
+    public AjpRequestChannel(final StreamSourceChannel delegate, AjpResponseChannel ajpResponseChannel, Long size) {
         super(delegate);
         this.ajpResponseChannel = ajpResponseChannel;
         this.size = size;
         if (size == null) {
             state = STATE_SEND_REQUIRED;
+            remaining = -1;
+            remaining = 0;
         } else if (size == 0) {
             state = STATE_FINISHED;
+            remaining = 0;
         } else {
             state = STATE_READING;
+            remaining = size;
         }
     }
 
@@ -139,81 +154,95 @@ public class AjpRequestChannel extends DelegatingStreamSourceChannel<AjpRequestC
 
     @Override
     public int read(ByteBuffer dst) throws IOException {
-        do {
-            long state = getState();
-            if (anyAreSet(state, STATE_SEND_REQUIRED)) {
-                readBody = READ_BODY_CHUNK.duplicate();
-                if (!ajpResponseChannel.beginGetRequestBodyChunk(this)) {
-                    setState(STATE_SENDING);
-                    return 0;
-                }
-            } else if (anyAreSet(state, STATE_SENDING)) {
-                if (!ajpResponseChannel.continueSendRequestBodyChunk()) {
-                    return 0;
-                }
-                setState(STATE_READING);
-            } else if (anyAreSet(state, STATE_READING)) {
-                return doRead(dst);
+        long state = this.state;
+        if (anyAreSet(state, STATE_SEND_REQUIRED)) {
+            readBody = READ_BODY_CHUNK.duplicate();
+            if (!ajpResponseChannel.beginGetRequestBodyChunk(this)) {
+                this.state = (state & STATE_MASK) | STATE_SENDING;
+                return 0;
+            } else {
+                state = this.state = (state & STATE_MASK) | STATE_READING;
             }
-        } while (state != STATE_FINISHED);
+        } else if (anyAreSet(state, STATE_SENDING)) {
+            if (!ajpResponseChannel.continueSendRequestBodyChunk()) {
+                return 0;
+            }
+            this.state = (state & STATE_MASK) | STATE_READING;
+        }
+        //we might have gone into state_reading above
+        if (anyAreSet(state, STATE_READING)) {
+            return doRead(dst, state);
+        }
+        assert STATE_FINISHED == state;
         return -1;
     }
 
-    private int doRead(final ByteBuffer dst) throws IOException {
+    private int doRead(final ByteBuffer dst, long state) throws IOException {
         ByteBuffer headerBuffer = this.headerBuffer;
-        long headerRead = headerBuffer.remaining();
-        long remaining;
-        if (headerRead < 4) {
+        long headerRead = HEADER_LENGTH - headerBuffer.remaining();
+        long remaining = this.remaining;
+        if (remaining == 0) {
+            this.state = STATE_FINISHED;
+            return -1;
+        }
+        long chunkRemaining;
+        if (headerRead < HEADER_LENGTH) {
             int read = delegate.read(headerBuffer);
             if (read == -1) {
                 return read;
             } else if (headerBuffer.hasRemaining()) {
                 return 0;
             } else {
+                headerBuffer.flip();
                 byte b1 = headerBuffer.get(); //0x12
                 byte b2 = headerBuffer.get(); //0x34
                 assert b1 == 0x12;
                 assert b2 == 0x34;
+                headerBuffer.get();//the length headers, two less than the string length header
+                headerBuffer.get();
                 b1 = headerBuffer.get();
                 b2 = headerBuffer.get();
-                remaining = ((b1 & 0xFF) << 8) & (b2 & 0xFF);
+                chunkRemaining = ((b1 & 0xFF) << 8) | (b2 & 0xFF);
             }
         } else {
-            remaining = this.state & ~STATE_MASK;
+            chunkRemaining = this.state & ~STATE_MASK;
         }
+
         int limit = dst.limit();
         try {
-            if(limit > remaining) {
-                dst.limit((int) (dst.position() + remaining));
+            if (limit > chunkRemaining) {
+                dst.limit((int) (dst.position() + chunkRemaining));
             }
-            return delegate.read(dst);
+            int read = delegate.read(dst);
+            chunkRemaining -= read;
+            remaining -= read;
+            if (remaining == 0) {
+                this.state = STATE_FINISHED;
+            } else if (chunkRemaining == 0) {
+                headerBuffer.clear();
+                this.state = STATE_SEND_REQUIRED;
+            } else {
+                this.state = (state & ~STATE_MASK) | chunkRemaining;
+            }
+            return read;
         } finally {
+            this.remaining = remaining;
             dst.limit(limit);
-            state = (state & STATE_MASK) | remaining;
         }
     }
 
     @Override
     public void awaitReadable() throws IOException {
-        if (state == STATE_FINISHED ||
-                state == STATE_READING) {
-            super.awaitReadable();
-        } else {
-
+        if (!anyAreSet(state, STATE_FINISHED)) {
+            delegate.awaitReadable();
         }
-    }
-
-    private long getState() {
-        return state & STATE_MASK;
-    }
-
-    private void setState(long newState) {
-        this.state = (this.state & ~STATE_MASK) | newState;
     }
 
     @Override
     public void awaitReadable(long time, TimeUnit timeUnit) throws IOException {
-
+        if (!anyAreSet(state, STATE_FINISHED)) {
+            delegate.awaitReadable(time, timeUnit);
+        }
     }
 
 

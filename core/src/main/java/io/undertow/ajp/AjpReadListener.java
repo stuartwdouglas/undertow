@@ -7,12 +7,15 @@ import io.undertow.server.ChannelWrapper;
 import io.undertow.server.HttpCompletionHandler;
 import io.undertow.server.HttpServerConnection;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 import io.undertow.util.WorkerDispatcher;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
 import org.xnio.Pooled;
+import org.xnio.channels.EmptyStreamSourceChannel;
 import org.xnio.channels.PushBackStreamChannel;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
@@ -307,9 +310,33 @@ final class AjpReadListener implements ChannelListener<PushBackStreamChannel> {
             return new ChannelWrapper<StreamSourceChannel>() {
                 @Override
                 public StreamSourceChannel wrap(StreamSourceChannel channel, HttpServerExchange exchange) {
+                    final HeaderMap requestHeaders = exchange.getRequestHeaders();
+                    HttpString transferEncoding = Headers.IDENTITY;
+                    Long length;
+                    boolean hasTransferEncoding = requestHeaders.contains(Headers.TRANSFER_ENCODING);
+                    if (hasTransferEncoding) {
+                        transferEncoding = new HttpString(requestHeaders.getLast(Headers.TRANSFER_ENCODING));
+                    }
 
-                    String contentLength = exchange.getResponseHeaders().getFirst(Headers.CONTENT_LENGTH);
-                    Integer length = contentLength == null ? null : Integer.parseInt(contentLength);
+                    if (hasTransferEncoding) {
+                        length = null; //unkown length
+                    } else if (exchange.getRequestHeaders().contains(Headers.CONTENT_LENGTH)) {
+                        final long contentLength = Long.parseLong(requestHeaders.get(Headers.CONTENT_LENGTH).getFirst());
+                        if (contentLength == 0L) {
+                            UndertowLogger.REQUEST_LOGGER.trace("No content, starting next request");
+                            // no content - immediately start the next request, returning an empty stream for this one
+                            exchange.terminateRequest();
+                            return new EmptyStreamSourceChannel(channel.getWorker(), channel.getReadThread());
+                        } else {
+                            length = contentLength;
+                        }
+                    } else {
+                        UndertowLogger.REQUEST_LOGGER.trace("No content length or transfer coding, starting next request");
+                        // no content - immediately start the next request, returning an empty stream for this one
+                        exchange.terminateRequest();
+                        return new EmptyStreamSourceChannel(channel.getWorker(), channel.getReadThread());
+                    }
+                    String contentLength = exchange.getRequestHeaders().getFirst(Headers.CONTENT_LENGTH);
                     return new AjpRequestChannel(channel, responseChannel, length);
                 }
             };

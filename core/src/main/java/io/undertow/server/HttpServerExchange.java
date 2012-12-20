@@ -475,7 +475,7 @@ public final class HttpServerExchange extends AbstractAttachable {
      * Force the codec to treat the request as fully read.  Should only be invoked by handlers which downgrade
      * the socket or implement a transfer coding.
      */
-    void terminateRequest() {
+    public void terminateRequest() {
         int oldVal, newVal;
         do {
             oldVal = state;
