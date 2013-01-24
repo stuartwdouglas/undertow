@@ -1,8 +1,29 @@
+/*
+ * Copyright 2013 JBoss, by Red Hat, Inc
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.undertow.websockets.highlevel;
 
+import java.nio.ByteBuffer;
 import java.util.Set;
 
 /**
+ * Session for a WebSocket connection. For each new connection a {@link WebSocketSession} will be created.
+ * This {@link WebSocketSession} can then be used to communicate with the remote peer.
+ *
+ * Implementations of the interface are expected to be thread-safe.
+ *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
 public interface WebSocketSession {
@@ -12,11 +33,18 @@ public interface WebSocketSession {
     String getId();
 
     /**
-     * Send the {@link WebSocketFrame} and notify the {@link SendCallback} once done.
+     * Send the a binary websocket frame and notify the {@link SendCallback} once done.
      * It is possible to send multiple frames at the same time even if the {@link SendCallback} is not triggered yet.
      * The implementation is responsible to queue them up and send them in the correct order.
      */
-    void send(WebSocketFrame frame, SendCallback callback);
+    void sendBinary(ByteBuffer payload, SendCallback callback);
+
+    /**
+     * Send the a text websocket frame and notify the {@link SendCallback} once done.
+     * It is possible to send multiple frames at the same time even if the {@link SendCallback} is not triggered yet.
+     * The implementation is responsible to queue them up and send them in the correct order.
+     */
+    void sendText(String payload, SendCallback callback);
 
     /**
      * Return a {@link PartialWebSocketFrameHandler} which can be used to send a binary frame in chunks.
@@ -85,7 +113,7 @@ public interface WebSocketSession {
      * Set the {@link PartialWebSocketFrameHandler} which is used for binary frames. If non is set all text frames will
      * just be discarded. Returns the {@link PartialWebSocketFrameHandler} which was set before.
      */
-    void setBinaryFrameHandler(PartialWebSocketFrameHandler handler);
+    PartialWebSocketFrameHandler setBinaryFrameHandler(PartialWebSocketFrameHandler handler);
 
     /**
      * Get the {@link PartialWebSocketFrameHandler} which is set for binary frames.

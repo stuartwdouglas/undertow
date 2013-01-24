@@ -13,21 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.undertow.websockets.highlevel;
+package io.undertow.websockets.highlevel.impl;
+
+import io.undertow.websockets.highlevel.WebSocketSessionIdGenerator;
+
+import java.util.UUID;
 
 /**
- * Callback which will be called once a send operation completes. This may successfully or because of an error.
+ * {@link WebSocketSessionIdGenerator} implementation which use {@link UUID#randomUUID()}  to generate the id
+ * to use. In a Clustered enviroment you may need something better.
  *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public interface SendCallback {
-    /**
-     * Called once a send operation complete without an error
-     */
-    void onCompletion();
-
-    /**
-     * Called once an error was thrown during a send operation
-    */
-    void onError(Throwable cause);
+public class UuidWebSocketSessionIdGenerator implements WebSocketSessionIdGenerator {
+    @Override
+    public String nextId() {
+        return UUID.randomUUID().toString();
+    }
 }

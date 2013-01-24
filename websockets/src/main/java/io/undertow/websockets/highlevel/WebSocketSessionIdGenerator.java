@@ -16,18 +16,15 @@
 package io.undertow.websockets.highlevel;
 
 /**
- * Callback which will be called once a send operation completes. This may successfully or because of an error.
+ * Generates Id for {@link WebSocketSession}s.
  *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public interface SendCallback {
-    /**
-     * Called once a send operation complete without an error
-     */
-    void onCompletion();
+public interface WebSocketSessionIdGenerator {
 
     /**
-     * Called once an error was thrown during a send operation
-    */
-    void onError(Throwable cause);
+     * Generate an id to use for a {@link WebSocketSession}. The generated id must be unique during the lifetime of the
+     * application.
+     */
+    String nextId();
 }
