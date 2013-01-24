@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.undertow.websockets.highlevel.impl;
 
 import io.undertow.websockets.highlevel.SendCallback;
@@ -21,32 +20,24 @@ import org.xnio.Pooled;
 
 /**
  *
+ * {@link SendCallback} which will free up a {@link Pooled} instance once the send operation completes.
+ *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public final class PooledSendCallback implements SendCallback {
-    private final SendCallback callback;
+public final class PooledFreeupSendCallback implements SendCallback {
     private final Pooled<?> pooled;
 
-    public PooledSendCallback(SendCallback callback, Pooled<?> pooled) {
-        this.callback = callback;
+    public PooledFreeupSendCallback(Pooled<?> pooled) {
         this.pooled = pooled;
     }
 
     @Override
     public void onCompletion() {
-        try {
-            callback.onCompletion();
-        } finally {
-            pooled.free();
-        }
+        pooled.free();
     }
 
     @Override
     public void onError(Throwable cause) {
-        try {
-            callback.onError(cause);
-        } finally {
-            pooled.free();
-        }
+        pooled.free();
     }
 }

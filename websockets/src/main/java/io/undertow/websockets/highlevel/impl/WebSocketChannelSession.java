@@ -90,19 +90,6 @@ public final class WebSocketChannelSession implements WebSocketSession {
     @Override
     public void close(CloseCode code, String reason, final SendCallback callback) {
         final Pooled<ByteBuffer> pooled = channel.getBufferPool().allocate();
-        SendCallback pooledCallback = new PooledSendCallback(new SendCallback() {
-            @Override
-            public void onCompletion() {
-                callback.onCompletion();
-                IoUtils.safeClose(channel);
-            }
-
-            @Override
-            public void onError(Throwable cause) {
-                callback.onError(cause);
-                IoUtils.safeClose(channel);
-            }
-        }, pooled);
         ByteBuffer buffer = pooled.getResource();
         buffer.putShort((short) code.getCode());
         if (reason != null) {
@@ -110,7 +97,18 @@ public final class WebSocketChannelSession implements WebSocketSession {
         }
         buffer.flip();
 
-        send(WebSocketFrameType.CLOSE, buffer, pooledCallback);
+        send(WebSocketFrameType.CLOSE, buffer, new SendCallbacks(callback, new PooledFreeupSendCallback(pooled),
+                new SendCallback() {
+                    @Override
+                    public void onCompletion() {
+                        IoUtils.safeClose(channel);
+                    }
+
+                    @Override
+                    public void onError(Throwable cause) {
+                        IoUtils.safeClose(channel);
+                    }
+                }));
     }
 
     private void send(WebSocketFrameType type, final ByteBuffer buffer, final SendCallback callback) {
@@ -200,6 +198,7 @@ public final class WebSocketChannelSession implements WebSocketSession {
 
     @Override
     public Set<String> getSubProtocols() {
+        // TODO: Implement me!
         return Collections.emptySet();
     }
 
