@@ -1,5 +1,7 @@
 package io.undertow.websockets.highlevel;
 
+import java.util.Set;
+
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
@@ -94,5 +96,11 @@ public interface WebSocketSession {
      * Remove the {@link PartialWebSocketFrameHandler} which is used for binary frames.
      */
     PartialWebSocketFrameHandler removeBinaryFrameHandler();
+
+    /**
+     * Return an unmodifiable {@link Set} of sub-protocols for which the {@link WebSocketSession} will be used. May
+     * return an empty {@link Set}
+     */
+    Set<String> getSubProtocols();
 
 }
