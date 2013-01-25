@@ -18,7 +18,7 @@ package io.undertow.websockets.highlevel.impl;
 import io.undertow.websockets.StreamSinkFrameChannel;
 import io.undertow.websockets.WebSocketChannel;
 import io.undertow.websockets.WebSocketFrameType;
-import io.undertow.websockets.highlevel.PartialWebSocketFrameSender;
+import io.undertow.websockets.highlevel.FragmentedBinaryFrameSender;
 import io.undertow.websockets.highlevel.SendCallback;
 import org.xnio.ChannelListener;
 import org.xnio.channels.StreamSinkChannel;
@@ -28,19 +28,19 @@ import java.nio.ByteBuffer;
 
 /**
  *
- * Default {@link PartialWebSocketFrameSender} implementation which use a {@link WebSocketChannel} for the I/O
+ * Default {@link io.undertow.websockets.highlevel.FragmentedBinaryFrameSender} implementation which use a {@link WebSocketChannel} for the I/O
  * operation.
  *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-class PartialWebSocketChannelFrameSender implements PartialWebSocketFrameSender {
+class FragmentedBinaryChannelFrameSender implements FragmentedBinaryFrameSender {
     private final WebSocketChannel channel;
     private final long payloadSize;
     private final WebSocketFrameType type;
 
     protected StreamSinkFrameChannel sink;
 
-    PartialWebSocketChannelFrameSender(WebSocketChannel channel, WebSocketFrameType type, long payloadSize) {
+    FragmentedBinaryChannelFrameSender(WebSocketChannel channel, WebSocketFrameType type, long payloadSize) {
         this.channel = channel;
         this.payloadSize = payloadSize;
         this.type = type;

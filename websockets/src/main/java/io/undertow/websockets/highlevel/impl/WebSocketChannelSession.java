@@ -20,9 +20,9 @@ import io.undertow.websockets.WebSocketChannel;
 import io.undertow.websockets.WebSocketFrameType;
 import io.undertow.websockets.WebSocketUtils;
 import io.undertow.websockets.highlevel.CloseCode;
+import io.undertow.websockets.highlevel.FragmentedTextFrameSender;
 import io.undertow.websockets.highlevel.PartialWebSocketFrameHandler;
-import io.undertow.websockets.highlevel.PartialWebSocketFrameSender;
-import io.undertow.websockets.highlevel.PartialWebSocketTextFrameSender;
+import io.undertow.websockets.highlevel.FragmentedBinaryFrameSender;
 import io.undertow.websockets.highlevel.SendCallback;
 import io.undertow.websockets.highlevel.WebSocketSession;
 import org.xnio.ChannelListener;
@@ -73,13 +73,13 @@ public final class WebSocketChannelSession implements WebSocketSession {
     }
 
     @Override
-    public PartialWebSocketFrameSender sendBinary(final long payloadSize) {
-        return new PartialWebSocketChannelFrameSender(channel, WebSocketFrameType.BINARY, payloadSize);
+    public FragmentedBinaryFrameSender sendBinary(final long payloadSize) {
+        return new FragmentedBinaryChannelFrameSender(channel, WebSocketFrameType.BINARY, payloadSize);
     }
 
     @Override
-    public PartialWebSocketTextFrameSender sendText(long payloadSize) {
-        return new PartialWebSocketChannelTextFrameSender(channel, payloadSize);
+    public FragmentedTextFrameSender sendText(long payloadSize) {
+        return new FragmentedChannelTextFrameSender(channel, payloadSize);
     }
 
     @Override

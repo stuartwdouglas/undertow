@@ -15,50 +15,34 @@
  */
 package io.undertow.websockets.highlevel;
 
-import java.nio.ByteBuffer;
+import java.io.IOException;
 import java.util.Set;
 
 /**
  * Session for a WebSocket connection. For each new connection a {@link WebSocketSession} will be created.
  * This {@link WebSocketSession} can then be used to communicate with the remote peer.
- *
- * Implementations of the interface are expected to be thread-safe.
+ * <p/>
+ * Implementations of the interface are expected to be thread-safe, however if multiple threads
+ * are sending messages no guarantees are provided about the resulting message order.
  *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-public interface WebSocketSession {
+public interface WebSocketSession extends BinaryFrameSender, TextFrameSender {
     /**
      * Unique id for the session
      */
     String getId();
 
     /**
-     * Send the a binary websocket frame and notify the {@link SendCallback} once done.
-     * It is possible to send multiple frames at the same time even if the {@link SendCallback} is not triggered yet.
-     * The implementation is responsible to queue them up and send them in the correct order.
+     * Return a {@link FragmentedBinaryFrameSender} which can be used to send a binary frame in chunks.
      */
-    void sendBinary(ByteBuffer payload, SendCallback callback);
+    FragmentedBinaryFrameSender sendFragmentedBinary();
 
     /**
-     * Send the a text websocket frame and notify the {@link SendCallback} once done.
-     * It is possible to send multiple frames at the same time even if the {@link SendCallback} is not triggered yet.
-     * The implementation is responsible to queue them up and send them in the correct order.
+     * Return a {@link FragmentedTextFrameSender} which can be used to send a text frame in chunks.
      */
-    void sendText(String payload, SendCallback callback);
+    FragmentedTextFrameSender sendFragmentedText();
 
-    /**
-     * Return a {@link PartialWebSocketFrameHandler} which can be used to send a binary frame in chunks.
-     * If a {@link PartialWebSocketFrameSender} was optained it is not valid to obtain another one till the
-     * {@link SendCallback} of the last payload part was called. Trying so will result in an {@link IllegalStateException}
-     */
-    PartialWebSocketFrameSender sendBinary(long payloadSize);
-
-    /**
-     * Return a {@link PartialWebSocketTextFrameSender} which can be used to send a text frame in chunks.
-     * If a {@link PartialWebSocketFrameSender} was optained it is not valid to obtain another one till the
-     * {@link SendCallback} of the last payload part was called. Trying so will result in an {@link IllegalStateException}
-     */
-    PartialWebSocketTextFrameSender sendText(long payloadSize);
 
     /**
      * Close the session with a normal close code and no reason. The {@link SendCallback} will be notified once the close
@@ -73,8 +57,19 @@ public interface WebSocketSession {
     void close(CloseCode code, String reason, SendCallback callback);
 
     /**
+     * Close the session with a normal close code and no reason. This method will block until the close has been sent
+     * and acknowledged.
+     */
+    void close() throws IOException;
+
+    /**
+     * Close the session with the provided code and reason. This method will block until the close has been sent
+     * and acknowledged.
+     */
+    void close(CloseCode code, String reason) throws IOException;
+
+    /**
      * Set a attribute on the session. When the value is {@code null} it will remove the attribute with the key.
-     *
      */
     boolean setAttribute(String key, Object value);
 
@@ -96,7 +91,7 @@ public interface WebSocketSession {
     /**
      * Set the {@link PartialWebSocketFrameHandler} which is used for text frames. If non is set all text frames will
      * just be discarded. Returns the {@link PartialWebSocketFrameHandler} which was set before.
-     *
+     * <p/>
      * Be aware that if you set a new {@link PartialWebSocketFrameHandler} it will only be used for the next websocket
      * frame. In progress handling of a frame will continue with the old one.
      */
@@ -109,7 +104,7 @@ public interface WebSocketSession {
 
     /**
      * Remove the {@link PartialWebSocketFrameHandler} which is used for text frames.
-     *
+     * <p/>
      * Be aware that if you remove the {@link PartialWebSocketFrameHandler} in progress handling of a frame will
      * continue with the previous set {@link PartialWebSocketFrameHandler}.
      */
@@ -118,7 +113,7 @@ public interface WebSocketSession {
     /**
      * Set the {@link PartialWebSocketFrameHandler} which is used for binary frames. If non is set all text frames will
      * just be discarded. Returns the {@link PartialWebSocketFrameHandler} which was set before.
-     *
+     * <p/>
      * Be aware that if you set a new {@link PartialWebSocketFrameHandler} it will only be used for the next websocket
      * frame. In progress handling of a frame will continue with the old one.
      */
@@ -131,7 +126,7 @@ public interface WebSocketSession {
 
     /**
      * Remove the {@link PartialWebSocketFrameHandler} which is used for binary frames.
-     *
+     * <p/>
      * Be aware that if you remove the {@link PartialWebSocketFrameHandler} in progress handling of a frame will
      * continue with the previous set {@link PartialWebSocketFrameHandler}.
      */

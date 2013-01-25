@@ -15,24 +15,24 @@
  */
 package io.undertow.websockets.highlevel.impl;
 
+import java.nio.ByteBuffer;
+
 import io.undertow.websockets.WebSocketChannel;
 import io.undertow.websockets.WebSocketFrameType;
 import io.undertow.websockets.WebSocketUtils;
-import io.undertow.websockets.highlevel.PartialWebSocketFrameSender;
-import io.undertow.websockets.highlevel.PartialWebSocketTextFrameSender;
+import io.undertow.websockets.highlevel.FragmentedBinaryTextFrameSender;
+import io.undertow.websockets.highlevel.FragmentedTextFrameSender;
 import io.undertow.websockets.highlevel.SendCallback;
-
-import java.nio.ByteBuffer;
 
 /**
  *
- * Default {@link PartialWebSocketFrameSender} implementation which use a {@link WebSocketChannel} for the I/O
+ * Default {@link io.undertow.websockets.highlevel.FragmentedBinaryFrameSender} implementation which use a {@link WebSocketChannel} for the I/O
  * operation.
  *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
-class PartialWebSocketChannelTextFrameSender extends PartialWebSocketChannelFrameSender implements PartialWebSocketTextFrameSender {
-    public PartialWebSocketChannelTextFrameSender(WebSocketChannel channel, long payloadSize) {
+class FragmentedChannelTextFrameSender extends FragmentedBinaryChannelFrameSender implements FragmentedTextFrameSender {
+    public FragmentedChannelTextFrameSender(WebSocketChannel channel, long payloadSize) {
         super(channel, WebSocketFrameType.TEXT, payloadSize);
     }
 
