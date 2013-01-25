@@ -89,48 +89,28 @@ public interface WebSocketSession extends BinaryFrameSender, TextFrameSender {
     String getPath();
 
     /**
-     * Set the {@link PartialWebSocketFrameHandler} which is used for text frames. If non is set all text frames will
-     * just be discarded. Returns the {@link PartialWebSocketFrameHandler} which was set before.
+     * If this is true then incoming fragments are buffered and automatically
+     * assembled into a single message.
+     *
+     */
+    boolean isAutomaticallyAssembleFragments();
+
+    void setAutomaticallyAssembleFragments(boolean value);
+
+    /**
+     * Set the {@link FrameHandler} which is used for all frames. If non is set all frames will
+     * just be discarded. Returns the {@link FrameHandler} which was set before.
      * <p/>
-     * Be aware that if you set a new {@link PartialWebSocketFrameHandler} it will only be used for the next websocket
+     * Be aware that if you set a new {@link FrameHandler} it will only be used for the next websocket
      * frame. In progress handling of a frame will continue with the old one.
      */
-    PartialWebSocketFrameHandler setTextFrameHandler(PartialWebSocketFrameHandler handler);
+    FrameHandler setFrameHandler(FrameHandler handler);
 
     /**
-     * Get the {@link PartialWebSocketFrameHandler} which is set for text frames.
+     *
+     * @return The current frame handler
      */
-    PartialWebSocketFrameHandler getTextFrameHandler();
-
-    /**
-     * Remove the {@link PartialWebSocketFrameHandler} which is used for text frames.
-     * <p/>
-     * Be aware that if you remove the {@link PartialWebSocketFrameHandler} in progress handling of a frame will
-     * continue with the previous set {@link PartialWebSocketFrameHandler}.
-     */
-    PartialWebSocketFrameHandler removeTextFrameHandler();
-
-    /**
-     * Set the {@link PartialWebSocketFrameHandler} which is used for binary frames. If non is set all text frames will
-     * just be discarded. Returns the {@link PartialWebSocketFrameHandler} which was set before.
-     * <p/>
-     * Be aware that if you set a new {@link PartialWebSocketFrameHandler} it will only be used for the next websocket
-     * frame. In progress handling of a frame will continue with the old one.
-     */
-    PartialWebSocketFrameHandler setBinaryFrameHandler(PartialWebSocketFrameHandler handler);
-
-    /**
-     * Get the {@link PartialWebSocketFrameHandler} which is set for binary frames.
-     */
-    PartialWebSocketFrameHandler getBinaryFrameHandler();
-
-    /**
-     * Remove the {@link PartialWebSocketFrameHandler} which is used for binary frames.
-     * <p/>
-     * Be aware that if you remove the {@link PartialWebSocketFrameHandler} in progress handling of a frame will
-     * continue with the previous set {@link PartialWebSocketFrameHandler}.
-     */
-    PartialWebSocketFrameHandler removeBinaryFrameHandler();
+    FrameHandler getFrameHandler();
 
     /**
      * Return an unmodifiable {@link Set} of sub-protocols for which the {@link WebSocketSession} will be used. May

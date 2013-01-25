@@ -16,7 +16,7 @@
 
 package io.undertow.websockets.highlevel;
 
-import java.nio.ByteBuffer;
+import io.undertow.websockets.WebSocketFrameType;
 
 /**
  * A WebSocket frame
@@ -24,8 +24,7 @@ import java.nio.ByteBuffer;
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
 public interface WebSocketFrame {
-    boolean isBinary();
-    ByteBuffer getPayload();
+    WebSocketFrameType getType();
     int getRsv();
     boolean isLastFragement();
 }
