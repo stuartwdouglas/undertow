@@ -241,6 +241,12 @@
                 <scope>test</scope>
             </dependency>
 
+            <dependency>
+                <groupId>io.undertow</groupId>
+                <artifactId>undertow-proxy</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
             <!-- External Dependencies -->
 
             <dependency>
