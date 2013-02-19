@@ -66,8 +66,8 @@ public class NodeService extends LifeCycleServiceAdapter {
 
         logger.info("Initializing Node Service");
         this.random = new Random();
-        this.nodes = new ArrayList<>();
-        this.failedNodes = new ArrayList<>();
+        this.nodes = new ArrayList<Node>();
+        this.failedNodes = new ArrayList<Node>();
 
         XmlNodes xmlNodes = XmlConfig.loadNodes();
         logger.info("Adding new nodes : " + xmlNodes);
@@ -150,6 +150,7 @@ public class NodeService extends LifeCycleServiceAdapter {
         // String requestURI = request.decodedURI().toString();
 
         // TODO complete code here
+        System.out.println("getNode: " + sessionid);
 
         return getNode();
     }
@@ -207,7 +208,7 @@ public class NodeService extends LifeCycleServiceAdapter {
          */
         @Override
         public void run() {
-            List<Node> tmp = new ArrayList<>();
+            List<Node> tmp = new ArrayList<Node>();
             while (true) {
                 while (failedNodes.isEmpty()) {
                     synchronized (failedNodes) {
@@ -292,7 +293,7 @@ public class NodeService extends LifeCycleServiceAdapter {
 
         @Override
         public void run() {
-            List<Node> tmp = new ArrayList<>();
+            List<Node> tmp = new ArrayList<Node>();
             while (true) {
                 try {
                     Thread.sleep(5000);
