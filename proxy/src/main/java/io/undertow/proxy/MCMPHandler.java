@@ -25,7 +25,6 @@ import io.undertow.proxy.container.Context;
 import io.undertow.proxy.container.Context.Status;
 import io.undertow.proxy.container.MCMConfig;
 import io.undertow.proxy.container.Node;
-import io.undertow.proxy.container.NodeService;
 import io.undertow.proxy.container.VHost;
 import io.undertow.proxy.mcmp.Constants;
 import io.undertow.server.HttpHandler;
@@ -35,11 +34,16 @@ import io.undertow.util.HttpString;
 
 public class MCMPHandler implements HttpHandler {
 
-    static NodeService nodeservice = new NodeService();
-    static ProxyCallBack callback = new ProxyCallBack();
-
     public MCMPHandler() throws Exception {
-        nodeservice.init();
+        if (md == null)
+            md = MessageDigest.getInstance("MD5");
+        if (thread == null) {
+            thread = new Thread(new MCMAdapterBackgroundProcessor(),
+                    "MCMAdapaterBackgroundProcessor");
+            thread.setDaemon(true);
+            thread.start();
+
+        }
     }
 
     @Override
@@ -146,24 +150,6 @@ public class MCMPHandler implements HttpHandler {
     private final String scheme = "http";
     private final String securityKey = System
             .getProperty("org.jboss.cluster.proxy.securityKey", "secret");
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.apache.coyote.Adapter#init()
-     */
-    public void init() throws Exception {
-
-        if (md == null)
-            md = MessageDigest.getInstance("MD5");
-        if (thread == null) {
-            thread = new Thread(new MCMAdapterBackgroundProcessor(),
-                    "MCMAdapaterBackgroundProcessor");
-            thread.setDaemon(true);
-            thread.start();
-
-        }
-    }
 
     protected class MCMAdapterBackgroundProcessor implements Runnable {
 
@@ -489,7 +475,6 @@ public class MCMPHandler implements HttpHandler {
     private void process_info(HttpServerExchange exchange) throws Exception {
 
         String data = process_info_string();
-        System.out.println("process_info: " + data);
         exchange.setResponseCode(200);
         exchange.getResponseHeaders().add(new HttpString("Content-Type"), "plain/text");
         exchange.getResponseHeaders().add(new HttpString("Server"), "Mod_CLuster/0.0.0");
