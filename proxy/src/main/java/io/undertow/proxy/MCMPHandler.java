@@ -8,12 +8,14 @@ import java.net.MulticastSocket;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 
 import org.xnio.Pooled;
@@ -53,6 +55,7 @@ public class MCMPHandler implements HttpHandler {
         try {
             if (method.equals(Constants.GET)) {
                 // In fact that is /mod_cluster_manager
+                process_manager(exchange);
             } else if (method.equals(Constants.CONFIG)) {
                 process_config(exchange);
             } else if (method.equals(Constants.ENABLE_APP)) {
@@ -102,6 +105,74 @@ public class MCMPHandler implements HttpHandler {
             return;
         }
     }
+
+    static String MOD_CLUSTER_EXPOSED_VERSION = "mod_cluster/1.2.2.Final";
+    /*
+     * build the mod_cluster_manager page
+     * TODO add the nonce logic and the parameters processing.
+     *
+     */
+    boolean checkNonce = true;
+    private void process_manager(HttpServerExchange exchange) throws Exception {
+
+        Map<String, Deque<String>> params = exchange.getQueryParameters();
+        boolean hasNonce = params.containsKey("nonce");
+        if (checkNonce) {
+            /* Check the nonce */
+            if (hasNonce) {
+                String receivedNonce = params.get("nonce").getFirst();
+                if (receivedNonce.equals(getRawNonce())) {
+                    boolean refresh = params.containsKey("refresh");
+                    if (refresh) {
+                        String sval = params.get("refresh").getFirst();
+                        int val = Integer.parseInt(sval);
+                        if (val < 10)
+                            val = 10;
+                        exchange.getResponseHeaders().add(new HttpString("Refresh"), Integer.toString(val));
+                    }
+                    boolean cmd = params.containsKey("Cmd");
+                    if (cmd) {
+                        String scmd = params.get("Cmd").getFirst();
+                        if (scmd.equals("INFO")) {
+                            process_info(exchange);
+                            return;
+                        } else if (scmd.equals("DUMP")) {
+                            process_dump(exchange);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        exchange.setResponseCode(200);
+        exchange.getResponseHeaders().add(new HttpString("Content-Type"), "text/html; charset=ISO-8859-1");
+        StreamSinkChannel resp = exchange.getResponseChannel();
+        StringBuilder buf = new StringBuilder();
+        buf.append("<html><head>\n<title>Mod_cluster Status</title>\n</head><body>\n");
+        buf.append("<h1>"+ MOD_CLUSTER_EXPOSED_VERSION + "</h1>");
+
+        String uri = exchange.getRequestPath();
+        String nonce = getNonce();
+        buf.append("<a href=\"" + uri + "?" + nonce +
+                "&refresh=10" +
+                "\">Auto Refresh</a>");
+
+        buf.append(" <a href=\"" +  uri + "?" + nonce +
+                "&Cmd=DUMP&Range=ALL" +
+                "\">show DUMP output</a>");
+
+        buf.append(" <a href=\"" + uri + "?" + nonce +
+                "&Cmd=INFO&Range=ALL" +
+                "\">show INFO output</a>");
+
+        buf.append("\n");
+
+        buf.append("</body></html>\n");
+        ByteBuffer src = ByteBuffer.wrap(buf.toString().getBytes());
+        resp.write(src);
+        exchange.endExchange();
+     }
 
     private static final String VERSION_PROTOCOL = "0.2.1";
     private static final String TYPESYNTAX = "SYNTAX";
@@ -476,7 +547,7 @@ public class MCMPHandler implements HttpHandler {
 
         String data = process_info_string();
         exchange.setResponseCode(200);
-        exchange.getResponseHeaders().add(new HttpString("Content-Type"), "plain/text");
+        exchange.getResponseHeaders().add(new HttpString("Content-Type"), "text/plain");
         exchange.getResponseHeaders().add(new HttpString("Server"), "Mod_CLuster/0.0.0");
 
         StreamSinkChannel resp = exchange.getResponseChannel();
@@ -547,27 +618,82 @@ public class MCMPHandler implements HttpHandler {
     /**
      * Process <tt>DUMP</tt> request
      *
-     * @param req
-     * @param res
+     * @param exchange
+     * @throws IOException
      */
-    private void process_dump(HttpServerExchange exchange) {
-        String data = "";
+    private void process_dump(HttpServerExchange exchange) throws IOException {
+        String data = process_dump_string();
+        exchange.setResponseCode(200);
+        exchange.getResponseHeaders().add(new HttpString("Content-Type"), "text/plain");
+        exchange.getResponseHeaders().add(new HttpString("Server"), "Mod_CLuster/0.0.0");
+
+        StreamSinkChannel resp = exchange.getResponseChannel();
+        ByteBuffer bb = ByteBuffer.allocate(data.length());
+        bb.put(data.getBytes());
+        bb.flip();
+
+        resp.write(bb);
+        exchange.endExchange();
+
+    }
+    private String process_dump_string() {
+        StringBuilder data = new StringBuilder();
         int i = 1;
         for (Balancer balancer : conf.getBalancers()) {
-            String bal = "balancer: [" + i + "] Name: " + balancer.getName() + " Sticky: "
-                    + (balancer.isStickySession() ? "1" : "0") + " ["
-                    + balancer.getStickySessionCookie() + "]/[" + balancer.getStickySessionPath()
-                    + "] remove: " + (balancer.isStickySessionRemove() ? "1" : "0") + " force: "
-                    + (balancer.isStickySessionForce() ? "1" : "0") + " Timeout: "
-                    + balancer.getWaitWorker() + " maxAttempts: " + balancer.getMaxattempts()
-                    + "\n";
-            data = data.concat(bal);
+            data.append("balancer: [" + i + "] Name: " + balancer.getName() + " Sticky: ")
+                    .append((balancer.isStickySession() ? "1" : "0") + " [")
+                    .append(balancer.getStickySessionCookie() + "]/[" + balancer.getStickySessionPath())
+                    .append("] remove: " + (balancer.isStickySessionRemove() ? "1" : "0") + " force: ")
+                    .append((balancer.isStickySessionForce() ? "1" : "0") + " Timeout: ")
+                    .append(balancer.getWaitWorker() + " maxAttempts: " + balancer.getMaxattempts())
+                    .append("\n");
             i++;
         }
-        // TODO Add more...
 
-        System.out.println("process_dump");
-    }
+        i  = 1;
+        for (Node node : conf.getNodes()) {
+            data.append("node: [").append(i).append(":").append(i).append("]")
+                    .append(",Balancer: ").append(node.getBalancer())
+                    .append(",JVMRoute: ").append(node.getJvmRoute())
+                    .append(",LBGroup: ").append(node.getDomain())
+                    .append(",Host: ").append(node.getHostname())
+                    .append(",Port: ").append(node.getPort())
+                    .append(",Type: ").append(node.getType())
+                    .append(",flushpackets: ")
+                    .append((node.isFlushpackets() ? "1" : "0")).append(",flushwait: ")
+                    .append(node.getFlushwait()).append(",ping: ").append(node.getPing())
+                    .append(",smax: ").append(node.getSmax()).append(",ttl: ")
+                    .append(node.getTtl())
+                    .append(",timeout: ").append(node.getTimeout())
+                    .append("\n");
+            i++;
+        }
+
+        for (VHost host : conf.getHosts()) {
+            int j = 1;
+            long node = conf.getNodeId(host.getJVMRoute());
+            for (String alias : host.getAliases()) {
+                data.append("host: ").append(j).append(" [")
+                    .append(alias).append("] vhost: ").append(host.getId())
+                    .append(" node: ").append(node).append("\n");
+
+                j++;
+            }
+        }
+
+        i = 1;
+        for (Context context : conf.getContexts()) {
+            long node = conf.getNodeId(context.getJVMRoute());
+            data.append("context: ").append(i).append(" [").append(context.getPath())
+                    .append("] vhost: ").append(context.getHostId())
+                    .append(" node: ").append(node)
+                    .append(" status: ").append(context.getStatus()).append("\n");
+
+            i++;
+        }
+
+        return data.toString();
+     }
 
     /**
      * Process <tt>STATUS</tt> request
@@ -858,5 +984,23 @@ public class MCMPHandler implements HttpHandler {
         exchange.getResponseHeaders().add(new HttpString("Type"), type);
         exchange.getResponseHeaders().add(new HttpString("Mess"), errstring);
         exchange.endExchange();
+    }
+
+    /* Nonce logic */
+    private final Random r = new SecureRandom();
+    private String nonce = null;
+    String getNonce() {
+        return "nonce=" + getRawNonce();
+    }
+    String getRawNonce() {
+        if (this.nonce == null) {
+            byte[] nonce = new byte[16];
+            r.nextBytes(nonce);
+            this.nonce = "";
+            for (int i=0; i<16; i=i+2) {
+                this.nonce = this.nonce.concat(Integer.toHexString(0xFF&nonce[i]*16 + 0xFF&nonce[i+1]));
+            }
+        }
+        return nonce;
     }
 }
