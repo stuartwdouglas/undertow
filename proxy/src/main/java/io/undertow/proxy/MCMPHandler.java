@@ -54,7 +54,6 @@ public class MCMPHandler implements HttpHandler {
     @Override
     public void handleRequest(HttpServerExchange exchange) {
         HttpString method = exchange.getRequestMethod();
-
         try {
             if (method.equals(Constants.GET)) {
                 // In fact that is /mod_cluster_manager
@@ -63,14 +62,32 @@ public class MCMPHandler implements HttpHandler {
                 process_config(exchange);
             } else if (method.equals(Constants.ENABLE_APP)) {
                 try {
-                    process_enable(exchange);
+                    Map<String, String[]> params = read_post_parameters(exchange);
+                    if (params == null) {
+                        process_error(TYPESYNTAX, SMESPAR, exchange);
+                        return;
+                    }
+                    process_enable(exchange, params);
+                    process_OK(exchange);
                 } catch (Exception Ex) {
                     Ex.printStackTrace(System.out);
                 }
             } else if (method.equals(Constants.DISABLE_APP)) {
-                process_disable(exchange);
+                Map<String, String[]> params = read_post_parameters(exchange);
+                if (params == null) {
+                    process_error(TYPESYNTAX, SMESPAR, exchange);
+                    return;
+                }
+                process_disable(exchange, params);
+                process_OK(exchange);
             } else if (method.equals(Constants.STOP_APP)) {
-                process_stop(exchange);
+                Map<String, String[]> params = read_post_parameters(exchange);
+                if (params == null) {
+                    process_error(TYPESYNTAX, SMESPAR, exchange);
+                    return;
+                }
+                process_stop(exchange, params);
+                process_OK(exchange);
             } else if (method.equals(Constants.REMOVE_APP)) {
                 try {
                     process_remove(exchange);
@@ -112,7 +129,6 @@ public class MCMPHandler implements HttpHandler {
     static String MOD_CLUSTER_EXPOSED_VERSION = "mod_cluster/1.2.2.Final";
     /*
      * build the mod_cluster_manager page
-     * TODO add the parameters processing.
      * It builds the html like mod_manager.c
      *
      */
@@ -138,14 +154,46 @@ public class MCMPHandler implements HttpHandler {
                         exchange.getResponseHeaders().add(new HttpString("Refresh"), Integer.toString(val));
                     }
                     boolean cmd = params.containsKey("Cmd");
+                    boolean range = params.containsKey("Range");
                     if (cmd) {
                         String scmd = params.get("Cmd").getFirst();
                         if (scmd.equals("INFO")) {
                             process_info(exchange);
-                            return;
                         } else if (scmd.equals("DUMP")) {
                             process_dump(exchange);
-                            return;
+                        } else if (scmd.equals("ENABLE-APP") && range) {
+                            String srange = params.get("Range").getFirst();
+                            Map<String, String[]> mparams = buildMap(params);
+                            if (srange.equals("NODE")) {
+                                process_node_cmd(exchange, mparams, Status.ENABLED);
+                            }
+                            if (srange.equals("DOMAIN")) {
+                                boolean domain = params.containsKey("Domain");
+                                if (domain) {
+                                    String sdomain = params.get("Domain").getFirst();
+                                    process_domain_cmd(exchange, sdomain, Status.ENABLED);
+                                }
+                            }
+                            if (srange.equals("CONTEXT")) {
+                                process_cmd(exchange, mparams, Status.ENABLED);
+                            }
+                         } else if (scmd.equals("DISABLE-APP") && range) {
+                            String srange = params.get("Range").getFirst();
+                            Map<String, String[]> mparams = buildMap(params);
+                            if (srange.equals("NODE")) {
+                                process_node_cmd(exchange, mparams, Status.DISABLED);
+                            }
+                            if (srange.equals("DOMAIN")) {
+                                boolean domain = params.containsKey("Domain");
+                                if (domain) {
+                                    String sdomain = params.get("Domain").getFirst();
+                                    process_domain_cmd(exchange, sdomain, Status.DISABLED);
+                                }
+                            }
+                            if (srange.equals("CONTEXT")) {
+                                process_cmd(exchange, mparams, Status.DISABLED);
+                            }
+
                         }
                     }
                 }
@@ -230,6 +278,29 @@ public class MCMPHandler implements HttpHandler {
         exchange.endExchange();
      }
 
+    private void process_domain_cmd(HttpServerExchange exchange, String domain, Status status) throws Exception {
+        for (Node node : conf.getNodes()) {
+            if (node.getDomain().equals(domain)) {
+                Map<String, String[]> params = new HashMap<String, String[]>();
+                String[] values = new String[1];
+                values[0] = node.getJvmRoute();
+                params.put("JVMRoute", values);
+                process_node_cmd(exchange, params, status);
+            }
+        }
+     }
+
+    private Map<String, String[]> buildMap(Map<String, Deque<String>> params) {
+        Map<String, String[]> sparams = new HashMap<String, String[]>();
+        for (String key : params.keySet()) {
+            // In fact we only have one
+            String[] values = new String[1];
+            values[0] = params.get(key).getFirst();
+            sparams.put(key, values);
+        }
+        return sparams;
+    }
+
     /*
      * list the session informations.
      */
@@ -301,6 +372,7 @@ public class MCMPHandler implements HttpHandler {
         switch (status) {
             case DISABLED:
                 buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=CONTEXT&" + contextString(path, alias, jvmRoute) + "\">Enable</a> ");
+                break;
             case ENABLED:
                 buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=DISABLE-APP&Range=CONTEXT&" + contextString(path, alias, jvmRoute) + "\">Enable</a> ");
                 break;
@@ -968,8 +1040,8 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_stop(HttpServerExchange exchange) throws Exception {
-        process_cmd(exchange, Context.Status.STOPPED);
+    private void process_stop(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
+        process_cmd(exchange, params, Context.Status.STOPPED);
     }
 
     /**
@@ -979,8 +1051,8 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_disable(HttpServerExchange exchange) throws Exception {
-        process_cmd(exchange, Context.Status.DISABLED);
+    private void process_disable(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
+        process_cmd(exchange, params, Context.Status.DISABLED);
     }
 
     /**
@@ -990,19 +1062,13 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_enable(HttpServerExchange exchange) throws Exception {
-        process_cmd(exchange, Context.Status.ENABLED);
+    private void process_enable(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
+        process_cmd(exchange, params, Context.Status.ENABLED);
     }
 
-    private void process_cmd(HttpServerExchange exchange, Context.Status status) throws Exception {
-        Map<String, String[]> params = read_post_parameters(exchange);
-        if (params == null) {
-            process_error(TYPESYNTAX, SMESPAR, exchange);
-            return;
-        }
-
-        if (exchange.getRequestPath().equals("*") || exchange.getRequestPath().endsWith("/*")) {
-            process_node_cmd(exchange, status);
+    private void process_cmd(HttpServerExchange exchange, Map<String, String[]> params, Context.Status status) throws Exception {
+         if (exchange.getRequestPath().equals("*") || exchange.getRequestPath().endsWith("/*")) {
+            process_node_cmd(exchange, params,  status);
             return;
         }
 
@@ -1037,13 +1103,11 @@ public class MCMPHandler implements HttpHandler {
         long id = conf.insertupdate(host);
         context.setHostid(id);
         conf.insertupdate(context);
-        process_OK(exchange);
     }
 
     /* Process a *-APP command that applies to the node */
-    private void process_node_cmd(HttpServerExchange exchange, Status status) throws Exception {
+    private void process_node_cmd(HttpServerExchange exchange, Map<String, String[]> params, Status status) throws Exception {
         String jvmRoute = null;
-        Map<String, String[]> params = read_post_parameters(exchange);
         for (Map.Entry<String, String[]> e : params.entrySet()) {
             String name = e.getKey();
             String[] values = e.getValue();
@@ -1071,7 +1135,6 @@ public class MCMPHandler implements HttpHandler {
                 }
             }
         }
-        System.out.println("process_node_cmd:" + process_info_string());
     }
 
     /**
