@@ -32,6 +32,7 @@ public class MCMConfig {
     private List<Balancer> balancers = new ArrayList<Balancer>();
     private List<VHost> hosts = new ArrayList<VHost>();
     private List<Context> contexts = new ArrayList<Context>();
+    private List<SessionId> sessionids = new ArrayList<SessionId>();
     private final int lbstatus_recalc_time = 5;
 
     protected Thread thread = null;
@@ -307,6 +308,26 @@ public class MCMConfig {
         }
         for (Node nod : remnodes)
             getNodes().remove(nod);
+    }
+
+    public List<SessionId> getSessionids() {
+        return sessionids;
+    }
+
+    public void setSessionids(List<SessionId> sessionids) {
+        this.sessionids = sessionids;
+    }
+
+    /*
+     * Count the number of sessionid corresponding to the node.
+     */
+    public String getJVMRouteSessionCount(String jvmRoute) {
+        int i = 0;
+        for (SessionId s : this.sessionids) {
+            if (s.getJmvRoute().equals(jvmRoute))
+                i++;
+        }
+        return "" + i;
     }
 
 }

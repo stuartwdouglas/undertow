@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -27,6 +28,8 @@ import io.undertow.proxy.container.Context;
 import io.undertow.proxy.container.Context.Status;
 import io.undertow.proxy.container.MCMConfig;
 import io.undertow.proxy.container.Node;
+import io.undertow.proxy.container.Node.NodeStatus;
+import io.undertow.proxy.container.SessionId;
 import io.undertow.proxy.container.VHost;
 import io.undertow.proxy.mcmp.Constants;
 import io.undertow.server.HttpHandler;
@@ -109,10 +112,14 @@ public class MCMPHandler implements HttpHandler {
     static String MOD_CLUSTER_EXPOSED_VERSION = "mod_cluster/1.2.2.Final";
     /*
      * build the mod_cluster_manager page
-     * TODO add the nonce logic and the parameters processing.
+     * TODO add the parameters processing.
+     * It builds the html like mod_manager.c
      *
      */
     boolean checkNonce = true;
+    boolean reduceDisplay = false;
+    boolean allowCmd = true;
+    boolean displaySessionids = true;
     private void process_manager(HttpServerExchange exchange) throws Exception {
 
         Map<String, Deque<String>> params = exchange.getQueryParameters();
@@ -168,11 +175,174 @@ public class MCMPHandler implements HttpHandler {
 
         buf.append("\n");
 
+        /* TODO sort the node by LBGroup (domain) */
+        String lbgroup = "";
+        for (Node node : conf.getNodes()) {
+            if (!lbgroup.equals(node.getDomain())) {
+                lbgroup = node.getDomain();
+                if (reduceDisplay)
+                    buf.append("<br/><br/>LBGroup " + lbgroup + ": ");
+                else
+                    buf.append("<h1> LBGroup " + lbgroup + ": ");
+                if (allowCmd) {
+                    domainCommandString(buf, uri, Status.ENABLED, lbgroup);
+                    domainCommandString(buf, uri, Status.DISABLED, lbgroup);
+                }
+            }
+            if (reduceDisplay) {
+                buf.append("<br/><br/>Node " + node.getJvmRoute());
+                printProxyStat(buf, node, reduceDisplay);
+            } else
+                buf.append("<h1> Node " + node.getJvmRoute() + " (" + node.getType() + "://" + node.getHostname() + ":" + node.getPort() + "): </h1>\n");
+
+
+            if (allowCmd) {
+                nodeCommandString(buf, uri, Status.ENABLED, node.getJvmRoute());
+                nodeCommandString(buf, uri, Status.DISABLED, node.getJvmRoute());
+            }
+            if (!reduceDisplay) {
+                buf.append("<br/>\n");
+                buf.append("Balancer: " + node.getBalancer() + ",LBGroup: " + node.getDomain());
+                String flushpackets = "off";
+                if (node.isFlushpackets())
+                    flushpackets = "Auto";
+                buf.append(",Flushpackets: " + flushpackets + ",Flushwait: " + node.getFlushwait() + ",Ping: " + node.getPing() + " ,Smax: " + node.getPing() + ",Ttl: " + node.getTtl());
+                printProxyStat(buf, node, reduceDisplay);
+            } else {
+                buf.append("<br/>\n");
+            }
+            // the sessionid list is mostly for demos.
+            if (displaySessionids)
+                buf.append(",Num sessions: " + conf.getJVMRouteSessionCount(node.getJvmRoute()));
+            buf.append("\n");
+
+            // Process the virtual-host of the node
+            printInfoHost(buf, uri, reduceDisplay, allowCmd, node.getJvmRoute());
+        }
+
+       // Display the all the actives sessions
+        if (displaySessionids)
+            printInfoSessions(buf, conf.getSessionids());
+
         buf.append("</body></html>\n");
         ByteBuffer src = ByteBuffer.wrap(buf.toString().getBytes());
         resp.write(src);
         exchange.endExchange();
      }
+
+    /*
+     * list the session informations.
+     */
+    private void printInfoSessions(StringBuilder buf, List<SessionId> sessionids) {
+        buf.append("<h1>SessionIDs:</h1>");
+        buf.append("<pre>");
+        for (SessionId s : sessionids)
+            buf.append("id: " + s.getSessionId() + " route: " + s.getJmvRoute() + "\n");
+        buf.append("</pre>");
+    }
+
+    /* based on manager_info_hosts */
+    private void printInfoHost(StringBuilder buf, String uri, boolean reduceDisplay, boolean allowCmd, String jvmRoute) {
+        for (VHost host : conf.getHosts()) {
+            if (host.getJVMRoute().equals(jvmRoute)) {
+                if (!reduceDisplay) {
+                    buf.append("<h2> Virtual Host " + host.getId() + ":</h2>");
+                }
+                printInfoContexts(buf, uri, reduceDisplay, allowCmd, host.getId(), host.getAliases(), jvmRoute);
+                if (reduceDisplay) {
+                    buf.append("Aliases: ");
+                    for (String alias : host.getAliases())
+                        buf.append(alias + " ");
+                } else {
+                    buf.append("<h3>Aliases:</h3>");
+                    buf.append("<pre>");
+                    for (String alias : host.getAliases())
+                        buf.append(alias + "\n");
+                    buf.append("</pre>");
+                }
+
+            }
+        }
+
+    }
+
+    /* based on manager_info_contexts */
+    private void printInfoContexts(StringBuilder buf, String uri, boolean reduceDisplay, boolean allowCmd, long host, String[] alias, String jvmRoute) {
+        if (!reduceDisplay)
+            buf.append("<h3>Contexts:</h3>");
+        buf.append("<pre>");
+        for (Context context : conf.getContexts()) {
+            if (context.getJVMRoute().equals(jvmRoute) && context.getHostid() == host) {
+                String status = "REMOVED";
+                switch (context.getStatus()) {
+                    case ENABLED:
+                        status = "ENABLED";
+                        break;
+                    case DISABLED:
+                        status = "DISABLED";
+                        break;
+                    case STOPPED:
+                        status = "STOPPED";
+                        break;
+                }
+                buf.append(context.getPath() + " , Status: " + status + " Request: " + context.getNbRequests() + " ");
+                if (allowCmd)
+                    contextCommandString(buf, uri, context.getStatus(), context.getPath(), alias[0], jvmRoute);
+                buf.append("\n");
+            }
+            buf.append("</pre>");
+
+        }
+    }
+
+    /* generate a command URL for the context */
+    private void contextCommandString(StringBuilder buf, String uri, Status status, String path, String alias, String jvmRoute) {
+
+        switch (status) {
+            case DISABLED:
+                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=CONTEXT&" + contextString(path, alias, jvmRoute) + "\">Enable</a> ");
+            case ENABLED:
+                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=DISABLE-APP&Range=CONTEXT&" + contextString(path, alias, jvmRoute) + "\">Enable</a> ");
+                break;
+        }
+    }
+
+    private String contextString(String path, String alias, String jvmRoute) {
+        return "JVMRoute=" + jvmRoute + "&Alias=" +  alias + "&Context=" + path;
+    }
+
+    private void nodeCommandString(StringBuilder buf, String uri, Status status, String jvmRoute) {
+        switch(status) {
+            case ENABLED:
+                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=NODE&JVMRoute=" + jvmRoute + "\">Enable Contexts</a> ");
+                break;
+            case DISABLED:
+                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=DISABLE-APP&Range=NODE&JVMRoute=" + jvmRoute + "\">Disable Contexts</a> ");
+                break;
+        }
+    }
+
+    private void printProxyStat(StringBuilder buf, Node node, boolean reduceDisplay ) {
+        String status = "NOTOK";
+        if (node.getStatus()==NodeStatus.NODE_UP)
+            status = "OK";
+        if (reduceDisplay)
+            buf.append(" " + status + " ");
+        else {
+            buf.append(",Status: " + status + ",Elected: " + node.getOldelected() + ",Read: " + node.getRead() + ",Transferred: " + node.getTransfered() + ",Connected: "
+                    + node.getConnected() + ",Load: " + node.getLoad());
+        }
+    }
+
+    /* based on domain_command_string */
+    private void domainCommandString(StringBuilder buf, String uri, Status status, String lbgroup) {
+        switch(status) {
+            case ENABLED:
+                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=DOMAIN&Domain=" + lbgroup + "\">Enable Nodes</a>");
+            case DISABLED:
+                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=DISABLE-APP&Range=DOMAIN&Domain=" + lbgroup + "\">Disable Nodes</a>");
+        }
+    }
 
     private static final String VERSION_PROTOCOL = "0.2.1";
     private static final String TYPESYNTAX = "SYNTAX";
@@ -593,12 +763,10 @@ public class MCMPHandler implements HttpHandler {
         i = 1;
         for (Context context : conf.getContexts()) {
             data.append("Context: [").append(conf.getNodeId(context.getJVMRoute())).append(":")
-                    .append(context.getHostId()).append(":").append(i).append("], Context: ")
+                    .append(context.getHostid()).append(":").append(i).append("], Context: ")
                     .append(context.getPath()).append(", Status: ").append(context.getStatus())
                     .append("\n");
-
-            // TODO do we need to increment i ?
-            // i++;
+            i++;
         }
         return data.toString();
     }
@@ -685,7 +853,7 @@ public class MCMPHandler implements HttpHandler {
         for (Context context : conf.getContexts()) {
             long node = conf.getNodeId(context.getJVMRoute());
             data.append("context: ").append(i).append(" [").append(context.getPath())
-                    .append("] vhost: ").append(context.getHostId())
+                    .append("] vhost: ").append(context.getHostid())
                     .append(" node: ").append(node)
                     .append(" status: ").append(context.getStatus()).append("\n");
 
@@ -872,8 +1040,37 @@ public class MCMPHandler implements HttpHandler {
         process_OK(exchange);
     }
 
-    /* TODO */
-    private void process_node_cmd(HttpServerExchange exchange, Status enabled) {
+    /* Process a *-APP command that applies to the node */
+    private void process_node_cmd(HttpServerExchange exchange, Status status) throws Exception {
+        String jvmRoute = null;
+        Map<String, String[]> params = read_post_parameters(exchange);
+        for (Map.Entry<String, String[]> e : params.entrySet()) {
+            String name = e.getKey();
+            String[] values = e.getValue();
+            String value = values[0];
+            if (name.equalsIgnoreCase("JVMRoute")) {
+                jvmRoute = value;
+            }
+        }
+        if (jvmRoute == null) {
+            process_error(TYPESYNTAX, SROUBAD, exchange);
+            return;
+        }
+
+        for (VHost host : conf.getHosts()) {
+            if (host.getJVMRoute().equals(jvmRoute)) {
+                for (Context context : conf.getContexts()) {
+                    if (context.getJVMRoute().equals(jvmRoute) && context.getHostid() == host.getId()) {
+                        if (status != Status.REMOVED) {
+                            context.setStatus(status);
+                            conf.insertupdate(context);
+                        } else {
+                            conf.remove(context, host);
+                        }
+                    }
+                }
+            }
+        }
         System.out.println("process_node_cmd:" + process_info_string());
     }
 
@@ -964,7 +1161,6 @@ public class MCMPHandler implements HttpHandler {
      */
     private void process_OK(HttpServerExchange exchange) throws Exception {
         exchange.setResponseCode(200);
-        // TODO exchange.setMessage("OK");
         exchange.getResponseHeaders().add(new HttpString("Content-type"), "plain/text");
         exchange.endExchange();
     }

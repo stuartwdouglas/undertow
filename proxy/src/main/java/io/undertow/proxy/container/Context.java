@@ -35,25 +35,16 @@ public class Context implements Serializable {
     /**
      * {@code Status}
      * <p>
-     * This class represents the status of the context.
+     * This class represents the status of the context, node etc.
      * </p>
-     * Created on Jun 13, 2012 at 4:22:11 PM
      *
-     * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>
+     * @author Jean-Frederic Clere
      */
     public enum Status {
-        /**
-         *
-         */
         ENABLED,
-        /**
-         *
-         */
         DISABLED,
-        /**
-         *
-         */
-        STOPPED;
+        STOPPED,
+        REMOVED;
     }
 
     /**
@@ -82,6 +73,11 @@ public class Context implements Serializable {
      * The virtualhost id.
      */
     private long hostid;
+
+    /*
+     * The number of active requests
+     */
+    private long nbRequests;
 
     /**
      * Create a new instance of {@code Context}
@@ -185,15 +181,19 @@ public class Context implements Serializable {
         JVMRoute = jVMRoute;
     }
 
-    public long getHostId() {
-        return getHostid();
-    }
-
     public long getHostid() {
         return hostid;
     }
 
     public void setHostid(long hostid) {
         this.hostid = hostid;
+    }
+
+    public long getNbRequests() {
+        return nbRequests;
+    }
+
+    public void setNbRequests(long nbRequests) {
+        this.nbRequests = nbRequests;
     }
 }

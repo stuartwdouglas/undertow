@@ -53,6 +53,7 @@ public class Node implements Serializable {
     private String domain = "";
     private String hostname = "localhost";
     private int port = 8009;
+    private boolean flushPackets = false;
 
     /**
      * Protocol using by the connector (AJP/http/https).
@@ -531,5 +532,13 @@ public class Node implements Serializable {
 
     public void setId(long id) {
         this.id = id;
+    }
+
+    public boolean isFlushPackets() {
+        return flushPackets;
+    }
+
+    public void setFlushPackets(boolean flushPackets) {
+        this.flushPackets = flushPackets;
     }
 }
