@@ -51,16 +51,12 @@ public class Context implements Serializable {
      *
      */
     private static final long serialVersionUID = -3107364662635260034L;
-    /**
-     * Context: (String) URL to be mapped.
-     */
-    private String name;
-    /**
+     /**
      * Status of the application: ENABLED, DISABLED or STOPPED.
      */
     private Status status;
     /**
-     * The context path
+     * The context path. (String) URL to be mapped.
      */
     private String path;
 
@@ -106,26 +102,6 @@ public class Context implements Serializable {
     public boolean isStopped() {
         return this.status == Status.STOPPED;
     }
-
-    /**
-     * Getter for name
-     *
-     * @return the name
-     */
-    public String getName() {
-        return this.name;
-    }
-
-    /**
-     * Setter for the name
-     *
-     * @param name
-     *            the name to set
-     */
-    public void setName(String name) {
-        this.name = name;
-    }
-
     /**
      * Getter for status
      *
@@ -152,7 +128,7 @@ public class Context implements Serializable {
      */
     @Override
     public String toString() {
-        return "Context[Path: " + this.name + ", Status: " + this.status + "]";
+        return "Context[Path: " + this.path + ", Status: " + this.status + ", Node: " + this.JVMRoute + ", Host: " + this.hostid +  "]";
     }
 
     /**

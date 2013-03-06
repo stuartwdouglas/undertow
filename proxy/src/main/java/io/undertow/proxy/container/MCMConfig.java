@@ -203,7 +203,7 @@ public class MCMConfig {
             for (Context con : getContexts()) {
                 if (context.getJVMRoute().equals(con.getJVMRoute())
                         && context.getHostid() == con.getHostid()
-                        && context.getPath() == con.getPath()) {
+                        && context.getPath().equals(con.getPath())) {
                     // update the status.
                     con.setStatus(context.getStatus());
                     return;

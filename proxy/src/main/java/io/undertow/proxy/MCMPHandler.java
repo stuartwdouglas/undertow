@@ -140,6 +140,7 @@ public class MCMPHandler implements HttpHandler {
 
         Map<String, Deque<String>> params = exchange.getQueryParameters();
         boolean hasNonce = params.containsKey("nonce");
+        int refreshTime = 0;
         if (checkNonce) {
             /* Check the nonce */
             if (hasNonce) {
@@ -148,10 +149,10 @@ public class MCMPHandler implements HttpHandler {
                     boolean refresh = params.containsKey("refresh");
                     if (refresh) {
                         String sval = params.get("refresh").getFirst();
-                        int val = Integer.parseInt(sval);
-                        if (val < 10)
-                            val = 10;
-                        exchange.getResponseHeaders().add(new HttpString("Refresh"), Integer.toString(val));
+                        refreshTime = Integer.parseInt(sval);
+                        if (refreshTime < 10)
+                            refreshTime = 10;
+                        exchange.getResponseHeaders().add(new HttpString("Refresh"), Integer.toString(refreshTime));
                     }
                     boolean cmd = params.containsKey("Cmd");
                     boolean range = params.containsKey("Range");
@@ -159,8 +160,10 @@ public class MCMPHandler implements HttpHandler {
                         String scmd = params.get("Cmd").getFirst();
                         if (scmd.equals("INFO")) {
                             process_info(exchange);
+                            return;
                         } else if (scmd.equals("DUMP")) {
                             process_dump(exchange);
+                            return;
                         } else if (scmd.equals("ENABLE-APP") && range) {
                             String srange = params.get("Range").getFirst();
                             Map<String, String[]> mparams = buildMap(params);
@@ -209,9 +212,10 @@ public class MCMPHandler implements HttpHandler {
 
         String uri = exchange.getRequestPath();
         String nonce = getNonce();
-        buf.append("<a href=\"" + uri + "?" + nonce +
-                "&refresh=10" +
-                "\">Auto Refresh</a>");
+        if (refreshTime<=0)
+            buf.append("<a href=\"" + uri + "?" + nonce +
+                    "&refresh=10" +
+                    "\">Auto Refresh</a>");
 
         buf.append(" <a href=\"" +  uri + "?" + nonce +
                 "&Cmd=DUMP&Range=ALL" +
@@ -358,7 +362,7 @@ public class MCMPHandler implements HttpHandler {
                 }
                 buf.append(context.getPath() + " , Status: " + status + " Request: " + context.getNbRequests() + " ");
                 if (allowCmd)
-                    contextCommandString(buf, uri, context.getStatus(), context.getPath(), alias[0], jvmRoute);
+                    contextCommandString(buf, uri, context.getStatus(), context.getPath(), alias, jvmRoute);
                 buf.append("\n");
             }
             buf.append("</pre>");
@@ -367,20 +371,32 @@ public class MCMPHandler implements HttpHandler {
     }
 
     /* generate a command URL for the context */
-    private void contextCommandString(StringBuilder buf, String uri, Status status, String path, String alias, String jvmRoute) {
-
+    private void contextCommandString(StringBuilder buf, String uri, Status status, String path, String[] alias, String jvmRoute) {
         switch (status) {
             case DISABLED:
-                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=CONTEXT&" + contextString(path, alias, jvmRoute) + "\">Enable</a> ");
+                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=CONTEXT&");
+                contextString(buf, path, alias, jvmRoute);
+                buf.append("\">Enable</a> ");
                 break;
             case ENABLED:
-                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=DISABLE-APP&Range=CONTEXT&" + contextString(path, alias, jvmRoute) + "\">Enable</a> ");
+                buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=DISABLE-APP&Range=CONTEXT&");
+                contextString(buf, path, alias, jvmRoute);
+                buf.append("\">Disable</a> ");
                 break;
         }
     }
 
-    private String contextString(String path, String alias, String jvmRoute) {
-        return "JVMRoute=" + jvmRoute + "&Alias=" +  alias + "&Context=" + path;
+    private void contextString(StringBuilder buf, String path, String[] alias, String jvmRoute) {
+        buf.append("JVMRoute=" + jvmRoute + "&Alias=");
+        boolean first = true;
+        for (String a : alias) {
+             if (first)
+                first = false;
+            else
+                buf.append(",");
+            buf.append(a);
+        }
+       buf.append("&Context=" + path);
     }
 
     private void nodeCommandString(StringBuilder buf, String uri, Status status, String jvmRoute) {
@@ -411,8 +427,10 @@ public class MCMPHandler implements HttpHandler {
         switch(status) {
             case ENABLED:
                 buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=DOMAIN&Domain=" + lbgroup + "\">Enable Nodes</a>");
+                break;
             case DISABLED:
                 buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=DISABLE-APP&Range=DOMAIN&Domain=" + lbgroup + "\">Disable Nodes</a>");
+                break;
         }
     }
 
