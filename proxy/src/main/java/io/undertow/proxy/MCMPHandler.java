@@ -41,8 +41,16 @@ public class MCMPHandler implements HttpHandler {
 
     private String chost = "127.0.0.1";
     private int cport = 6666;
+    private ProxyHandler proxy;
+
+    private MCMConfig conf = null;
 
     public void init() throws Exception {
+        if (conf == null) {
+            conf = new MCMConfig();
+            conf.init();
+            proxy.setNodeservice(conf);
+        }
         if (md == null)
             md = MessageDigest.getInstance("MD5");
         if (thread == null) {
@@ -56,6 +64,16 @@ public class MCMPHandler implements HttpHandler {
 
     @Override
     public void handleRequest(HttpServerExchange exchange) {
+
+        /*
+         * Proxy the request that needs to be proxied and process others
+         */
+        InetSocketAddress addr = exchange.getDestinationAddress();
+        if (addr.getPort() != cport || !addr.getHostName().equals(chost)) {
+            proxy.handleRequest(exchange);
+            return;
+        }
+
         HttpString method = exchange.getRequestMethod();
         try {
             if (method.equals(Constants.GET)) {
@@ -567,8 +585,6 @@ public class MCMPHandler implements HttpHandler {
         }
 
     }
-
-    static MCMConfig conf = new MCMConfig();
 
     /**
      * Process <tt>PING</tt> request
@@ -1294,5 +1310,13 @@ public class MCMPHandler implements HttpHandler {
 
     public void setCport(int cport) {
         this.cport = cport;
+    }
+
+    public ProxyHandler getProxy() {
+        return proxy;
+    }
+
+    public void setProxy(ProxyHandler proxy) {
+        this.proxy = proxy;
     }
 }

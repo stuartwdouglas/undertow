@@ -22,11 +22,12 @@ import java.util.List;
 
 /**
  * Configuration of the cluster received via the MCM elements.
+ * And provider of the node for the ProxyHander.
  *
  * @author Jean-Frederic Clere
  *
  */
-public class MCMConfig {
+public class MCMConfig extends NodeService {
 
     private List<Node> nodes = new ArrayList<Node>();
     private List<Balancer> balancers = new ArrayList<Balancer>();
@@ -37,7 +38,16 @@ public class MCMConfig {
 
     protected Thread thread = null;
 
-    public MCMConfig() {
+    /**
+     * Create a new instance of {@code NodeService}
+     */
+    public MCMConfig()  {
+        super();
+    }
+
+
+    @Override
+    public void init() throws Exception {
         // Create the thread to keep the configure up to date.
         if (thread == null) {
             thread = new Thread(new MCMConfigBackgroundProcessor(), "MCMConfigBackgroundProcessor");
@@ -45,7 +55,7 @@ public class MCMConfig {
             thread.start();
 
         }
-
+        setInitialized(true);
     }
 
      protected class MCMConfigBackgroundProcessor implements Runnable {
@@ -330,4 +340,12 @@ public class MCMConfig {
         return "" + i;
     }
 
+    /*
+     * Find the cookie and return the corresponding node.
+     */
+    @Override
+    public Node getNodeByCookie(String cooky) {
+        // TODO Auto-generated method stub
+        return null;
+    }
 }

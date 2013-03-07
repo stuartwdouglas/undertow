@@ -1,6 +1,5 @@
 package io.undertow.proxy;
 
-import io.undertow.io.Sender;
 import io.undertow.proxy.container.Node;
 import io.undertow.proxy.container.NodeService;
 import io.undertow.server.HttpHandler;
@@ -10,29 +9,30 @@ import io.undertow.util.Headers;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Deque;
+import java.util.List;
 
 import org.xnio.channels.StreamSinkChannel;
 
 public class ProxyHandler implements HttpHandler {
 
-    static NodeService nodeservice = new NodeService();
-    static ProxyCallBack callback = new ProxyCallBack();
+    private NodeService nodeservice = null;
 
-    public ProxyHandler() throws Exception {
-        nodeservice.init();
+    /* Initialise the node provider to the xml one if there was none set before */
+    public void init() throws Exception {
+        if (getNodeservice() ==null)
+            setNodeservice(new NodeService());
     }
 
     @Override
     public void handleRequest(HttpServerExchange exchange) {
         HeaderMap headers = exchange.getRequestHeaders();
-        Deque<String> head = headers.get(Headers.COOKIE);
+        List<String> head = headers.get(Headers.COOKIE);
         String cooky = null;
         if (head != null)
             cooky = head.toString();
         System.out.println("Cookie:" + cooky);
         try {
-            Node node = nodeservice.getNode(cooky);
+            Node node = getNodeservice().getNodeByCookie(head);
             System.out.println("Node:" + node);
             if (node==null) {
                 exchange.setResponseCode(503);
@@ -48,13 +48,13 @@ public class ProxyHandler implements HttpHandler {
             } else {
                 System.out.println("Writing OK");
                 exchange.setResponseCode(200);
-                Sender resp = exchange.getResponseSender();
+                StreamSinkChannel resp = exchange.getResponseChannel();
 
                 ByteBuffer bb = ByteBuffer.allocate(100);
                 bb.put("OK".getBytes());
                 bb.flip();
 
-                resp.send(bb, callback);
+                resp.write(bb);
                 exchange.endExchange();
             }
         } catch (Exception e) {
@@ -74,5 +74,13 @@ public class ProxyHandler implements HttpHandler {
             exchange.endExchange();
             return;
         }
+    }
+
+    public NodeService getNodeservice() {
+        return nodeservice;
+    }
+
+    public void setNodeservice(NodeService nodeservice) {
+        this.nodeservice = nodeservice;
     }
 }

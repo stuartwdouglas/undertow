@@ -145,7 +145,7 @@ public class NodeService extends LifeCycleServiceAdapter {
      * @param sessionid
      * @return a node instance form the list of nodes
      */
-    public Node getNode(String sessionid) {
+    public Node getNodeBySessionid(String sessionid) {
         // URI decoding
         // String requestURI = request.decodedURI().toString();
 
@@ -182,14 +182,14 @@ public class NodeService extends LifeCycleServiceAdapter {
      * @param failedNode
      * @return
      */
-    public Node getNode(String sessionid, Node failedNode) {
+    public Node getNodeBySessionid(String sessionid, Node failedNode) {
         if (failedNode != null) {
             // Set the node status to down
             logger.warn("The node [" + failedNode.getHostname() + ":" + failedNode.getPort() + "] is down");
             failedNode.setNodeDown();
         }
 
-        return getNode(sessionid);
+        return getNodeBySessionid(sessionid);
     }
 
     /**
@@ -343,5 +343,21 @@ public class NodeService extends LifeCycleServiceAdapter {
                 }
             }
         }
+    }
+
+    /*
+     * return the corresponding node corresponding to the cookie.
+     */
+    public Node getNodeByCookie(String cookie) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    /*
+     * Find the cookie and return the corresponding node.
+     */
+    public Node getNodeByCookie(List<String> cookies) {
+        // TODO Auto-generated method stub
+        return null;
     }
 }
