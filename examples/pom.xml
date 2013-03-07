@@ -48,7 +48,7 @@
 
         <dependency>
             <groupId>io.undertow</groupId>
-            <artifactId>undertow-websockets</artifactId>
+            <artifactId>undertow-websockets-jsr</artifactId>
         </dependency>
 
         <dependency>
