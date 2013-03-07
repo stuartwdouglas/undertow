@@ -48,12 +48,13 @@ public class XmlConfig {
     }
 
     /**
-     * @return the list of nodes
-     * @throws Exception.
+     * @return the list of nodes or null if it can't parse the file.
+     * @throws Exception
      */
     public static XmlNodes loadNodes() throws Exception {
 
-        try (FileInputStream fis = new FileInputStream(CONFIG_PATH)) {
+        FileInputStream fis = new FileInputStream(CONFIG_PATH);
+        try {
             logger.info("Loading nodes configurations");
             XmlNodes nodes = (XmlNodes) xmlToObject(fis);
             return nodes;
