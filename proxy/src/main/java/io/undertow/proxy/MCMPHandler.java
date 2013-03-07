@@ -39,7 +39,10 @@ import io.undertow.util.HttpString;
 
 public class MCMPHandler implements HttpHandler {
 
-    public MCMPHandler() throws Exception {
+    private String chost = "127.0.0.1";
+    private int cport = 6666;
+
+    public void init() throws Exception {
         if (md == null)
             md = MessageDigest.getInstance("MD5");
         if (thread == null) {
@@ -474,10 +477,6 @@ public class MCMPHandler implements HttpHandler {
     private final int sport = 23364;
     private final String slocal = "127.0.0.1";
     private MessageDigest md = null;
-    private final String chost = "127.0.0.1"; // System.getProperty("org.jboss.cluster.proxy.net.ADDRESS",
-                                        // "127.0.0.1");
-    private final int cport = Integer.parseInt(System.getProperty("org.jboss.cluster.proxy.net.PORT",
-            "6666"));
     private final String scheme = "http";
     private final String securityKey = System
             .getProperty("org.jboss.cluster.proxy.securityKey", "secret");
@@ -534,9 +533,9 @@ public class MCMPHandler implements HttpHandler {
 
                     String sbuf = "HTTP/1.0 200 OK\r\n" + "Date: " + date + "\r\n" + "Sequence: "
                             + seq + "\r\n" + "Digest: " + str.toString() + "\r\n" + "Server: "
-                            + server + "\r\n" + "X-Manager-Address: " + chost + ":" + cport
+                            + server + "\r\n" + "X-Manager-Address: " + getChost() + ":" + getCport()
                             + "\r\n" + "X-Manager-Url: /" + server + "\r\n"
-                            + "X-Manager-Protocol: " + scheme + "\r\n" + "X-Manager-Host: " + chost
+                            + "X-Manager-Protocol: " + scheme + "\r\n" + "X-Manager-Host: " + getChost()
                             + "\r\n";
 
                     byte[] buf = sbuf.getBytes();
@@ -1279,5 +1278,21 @@ public class MCMPHandler implements HttpHandler {
             }
         }
         return nonce;
+    }
+
+    public String getChost() {
+        return chost;
+    }
+
+    public void setChost(String chost) {
+        this.chost = chost;
+    }
+
+    public int getCport() {
+        return cport;
+    }
+
+    public void setCport(int cport) {
+        this.cport = cport;
     }
 }
