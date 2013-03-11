@@ -1,5 +1,10 @@
 package io.undertow.examples.proxy;
 
+import org.xnio.OptionMap;
+import org.xnio.Options;
+import org.xnio.Xnio;
+import org.xnio.XnioWorker;
+
 import io.undertow.Undertow;
 import io.undertow.examples.UndertowExample;
 import io.undertow.proxy.MCMPHandler;
@@ -20,6 +25,26 @@ public class ProxyServer {
     static String phost = System.getProperty("io.undertow.examples.proxy.ADDRESS", "localhost");
     static final int pport = Integer.parseInt(System.getProperty("io.undertow.examples.proxy.PORT", "8000"));
 
+    /* Start HACK */
+    private static final OptionMap DEFAULT_OPTIONS;
+    private static XnioWorker worker;
+    static {
+       final OptionMap.Builder builder = OptionMap.builder()
+               .set(Options.WORKER_IO_THREADS, 8)
+               .set(Options.TCP_NODELAY, true)
+               .set(Options.KEEP_ALIVE, true)
+               .set(Options.WORKER_NAME, "Proxy");
+         DEFAULT_OPTIONS = builder.getMap();
+         Xnio xnio = Xnio.getInstance();
+         try {
+            worker = xnio.createWorker(null, DEFAULT_OPTIONS);
+            System.out.println("worker: " + worker);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    /* End HACK */
+
     public static void main(final String[] args) {
         Undertow server;
         try {
@@ -30,6 +55,8 @@ public class ProxyServer {
             }
             MCMPHandler mcmp = new MCMPHandler();
             ProxyHandler proxy = new ProxyHandler();
+            ProxyHandler.setWorker(worker);
+            ProxyHandler.setOptions(DEFAULT_OPTIONS);
             mcmp.setChost(chost);
             mcmp.setCport(cport);
             mcmp.setProxy(proxy);

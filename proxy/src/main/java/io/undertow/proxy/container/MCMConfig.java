@@ -29,10 +29,6 @@ import java.util.List;
  */
 public class MCMConfig extends NodeService {
 
-    private List<Node> nodes = new ArrayList<Node>();
-    private List<Balancer> balancers = new ArrayList<Balancer>();
-    private List<VHost> hosts = new ArrayList<VHost>();
-    private List<Context> contexts = new ArrayList<Context>();
     private List<SessionId> sessionids = new ArrayList<SessionId>();
     private final int lbstatus_recalc_time = 5;
 
@@ -119,21 +115,7 @@ public class MCMConfig extends NodeService {
         }
     }
 
-    public List<Node> getNodes() {
-        return nodes;
-    }
 
-    public void setNodes(List<Node> nodes) {
-        this.nodes = nodes;
-    }
-
-    public List<VHost> getHosts() {
-        return hosts;
-    }
-
-    public void setHosts(List<VHost> hosts) {
-        this.hosts = hosts;
-    }
 
     public long getNodeId(String jvmRoute) {
         for (Node nod : getNodes()) {
@@ -144,30 +126,7 @@ public class MCMConfig extends NodeService {
         return -1;
     }
 
-    public List<Context> getContexts() {
-        return contexts;
-    }
 
-    public void setContexts(List<Context> contexts) {
-        this.contexts = contexts;
-    }
-
-    public List<Balancer> getBalancers() {
-        return balancers;
-    }
-
-    public void setBalancers(List<Balancer> balancers) {
-        this.balancers = balancers;
-    }
-
-    public Node getNode(String jvmRoute) {
-        for (Node nod : getNodes()) {
-            if (nod.getJvmRoute().equals(jvmRoute)) {
-                return nod;
-            }
-        }
-        return null;
-    }
 
     public long insertupdate(VHost host) {
         int i = 1;
@@ -221,26 +180,6 @@ public class MCMConfig extends NodeService {
             }
             getContexts().add(context);
         }
-    }
-
-    /* get the least loaded node according to the tablel values */
-
-    public Node getNode() {
-        Node node = null;
-        for (Node nod : getNodes()) {
-            if (nod.getStatus() == Node.NodeStatus.NODE_DOWN)
-                continue; // skip it.
-            if (node != null) {
-                int status = ((node.getElected() - node.getOldelected()) * 1000) / node.getLoad();
-                int status1 = ((nod.getElected() - nod.getOldelected()) * 1000) / nod.getLoad();
-                if (status1 > status)
-                    node = nod;
-            } else
-                node = nod;
-        }
-        if (node != null)
-            node.setElected(node.getElected()+1);
-        return node;
     }
 
     public void checkHealthNode() {
@@ -338,14 +277,5 @@ public class MCMConfig extends NodeService {
                 i++;
         }
         return "" + i;
-    }
-
-    /*
-     * Find the cookie and return the corresponding node.
-     */
-    @Override
-    public Node getNodeByCookie(String cooky) {
-        // TODO Auto-generated method stub
-        return null;
     }
 }
