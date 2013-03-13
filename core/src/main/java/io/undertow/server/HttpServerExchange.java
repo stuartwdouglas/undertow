@@ -1143,7 +1143,7 @@ public final class HttpServerExchange extends AbstractAttachable {
         }
     }
 
-    private class WriteDispatchConduit extends AbstractStreamSinkConduit<StreamSinkConduit> implements StreamSinkConduit, Runnable {
+    private final class WriteDispatchConduit extends AbstractStreamSinkConduit<StreamSinkConduit> implements StreamSinkConduit, Runnable {
 
         private boolean wakeup;
 
@@ -1186,7 +1186,7 @@ public final class HttpServerExchange extends AbstractAttachable {
         }
     }
 
-    private class ReadDispatchConduit extends AbstractStreamSourceConduit<StreamSourceConduit> implements StreamSourceConduit, Runnable {
+    private final class ReadDispatchConduit extends AbstractStreamSourceConduit<StreamSourceConduit> implements StreamSourceConduit, Runnable {
 
         /**
          * Construct a new instance.
