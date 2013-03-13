@@ -5,13 +5,14 @@ import io.undertow.client.HttpClientCallback;
 import io.undertow.client.HttpClientConnection;
 import io.undertow.client.HttpClientRequest;
 import io.undertow.client.HttpClientResponse;
+import io.undertow.io.IoCallback;
+import io.undertow.io.Sender;
 import io.undertow.proxy.container.Node;
 import io.undertow.proxy.container.NodeService;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.Cookie;
-import io.undertow.util.HeaderMap;
-import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -19,7 +20,6 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.Map;
 
 import org.xnio.OptionMap;
@@ -40,17 +40,8 @@ public class ProxyHandler implements HttpHandler {
     private static OptionMap options;
     @Override
     public void handleRequest(HttpServerExchange exchange) {
-        HeaderMap headers = exchange.getRequestHeaders();
         Map<String, Cookie> map = exchange.getAttachment(Cookie.REQUEST_COOKIES);
         String cookie = getNodeservice().getNodeByCookie(map);
-        for (String name : map.keySet()) {
-            System.out.println("name: " + name);
-        }
-        List<String> head = headers.get(Headers.COOKIE);
-        String cooky = null;
-        if (head != null)
-            cooky = head.toString();
-        System.out.println("Cookie:" + cooky);
         try {
             Node node = null;
             if (cookie != null) {
@@ -60,7 +51,6 @@ public class ProxyHandler implements HttpHandler {
                 node = getNodeservice().getNode();
             }
 
-            System.out.println("Node:" + node);
             if (node==null) {
                 exchange.setResponseCode(503);
                 StreamSinkChannel resp = exchange.getResponseChannel();
@@ -151,14 +141,37 @@ public class ProxyHandler implements HttpHandler {
      */
     void handleProxyResult(final HttpClientResponse result, final HttpServerExchange exchange) throws IOException {
         final long contentLength = result.getContentLength();
+        // Copy the headers for the server to the client
+        for (HttpString name : result.getResponseHeaders()) {
+            exchange.getResponseHeaders().addAll(name, result.getResponseHeaders().get(name));
+        }
         if(contentLength >= 0L) {
-            exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, contentLength);
-            exchange.endExchange();
+            IoCallback callback = createProxyResponseCallback(result, exchange);
+            // TODO Horrible blocking hack...
+            ByteBuffer bitbuff = ByteBuffer.allocate(20000);
+            result.readReplyBody().read(bitbuff);
+            exchange.getResponseSender().send(bitbuff, callback);
+            return;
         } else {
             exchange.endExchange();
         }
+    }
 
-        /* TODO body :D */
+    private IoCallback createProxyResponseCallback(HttpClientResponse result, HttpServerExchange exchange) {
+        return new IoCallback() {
+
+            @Override
+            public void onComplete(HttpServerExchange exchange, Sender sender) {
+                exchange.endExchange();
+            }
+
+            @Override
+            public void onException(HttpServerExchange exchange, Sender sender, IOException exception) {
+                // TODO Auto-generated method stub
+
+            }
+
+        };
     }
 
     /**

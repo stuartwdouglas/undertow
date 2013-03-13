@@ -395,16 +395,13 @@ public class NodeService extends LifeCycleServiceAdapter {
         int index =  cookie.lastIndexOf(".");
         if (index == -1)
             return null;
-        return getNode(cookie.substring(index));
+        return getNode(cookie.substring(index+1));
     }
 
     /*
      * Find the cookie and return the corresponding sessionid.
      */
     public String getNodeByCookie(Map<String, Cookie> map) {
-        for (String c : map.keySet()) {
-            System.out.println("getNodeByCookie: " + c);
-        }
         for (Balancer bal : balancers) {
             if (map.containsKey(bal.getStickySessionCookie())) {
                 // we have a balancer that uses that cookie.
