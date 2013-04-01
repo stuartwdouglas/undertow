@@ -32,13 +32,9 @@ import java.util.TreeMap;
  *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class HeaderMap implements Iterable<HttpString> {
+public final class HeaderMap implements Iterable<Map.Entry<HttpString, List<String>>> {
 
     private final Map<HttpString, Object> values = new TreeMap<>();
-
-    public Iterator<HttpString> iterator() {
-        return values.keySet().iterator();
-    }
 
     public String getFirst(HttpString headerName) {
         Object value = values.get(headerName);
@@ -107,6 +103,30 @@ public final class HeaderMap implements Iterable<HttpString> {
         }
     }
 
+    public Iterator<Map.Entry<HttpString, List<String>>> iterator() {
+        final Iterator<Map.Entry<HttpString,Object>> iterator = values.entrySet().iterator();
+        return new Iterator<Map.Entry<HttpString, List<String>>>() {
+            @Override
+            public boolean hasNext() {
+                return iterator.hasNext();
+            }
+
+            @Override
+            public Map.Entry<HttpString, List<String>> next() {
+                Map.Entry<HttpString, Object> next = iterator.next();
+                if(next.getValue() instanceof List) {
+                    return (Map.Entry)next;
+                }
+                return new SingleEntry(next.getKey(), (List)Collections.singletonList(next.getValue()));
+            }
+
+            @Override
+            public void remove() {
+                iterator.remove();
+            }
+        };
+    }
+
     public void clear() {
         values.clear();
     }
@@ -164,5 +184,31 @@ public final class HeaderMap implements Iterable<HttpString> {
         return "HeaderMap{" +
                 "values=" + values +
                 '}';
+    }
+
+    private final class SingleEntry implements Map.Entry<HttpString, List<String>> {
+
+        private final HttpString key;
+        private final List<String> value;
+
+        private SingleEntry(final HttpString key, final List<String> value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        @Override
+        public HttpString getKey() {
+            return key;
+        }
+
+        @Override
+        public List<String> getValue() {
+            return value;
+        }
+
+        @Override
+        public List<String> setValue(final List<String> value) {
+            throw new IllegalStateException();
+        }
     }
 }

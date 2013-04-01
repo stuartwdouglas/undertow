@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -247,8 +248,8 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
     @Override
     public Collection<String> getHeaderNames() {
         final Set<String> headers = new HashSet<String>();
-        for (final HttpString i : exchange.getResponseHeaders()) {
-            headers.add(i.toString());
+        for (final Map.Entry<HttpString, List<String>> i : exchange.getResponseHeaders()) {
+            headers.add(i.getKey().toString());
         }
         return headers;
     }

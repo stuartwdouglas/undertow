@@ -24,6 +24,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
@@ -172,8 +173,8 @@ final class AjpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCondu
             putInt(buffer, exchange.getResponseCode());
             putString(buffer, StatusCodes.getReason(exchange.getResponseCode()));
             putInt(buffer, exchange.getResponseHeaders().getHeaderNames().size());
-            for (final HttpString header : exchange.getResponseHeaders()) {
-                for (String headerValue : exchange.getResponseHeaders().get(header)) {
+            for (final Map.Entry<HttpString, List<String>> header : exchange.getResponseHeaders()) {
+                for (String headerValue : header.getValue()) {
                     Integer headerCode = HEADER_MAP.get(header);
                     if (headerCode != null) {
                         putInt(buffer, headerCode);
