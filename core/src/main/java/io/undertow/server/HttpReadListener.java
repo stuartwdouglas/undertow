@@ -87,7 +87,7 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ru
                     return;
                 } else if (res == -1) {
                     //EOF while reading a request, we just close the channel
-                    IoUtils.safeClose(channel);
+                    IoUtils.safeClose(connection);
                     return;
                 }
                 //TODO: we need to handle parse errors
