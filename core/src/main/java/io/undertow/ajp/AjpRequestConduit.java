@@ -5,6 +5,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.TimeUnit;
 
+import io.undertow.UndertowLogger;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.ResetableConduit;
+import io.undertow.util.HeaderMap;
+import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 import org.xnio.IoUtils;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.conduits.AbstractStreamSourceConduit;
@@ -19,7 +25,7 @@ import static org.xnio.Bits.longBitMask;
  *
  * @author Stuart Douglas
  */
-public class AjpRequestConduit extends AbstractStreamSourceConduit<StreamSourceConduit> {
+public class AjpRequestConduit extends AbstractStreamSourceConduit<StreamSourceConduit> implements ResetableConduit {
 
     private static final ByteBuffer READ_BODY_CHUNK;
 
@@ -40,9 +46,9 @@ public class AjpRequestConduit extends AbstractStreamSourceConduit<StreamSourceC
     private final AjpResponseConduit ajpResponseConduit;
 
     /**
-     * The size of the incoming request. A size of 0 indicates that the request is using chunked encoding
+     * The size of the incoming request.
      */
-    private final Long size;
+    private Long size;
 
     private static final int HEADER_LENGTH = 6;
 
@@ -80,20 +86,10 @@ public class AjpRequestConduit extends AbstractStreamSourceConduit<StreamSourceC
      */
     private static final long STATE_MASK = longBitMask(0, 60);
 
-    public AjpRequestConduit(final StreamSourceConduit delegate, AjpResponseConduit ajpResponseConduit, Long size) {
+    public AjpRequestConduit(final StreamSourceConduit delegate, AjpResponseConduit ajpResponseConduit) {
         super(delegate);
         this.ajpResponseConduit = ajpResponseConduit;
-        this.size = size;
-        if (size == null) {
-            state = STATE_SEND_REQUIRED;
-            remaining = -1;
-        } else if (size == 0) {
-            state = STATE_FINISHED;
-            remaining = 0;
-        } else {
-            state = STATE_READING;
-            remaining = size;
-        }
+
     }
 
     @Override
@@ -127,7 +123,7 @@ public class AjpRequestConduit extends AbstractStreamSourceConduit<StreamSourceC
     @Override
     public int read(ByteBuffer dst) throws IOException {
         long state = this.state;
-        if(anyAreSet(state, STATE_FINISHED)) {
+        if (anyAreSet(state, STATE_FINISHED)) {
             return -1;
         } else if (anyAreSet(state, STATE_SEND_REQUIRED)) {
             state = this.state = (state & STATE_MASK) | STATE_READING;
@@ -169,7 +165,7 @@ public class AjpRequestConduit extends AbstractStreamSourceConduit<StreamSourceC
                 b1 = headerBuffer.get();
                 b2 = headerBuffer.get();
                 chunkRemaining = ((b1 & 0xFF) << 8) | (b2 & 0xFF);
-                if(chunkRemaining == 0) {
+                if (chunkRemaining == 0) {
                     this.remaining = 0;
                     this.state = STATE_FINISHED;
                     return -1;
@@ -186,7 +182,7 @@ public class AjpRequestConduit extends AbstractStreamSourceConduit<StreamSourceC
             }
             int read = next.read(dst);
             chunkRemaining -= read;
-            if(remaining != -1) {
+            if (remaining != -1) {
                 remaining -= read;
             }
             if (remaining == 0) {
@@ -218,4 +214,46 @@ public class AjpRequestConduit extends AbstractStreamSourceConduit<StreamSourceC
         }
     }
 
+    @Override
+    public void reset(final HttpServerExchange exchange) {
+        //get size
+
+        final HeaderMap requestHeaders = exchange.getRequestHeaders();
+        HttpString transferEncoding = Headers.IDENTITY;
+        Long length;
+        final String teHeader = requestHeaders.getLast(Headers.TRANSFER_ENCODING);
+        boolean hasTransferEncoding = teHeader != null;
+        if (hasTransferEncoding) {
+            transferEncoding = new HttpString(teHeader);
+        }
+        final String requestContentLength = requestHeaders.getFirst(Headers.CONTENT_LENGTH);
+        if (hasTransferEncoding && !transferEncoding.equals(Headers.IDENTITY)) {
+            length = null; //unkown length
+        } else if (requestContentLength != null) {
+            final long contentLength = Long.parseLong(requestContentLength);
+            if (contentLength == 0L) {
+                UndertowLogger.REQUEST_LOGGER.trace("No content, starting next request");
+                // no content - immediately start the next request, returning an empty stream for this one
+                exchange.terminateRequest();
+            }
+            length = contentLength;
+        } else {
+            UndertowLogger.REQUEST_LOGGER.trace("No content length or transfer coding, starting next request");
+            // no content - immediately start the next request, returning an empty stream for this one
+            exchange.terminateRequest();
+            length = 0L;
+        }
+
+        this.size = length;
+        if (size == null) {
+            state = STATE_SEND_REQUIRED;
+            remaining = -1;
+        } else if (size == 0) {
+            state = STATE_FINISHED;
+            remaining = 0;
+        } else {
+            state = STATE_READING;
+            remaining = size;
+        }
+    }
 }

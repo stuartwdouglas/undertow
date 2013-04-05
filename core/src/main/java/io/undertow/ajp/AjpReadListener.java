@@ -2,19 +2,15 @@ package io.undertow.ajp;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowOptions;
-import io.undertow.conduits.ReadDataStreamSourceConduit;
-import io.undertow.server.ConduitWrapper;
 import io.undertow.server.ExchangeCompletionListener;
 import io.undertow.server.HttpHandlers;
 import io.undertow.server.HttpServerConnection;
 import io.undertow.server.HttpServerExchange;
-import io.undertow.util.ConduitFactory;
-import io.undertow.util.HeaderMap;
-import io.undertow.util.Headers;
-import io.undertow.util.HttpString;
+import io.undertow.server.ResetableConduit;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
@@ -23,39 +19,35 @@ import org.xnio.StreamConnection;
 import org.xnio.XnioExecutor;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
-import org.xnio.conduits.EmptyStreamSourceConduit;
-import org.xnio.conduits.StreamSinkChannelWrappingConduit;
-import org.xnio.conduits.StreamSinkConduit;
-import org.xnio.conduits.StreamSourceConduit;
 
 import static org.xnio.IoUtils.safeClose;
 
 /**
  *
- * TODO----- FIX AJP BEFORE THIS GOES TO UPSTREAM
+ * TODO----- FIX AND VERIFY AJP BEFORE THIS GOES TO UPSTREAM
  *
  *
  * @author Stuart Douglas
  */
 
-final class AjpReadListener implements ChannelListener<StreamSourceChannel> {
+final class AjpReadListener implements ChannelListener<StreamSourceChannel> , ExchangeCompletionListener, Runnable {
 
     private final StreamConnection channel;
 
     private AjpParseState state = new AjpParseState();
     private HttpServerExchange httpServerExchange;
     private final HttpServerConnection connection;
+    private final ResetableConduit[] resetableConduitList;
 
+    private HttpServerConnection.CurrentConduits conduitState;
     private volatile int read = 0;
     private final int maxRequestSize;
 
-    AjpReadListener(final StreamConnection channel, final HttpServerConnection connection) {
+    AjpReadListener(final StreamConnection channel, final HttpServerConnection connection, final ResetableConduit[] resetableConduitList) {
         this.channel = channel;
         this.connection = connection;
+        this.resetableConduitList = resetableConduitList;
         maxRequestSize = connection.getUndertowOptions().get(UndertowOptions.MAX_HEADER_SIZE, UndertowOptions.DEFAULT_MAX_HEADER_SIZE);
-
-        httpServerExchange = new HttpServerExchange(connection, channel.getSinkChannel());
-        httpServerExchange.addExchangeCompleteListener(new StartNextRequestAction(channel.getSourceChannel(), channel.getSinkChannel()));
     }
 
     public void handleEvent(final StreamSourceChannel channel) {
@@ -137,14 +129,17 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel> {
 
             final HttpServerExchange httpServerExchange = this.httpServerExchange;
             httpServerExchange.putAttachment(UndertowOptions.ATTACHMENT_KEY, connection.getUndertowOptions());
-            AjpConduitWrapper channelWrapper = new AjpConduitWrapper(new AjpResponseConduit(new StreamSinkChannelWrappingConduit(this.channel.getSinkChannel()), connection.getBufferPool(), httpServerExchange));
-            httpServerExchange.addResponseWrapper(channelWrapper);
+
             //httpServerExchange.addRequestWrapper(channelWrapper.getRequestWrapper());
 
             try {
                 httpServerExchange.setRequestScheme(connection.getSslSession() != null ? "https" : "http"); //todo: determine if this is https
                 state = null;
                 this.httpServerExchange = null;
+                for(ResetableConduit conduit : resetableConduitList) {
+                    conduit.reset(httpServerExchange);
+                }
+                connection.revertConduitState(conduitState);
                 HttpHandlers.executeRootHandler(connection.getRootHandler(), httpServerExchange, Thread.currentThread() instanceof XnioExecutor);
 
             } catch (Throwable t) {
@@ -161,100 +156,54 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel> {
         }
     }
 
-    /**
-     * Action that starts the next request
-     */
-    private static class StartNextRequestAction implements ExchangeCompletionListener {
 
-        private StreamSourceChannel requestChannel;
-        private StreamSinkChannel responseChannel;
+    public void startRequest() {
 
+        final HttpServerExchange oldExchange = this.httpServerExchange;
+        HttpServerConnection connection = this.connection;
+        conduitState = connection.revertToRawChannel();
 
-        public StartNextRequestAction(final StreamSourceChannel requestChannel, final StreamSinkChannel responseChannel) {
-            this.requestChannel = requestChannel;
-            this.responseChannel = responseChannel;
-        }
+        state = new AjpParseState();
+        read = 0;
+        HttpServerExchange exchange  = new HttpServerExchange(connection, connection.getChannel().getSinkChannel());
+        this.httpServerExchange = exchange;
+        exchange.addExchangeCompleteListener(this);
 
-        @Override
-        public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
-
-            final StreamSourceChannel channel = this.requestChannel;
-            final AjpReadListener listener = new AjpReadListener(exchange.getConnection().getChannel(), exchange.getConnection());
-            channel.getReadSetter().set(listener);
-            channel.resumeReads();
-            responseChannel = null;
-            this.requestChannel = null;
-            nextListener.proceed();
-        }
-
-        private static class DoNextRequestRead implements Runnable {
-            private final AjpReadListener listener;
-            private final StreamSourceChannel channel;
-
-            public DoNextRequestRead(AjpReadListener listener, StreamSourceChannel channel) {
-                this.listener = listener;
-                this.channel = channel;
-            }
-
-            @Override
-            public void run() {
-                listener.handleEvent(channel);
-            }
-        }
-    }
-
-    private class AjpConduitWrapper implements ConduitWrapper<StreamSinkConduit> {
-
-        private final AjpResponseConduit responseConduit;
-
-        private AjpConduitWrapper(AjpResponseConduit responseConduit) {
-            this.responseConduit = responseConduit;
-        }
-
-        @Override
-        public StreamSinkConduit wrap(ConduitFactory<StreamSinkConduit> factory, HttpServerExchange exchange) {
-            return responseConduit;
-        }
-
-        public ConduitWrapper<StreamSourceConduit> getRequestWrapper() {
-            return new ConduitWrapper<StreamSourceConduit>() {
-                @Override
-                public StreamSourceConduit wrap(ConduitFactory<StreamSourceConduit> factory, HttpServerExchange exchange) {
-                    StreamSourceConduit conduit = factory.create();
-                    conduit = new ReadDataStreamSourceConduit(conduit, exchange.getConnection());
-
-                    final HeaderMap requestHeaders = exchange.getRequestHeaders();
-                    HttpString transferEncoding = Headers.IDENTITY;
-                    Long length;
-                    final String teHeader = requestHeaders.getLast(Headers.TRANSFER_ENCODING);
-                    boolean hasTransferEncoding = teHeader != null;
-                    if (hasTransferEncoding) {
-                        transferEncoding = new HttpString(teHeader);
-                    }
-                    final String requestContentLength = requestHeaders.getFirst(Headers.CONTENT_LENGTH);
-                    if (hasTransferEncoding && !transferEncoding.equals(Headers.IDENTITY)) {
-                        length = null; //unkown length
-                    } else if (requestContentLength != null) {
-                        final long contentLength = Long.parseLong(requestContentLength);
-                        if (contentLength == 0L) {
-                            UndertowLogger.REQUEST_LOGGER.trace("No content, starting next request");
-                            // no content - immediately start the next request, returning an empty stream for this one
-                            exchange.terminateRequest();
-                            return new EmptyStreamSourceConduit(conduit.getReadThread());
-                        } else {
-                            length = contentLength;
-                        }
-                    } else {
-                        UndertowLogger.REQUEST_LOGGER.trace("No content length or transfer coding, starting next request");
-                        // no content - immediately start the next request, returning an empty stream for this one
-                        exchange.terminateRequest();
-                        return new EmptyStreamSourceConduit(conduit.getReadThread());
-                    }
-                    return new AjpRequestConduit(conduit, responseConduit, length);
+        if(oldExchange == null) {
+            //only on the initial request, we just run the read listener directly
+            handleEvent(connection.getChannel().getSourceChannel());
+        } else if (oldExchange.isPersistent() && !oldExchange.isUpgrade()) {
+            final StreamSourceChannel channel = connection.getChannel().getSourceChannel();
+            if (connection.getExtraBytes() == null) {
+                //if we are not pipelining we just register a listener
+                channel.getReadSetter().set(this);
+                channel.resumeReads();
+            } else {
+                if (channel.isReadResumed()) {
+                    channel.suspendReads();
                 }
-            };
+                if (oldExchange.isInIoThread()) {
+                    channel.getIoThread().execute(this);
+                } else {
+                    Executor executor = oldExchange.getDispatchExecutor();
+                    if (executor == null) {
+                        executor = connection.getWorker();
+                    }
+                    executor.execute(this);
+                }
+            }
         }
     }
 
+    @Override
+    public void run() {
+        handleEvent(channel.getSourceChannel());
+    }
+
+    @Override
+    public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
+        startRequest();
+        nextListener.proceed();
+    }
 
 }

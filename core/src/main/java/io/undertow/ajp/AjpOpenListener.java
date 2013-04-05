@@ -1,15 +1,17 @@
 package io.undertow.ajp;
 
 import java.nio.ByteBuffer;
-
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
+import io.undertow.conduits.ReadDataStreamSourceConduit;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerConnection;
 import io.undertow.server.OpenListener;
+import io.undertow.server.ResetableConduit;
 import org.xnio.OptionMap;
 import org.xnio.Pool;
 import org.xnio.StreamConnection;
+import org.xnio.conduits.StreamSourceConduit;
 
 /**
  * @author Stuart Douglas
@@ -39,9 +41,21 @@ public class AjpOpenListener implements OpenListener {
         }
 
         HttpServerConnection connection = new HttpServerConnection(channel, bufferPool, rootHandler, undertowOptions, bufferSize);
-        AjpReadListener readListener = new AjpReadListener(channel, connection);
-        channel.getSourceChannel().setReadListener(readListener);
-        readListener.handleEvent(channel.getSourceChannel());
+
+        final ResetableConduit[] resetableConduits = new ResetableConduit[2];
+        AjpResponseConduit responseConduit = new AjpResponseConduit(channel.getSinkChannel().getConduit(), bufferPool);
+        resetableConduits[0] = responseConduit;
+        channel.getSinkChannel().setConduit(responseConduit);
+
+        StreamSourceConduit streamSourceConduit = channel.getSourceChannel().getConduit();
+        streamSourceConduit = new ReadDataStreamSourceConduit(streamSourceConduit, connection);
+        AjpRequestConduit requestConduit = new AjpRequestConduit(streamSourceConduit, responseConduit);
+        resetableConduits[1] = requestConduit;
+        channel.getSourceChannel().setConduit(requestConduit);
+
+
+        AjpReadListener readListener = new AjpReadListener(channel, connection, resetableConduits);
+        readListener.startRequest();
     }
 
     public HttpHandler getRootHandler() {

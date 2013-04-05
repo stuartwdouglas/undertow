@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import io.undertow.UndertowLogger;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.ResetableConduit;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.StatusCodes;
@@ -53,7 +54,7 @@ import static org.xnio.Bits.anyAreSet;
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  * @author Stuart Douglas
  */
-final class AjpResponseConduit extends AbstractStreamSinkConduit<StreamSinkConduit> {
+final class AjpResponseConduit extends AbstractStreamSinkConduit<StreamSinkConduit> implements ResetableConduit {
 
     private static final Logger log = Logger.getLogger("io.undertow.server.channel.ajp.response");
 
@@ -81,7 +82,7 @@ final class AjpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCondu
      */
     private ByteBuffer[] packetHeaderAndDataBuffer;
 
-    private final HttpServerExchange exchange;
+    private HttpServerExchange exchange;
 
 
     /**
@@ -116,11 +117,9 @@ final class AjpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCondu
         HEADER_MAP = Collections.unmodifiableMap(headers);
     }
 
-    AjpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerExchange exchange) {
+    AjpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool) {
         super(next);
         this.pool = pool;
-        this.exchange = exchange;
-        state = FLAG_START;
     }
 
     private void putInt(final ByteBuffer buf, int value) {
@@ -460,5 +459,11 @@ final class AjpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCondu
         }
 
         return result;
+    }
+
+    @Override
+    public void reset(final HttpServerExchange newExchange) {
+        this.exchange = newExchange;
+        state = FLAG_START;
     }
 }
