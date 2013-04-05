@@ -25,12 +25,15 @@ import java.util.List;
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
+import io.undertow.conduits.HttpRequestStreamSourceConduit;
 import io.undertow.conduits.PipelingBufferingStreamSinkConduit;
+import io.undertow.conduits.ReadDataStreamSourceConduit;
 import org.xnio.ChannelListener;
 import org.xnio.OptionMap;
 import org.xnio.Pool;
 import org.xnio.StreamConnection;
 import org.xnio.conduits.StreamSinkConduit;
+import org.xnio.conduits.StreamSourceConduit;
 
 /**
  * Open listener for HTTP server.  XNIO should be set up to chain the accept handler to post-accept open
@@ -65,6 +68,7 @@ public final class HttpOpenListener implements ChannelListener<StreamConnection>
 
         final List<ResetableConduit> resetableConduits = new ArrayList<>();
         StreamSinkConduit sinkConduit = channel.getSinkChannel().getConduit();
+        StreamSourceConduit sourceConduit = channel.getSourceChannel().getConduit();
         //now we setup the conduits
         if(undertowOptions.get(UndertowOptions.BUFFER_PIPELINED_DATA, false)) {
             PipelingBufferingStreamSinkConduit bufferingStreamSinkConduit = new PipelingBufferingStreamSinkConduit(sinkConduit, connection.getBufferPool(), connection);
@@ -77,7 +81,15 @@ public final class HttpOpenListener implements ChannelListener<StreamConnection>
         sinkConduit = httpResponseConduit;
         resetableConduits.add(httpResponseConduit);
 
+        //setup the stream source conduits
+        sourceConduit = new ReadDataStreamSourceConduit(sourceConduit, connection);
+        HttpRequestStreamSourceConduit httpRequestStreamSourceConduit = new HttpRequestStreamSourceConduit(sourceConduit);
+        resetableConduits.add(httpRequestStreamSourceConduit);
+        sourceConduit = httpRequestStreamSourceConduit;
+
+
         channel.getSinkChannel().setConduit(sinkConduit);
+        channel.getSourceChannel().setConduit(sourceConduit);
 
         HttpReadListener readListener = new HttpReadListener(resetableConduits, connection);
         readListener.startRequest();

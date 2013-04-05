@@ -2,9 +2,9 @@ package io.undertow.client;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowOptions;
-import io.undertow.conduits.ChunkedStreamSourceConduit;
+import io.undertow.conduits.ClientChunkedStreamSourceConduit;
+import io.undertow.conduits.ClientFixedLengthStreamSourceConduit;
 import io.undertow.conduits.ConduitListener;
-import io.undertow.conduits.FixedLengthStreamSourceConduit;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
@@ -286,14 +286,14 @@ public final class PendingHttpRequest {
             }
 
             if (! transferEncoding.equals(Headers.IDENTITY.toString())) {
-                conduit = new ChunkedStreamSourceConduit(conduit, channel, connection.getBufferPool(), getFinishListener(closeConnection), maxEntitySize(connection.getOptions()));
+                conduit = new ClientChunkedStreamSourceConduit(conduit, channel, connection.getBufferPool(), getFinishListener(closeConnection), maxEntitySize(connection.getOptions()));
             } else if (headers.contains(Headers.CONTENT_LENGTH)) {
                 contentLength = Long.parseLong(headers.getFirst(Headers.CONTENT_LENGTH));
                 if(contentLength == 0L) {
                     conduit = new EmptyStreamSourceConduit(channel.getIoThread());
                     noContent = true;
                 } else {
-                    conduit = new FixedLengthStreamSourceConduit(conduit, contentLength, getFinishListener(closeConnection));
+                    conduit = new ClientFixedLengthStreamSourceConduit(conduit, contentLength, getFinishListener(closeConnection));
                 }
             } else {
                 closeConnection = true;

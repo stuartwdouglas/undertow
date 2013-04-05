@@ -44,10 +44,10 @@ import static org.xnio.Bits.longBitMask;
  *
  * @author Stuart Douglas
  */
-public class ChunkedStreamSourceConduit extends AbstractStreamSourceConduit<StreamSourceConduit> {
+public class ClientChunkedStreamSourceConduit extends AbstractStreamSourceConduit<StreamSourceConduit> {
 
     private final BufferWrapper bufferWrapper;
-    private final ConduitListener<? super ChunkedStreamSourceConduit> finishListener;
+    private final ConduitListener<? super ClientChunkedStreamSourceConduit> finishListener;
 
     private long state;
 
@@ -63,7 +63,7 @@ public class ChunkedStreamSourceConduit extends AbstractStreamSourceConduit<Stre
     private static final long FLAG_READING_NEWLINE = 1L << 57L;
     private static final long MASK_COUNT = longBitMask(0, 56);
 
-    public ChunkedStreamSourceConduit(final StreamSourceConduit next, final PushBackStreamChannel channel, final Pool<ByteBuffer> pool, final ConduitListener<? super ChunkedStreamSourceConduit> finishListener, final long maxLength) {
+    public ClientChunkedStreamSourceConduit(final StreamSourceConduit next, final PushBackStreamChannel channel, final Pool<ByteBuffer> pool, final ConduitListener<? super ClientChunkedStreamSourceConduit> finishListener, final long maxLength) {
         this(next, new BufferWrapper() {
             @Override
             public Pooled<ByteBuffer> allocate() {
@@ -77,7 +77,7 @@ public class ChunkedStreamSourceConduit extends AbstractStreamSourceConduit<Stre
         }, finishListener, maxLength);
     }
 
-    public ChunkedStreamSourceConduit(final StreamSourceConduit next, final HttpServerExchange exchange, final ConduitListener<? super ChunkedStreamSourceConduit> finishListener, final long maxLength) {
+    public ClientChunkedStreamSourceConduit(final StreamSourceConduit next, final HttpServerExchange exchange, final ConduitListener<? super ClientChunkedStreamSourceConduit> finishListener, final long maxLength) {
         this(next, new BufferWrapper() {
             @Override
             public Pooled<ByteBuffer> allocate() {
@@ -91,7 +91,7 @@ public class ChunkedStreamSourceConduit extends AbstractStreamSourceConduit<Stre
         }, finishListener, maxLength);
     }
 
-    protected ChunkedStreamSourceConduit(final StreamSourceConduit next, final BufferWrapper bufferWrapper, final ConduitListener<? super ChunkedStreamSourceConduit> finishListener, final long maxLength) {
+    protected ClientChunkedStreamSourceConduit(final StreamSourceConduit next, final BufferWrapper bufferWrapper, final ConduitListener<? super ClientChunkedStreamSourceConduit> finishListener, final long maxLength) {
         super(next);
         this.bufferWrapper = bufferWrapper;
         this.finishListener = finishListener;

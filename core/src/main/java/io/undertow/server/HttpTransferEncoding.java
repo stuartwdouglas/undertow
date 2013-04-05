@@ -19,16 +19,13 @@
 package io.undertow.server;
 
 import io.undertow.UndertowLogger;
-import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
-import io.undertow.conduits.BrokenStreamSourceConduit;
 import io.undertow.conduits.ChunkedStreamSinkConduit;
-import io.undertow.conduits.ChunkedStreamSourceConduit;
+import io.undertow.conduits.ClientChunkedStreamSourceConduit;
+import io.undertow.conduits.ClientFixedLengthStreamSourceConduit;
 import io.undertow.conduits.ConduitListener;
 import io.undertow.conduits.FinishableStreamSinkConduit;
 import io.undertow.conduits.FixedLengthStreamSinkConduit;
-import io.undertow.conduits.FixedLengthStreamSourceConduit;
-import io.undertow.conduits.ReadDataStreamSourceConduit;
 import io.undertow.util.ConduitFactory;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
@@ -36,9 +33,7 @@ import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import org.jboss.logging.Logger;
 import org.xnio.XnioExecutor;
-import org.xnio.conduits.EmptyStreamSourceConduit;
 import org.xnio.conduits.StreamSinkConduit;
-import org.xnio.conduits.StreamSourceConduit;
 
 /**
  * Class that is  responsible for HTTP transfer encooding, this could be part of the {@link HttpReadListener},
@@ -61,23 +56,8 @@ public class HttpTransferEncoding {
     public static void handleRequest(final HttpServerExchange exchange, final HttpHandler next) {
         final HeaderMap requestHeaders = exchange.getRequestHeaders();
         final String connectionHeader = requestHeaders.getFirst(Headers.CONNECTION);
-        final String transferEncodingHeader = requestHeaders.getLast(Headers.TRANSFER_ENCODING);
-        final String contentLengthHeader = requestHeaders.getFirst(Headers.CONTENT_LENGTH);
-
-        final HttpServerConnection connection = exchange.getConnection();
-
-        exchange.addRequestWrapper(ReadDataStreamSourceConduit.WRAPPER);
 
         boolean persistentConnection = persistentConnection(exchange, connectionHeader);
-
-        if(exchange.getRequestMethod().equals(Methods.GET)) {
-
-            // no content - immediately start the next request, returning an empty stream for this one
-            exchange.terminateRequest();
-            exchange.addRequestWrapper(EMPTY_STREAM_SOURCE_CONDUIT_WRAPPER);
-        } else {
-            persistentConnection = handleRequestEncoding(exchange, transferEncodingHeader, contentLengthHeader, connection, persistentConnection);
-        }
 
         exchange.setPersistent(persistentConnection);
 
@@ -87,38 +67,6 @@ public class HttpTransferEncoding {
         HttpHandlers.executeRootHandler(next, exchange, Thread.currentThread() instanceof XnioExecutor);
     }
 
-    private static boolean handleRequestEncoding(HttpServerExchange exchange, String transferEncodingHeader, String contentLengthHeader, HttpServerConnection connection, boolean persistentConnection) {
-        HttpString transferEncoding = Headers.IDENTITY;
-        if (transferEncodingHeader != null) {
-            transferEncoding = new HttpString(transferEncodingHeader);
-        }
-        if (transferEncodingHeader != null && !transferEncoding.equals(Headers.IDENTITY)) {
-            exchange.addRequestWrapper(CHUNKED_STREAM_SOURCE_CONDUIT_WRAPPER);
-        } else if (contentLengthHeader != null) {
-            final long contentLength;
-                contentLength = Long.parseLong(contentLengthHeader);
-            if (contentLength == 0L) {
-                log.trace("No content, starting next request");
-                // no content - immediately start the next request, returning an empty stream for this one
-                exchange.addRequestWrapper(EMPTY_STREAM_SOURCE_CONDUIT_WRAPPER);
-                exchange.terminateRequest();
-            } else {
-                // fixed-length content - add a wrapper for a fixed-length stream
-                exchange.addRequestWrapper(fixedLengthStreamSourceConduitWrapper(contentLength));
-            }
-        } else if (transferEncodingHeader != null) {
-            if (transferEncoding.equals(Headers.IDENTITY)) {
-                log.trace("Connection not persistent (no content length and identity transfer encoding)");
-                // make it not persistent
-                persistentConnection = false;
-            }
-        } else {
-            // no content - immediately start the next request, returning an empty stream for this one
-            exchange.terminateRequest();
-            exchange.addRequestWrapper(EMPTY_STREAM_SOURCE_CONDUIT_WRAPPER);
-        }
-        return persistentConnection;
-    }
 
     private static boolean persistentConnection(HttpServerExchange exchange, String connectionHeader) {
         if (exchange.isHttp11()) {
@@ -219,35 +167,9 @@ public class HttpTransferEncoding {
         };
     }
 
-    private static final ConduitWrapper<StreamSourceConduit> CHUNKED_STREAM_SOURCE_CONDUIT_WRAPPER = new ConduitWrapper<StreamSourceConduit>() {
-            public StreamSourceConduit wrap(final ConduitFactory<StreamSourceConduit> factory, final HttpServerExchange exchange) {
-                return new ChunkedStreamSourceConduit(factory.create(), exchange, chunkedDrainListener(exchange), maxEntitySize(exchange));
-            }
-        };
-
-    private static ConduitWrapper<StreamSourceConduit> fixedLengthStreamSourceConduitWrapper(final long contentLength) {
-        return new ConduitWrapper<StreamSourceConduit>() {
-            public StreamSourceConduit wrap(final ConduitFactory<StreamSourceConduit> factory, final HttpServerExchange exchange) {
-                StreamSourceConduit channel = factory.create();
-                final long max = maxEntitySize(exchange);
-                if(contentLength > max) {
-                    return new BrokenStreamSourceConduit(channel, UndertowMessages.MESSAGES.requestEntityWasTooLarge(exchange.getSourceAddress(), max));
-                }
-                return new FixedLengthStreamSourceConduit(channel, contentLength, fixedLengthDrainListener(exchange));
-            }
-        };
-    }
-
-    private static final ConduitWrapper<StreamSourceConduit> EMPTY_STREAM_SOURCE_CONDUIT_WRAPPER = new ConduitWrapper<StreamSourceConduit>() {
-            public StreamSourceConduit wrap(final ConduitFactory<StreamSourceConduit> factory, final HttpServerExchange exchange) {
-                StreamSourceConduit channel = factory.create();
-                return new EmptyStreamSourceConduit(channel.getReadThread());
-            }
-        };
-
-    private static ConduitListener<FixedLengthStreamSourceConduit> fixedLengthDrainListener(final HttpServerExchange exchange) {
-        return new ConduitListener<FixedLengthStreamSourceConduit>() {
-            public void handleEvent(final FixedLengthStreamSourceConduit fixedLengthConduit) {
+    private static ConduitListener<ClientFixedLengthStreamSourceConduit> fixedLengthDrainListener(final HttpServerExchange exchange) {
+        return new ConduitListener<ClientFixedLengthStreamSourceConduit>() {
+            public void handleEvent(final ClientFixedLengthStreamSourceConduit fixedLengthConduit) {
                 long remaining = fixedLengthConduit.getRemaining();
                 if (remaining > 0L) {
                     UndertowLogger.REQUEST_LOGGER.requestWasNotFullyConsumed();
@@ -258,10 +180,10 @@ public class HttpTransferEncoding {
         };
     }
 
-    private static ConduitListener<ChunkedStreamSourceConduit> chunkedDrainListener(final HttpServerExchange exchange) {
-        return new ConduitListener<ChunkedStreamSourceConduit>() {
-            public void handleEvent(final ChunkedStreamSourceConduit chunkedStreamSourceConduit) {
-                if(!chunkedStreamSourceConduit.isFinished()) {
+    private static ConduitListener<ClientChunkedStreamSourceConduit> chunkedDrainListener(final HttpServerExchange exchange) {
+        return new ConduitListener<ClientChunkedStreamSourceConduit>() {
+            public void handleEvent(final ClientChunkedStreamSourceConduit chunkedStreamSourceConduit) {
+                if (!chunkedStreamSourceConduit.isFinished()) {
                     UndertowLogger.REQUEST_LOGGER.requestWasNotFullyConsumed();
                     exchange.setPersistent(false);
                 }

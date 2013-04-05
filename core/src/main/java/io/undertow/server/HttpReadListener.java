@@ -46,6 +46,7 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ru
     private ParseState state;
     private HttpServerExchange httpServerExchange;
     private int read = 0;
+    private HttpServerConnection.CurrentConduits conduitState;
 
     HttpReadListener(final List<ResetableConduit> resetableConduits, final HttpServerConnection connection) {
         this.resetableConduits = resetableConduits;
@@ -122,6 +123,14 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ru
             try {
                 httpServerExchange.setRequestScheme(connection.getSslSession() != null ? "https" : "http");
                 state = null;
+                connection.revertConduitState(conduitState);
+                conduitState = null;
+
+                //setup our conduits for this request
+                for (final ResetableConduit conduit : resetableConduits) {
+                    conduit.reset(httpServerExchange);
+                }
+
                 HttpTransferEncoding.handleRequest(httpServerExchange, connection.getRootHandler());
 
             } catch (Throwable t) {
@@ -142,16 +151,13 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ru
 
         final HttpServerExchange oldExchange = this.httpServerExchange;
         HttpServerConnection connection = this.connection;
+        conduitState = connection.revertToRawChannel();
 
         state = new ParseState();
         read = 0;
-        HttpServerExchange exchange  = new HttpServerExchange(connection, connection.getChannel().getSourceChannel(), connection.getChannel().getSinkChannel());
+        HttpServerExchange exchange  = new HttpServerExchange(connection, connection.getChannel().getSinkChannel());
         this.httpServerExchange = exchange;
         exchange.addExchangeCompleteListener(this);
-
-        for (final ResetableConduit conduit : resetableConduits) {
-            conduit.reset(exchange);
-        }
 
         if(oldExchange == null) {
             //only on the initial request, we just run the read listener directly

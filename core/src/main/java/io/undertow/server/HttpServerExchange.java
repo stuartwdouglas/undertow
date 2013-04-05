@@ -60,7 +60,6 @@ import org.xnio.conduits.ConduitStreamSinkChannel;
 import org.xnio.conduits.ConduitStreamSourceChannel;
 import org.xnio.conduits.StreamSinkChannelWrappingConduit;
 import org.xnio.conduits.StreamSinkConduit;
-import org.xnio.conduits.StreamSourceChannelWrappingConduit;
 import org.xnio.conduits.StreamSourceConduit;
 
 import static org.xnio.Bits.allAreClear;
@@ -104,23 +103,18 @@ public final class HttpServerExchange extends AbstractAttachable {
     private Map<String, Deque<String>> queryParameters;
 
     private final StreamSinkChannel underlyingResponseChannel;
-    private final StreamSourceChannel underlyingRequestChannel;
     /**
      * The actual response channel. May be null if it has not been created yet.
      */
     private StreamSinkChannel responseChannel;
-    /**
-     * The actual request channel. May be null if it has not been created yet.
-     */
-    private StreamSourceChannel requestChannel;
 
     private BlockingHttpExchange blockingHttpExchange;
 
     private HttpString protocol;
 
     // mutable state
-
-    private int state = 200;
+    //request is assumed persistent, unless it is explicitly marked as non-persistent
+    private int state = 200 | FLAG_PERSISTENT;
     private HttpString requestMethod;
     private String requestScheme;
     /**
@@ -150,7 +144,6 @@ public final class HttpServerExchange extends AbstractAttachable {
      */
     private String queryString;
 
-    private List<ConduitWrapper<StreamSourceConduit>> requestWrappers = new ArrayList<ConduitWrapper<StreamSourceConduit>>(3);
     private List<ConduitWrapper<StreamSinkConduit>> responseWrappers = new ArrayList<ConduitWrapper<StreamSinkConduit>>(3);
 
     private static final int MASK_RESPONSE_CODE = intBitMask(0, 9);
@@ -178,9 +171,12 @@ public final class HttpServerExchange extends AbstractAttachable {
      */
     private static final int FLAG_IN_CALL = 1 << 17;
 
-    public HttpServerExchange(final HttpServerConnection connection, final StreamSourceChannel requestChannel, final StreamSinkChannel responseChannel) {
+    private static final int FLAG_REQUEST_CHANNEL_OBTAINED = 1 << 18;
+
+    private static final int FLAG_RESPONSE_CHANNEL_OBTAINED = 1 << 19;
+
+    public HttpServerExchange(final HttpServerConnection connection, final StreamSinkChannel responseChannel) {
         this.connection = connection;
-        this.underlyingRequestChannel = requestChannel;
         if (connection == null) {
             //just for unit tests
             this.underlyingResponseChannel = null;
@@ -655,28 +651,15 @@ public final class HttpServerExchange extends AbstractAttachable {
      * @return the channel for the inbound request, or {@code null} if another party already acquired the channel
      */
     public StreamSourceChannel getRequestChannel() {
-        final List<ConduitWrapper<StreamSourceConduit>> wrappers = this.requestWrappers;
-        this.requestWrappers = null;
-        if (wrappers == null) {
+        if(anyAreSet(state, FLAG_REQUEST_CHANNEL_OBTAINED)) {
             return null;
         }
-
-
-        ConduitFactory<StreamSourceConduit> factory = new ImmediateConduitFactory<StreamSourceConduit>(new StreamSourceChannelWrappingConduit(underlyingRequestChannel));
-        for (final ConduitWrapper<StreamSourceConduit> wrapper : wrappers) {
-            final ConduitFactory oldFactory = factory;
-            factory = new ConduitFactory<StreamSourceConduit>() {
-                @Override
-                public StreamSourceConduit create() {
-                    return wrapper.wrap(oldFactory, HttpServerExchange.this);
-                }
-            };
-        }
-        return requestChannel = new ConduitStreamSourceChannel(underlyingRequestChannel, new ReadDispatchConduit(factory.create()));
+        state |=FLAG_REQUEST_CHANNEL_OBTAINED;
+        return connection.getChannel().getSourceChannel();
     }
 
     public boolean isRequestChannelAvailable() {
-        return requestWrappers != null;
+        return allAreClear(state, FLAG_REQUEST_CHANNEL_OBTAINED);
     }
 
     /**
@@ -797,20 +780,6 @@ public final class HttpServerExchange extends AbstractAttachable {
         }
         this.state = oldVal & ~MASK_RESPONSE_CODE | responseCode & MASK_RESPONSE_CODE;
     }
-
-    /**
-     * Adds a {@link ConduitWrapper} to the request wrapper chain.
-     *
-     * @param wrapper the wrapper
-     */
-    public void addRequestWrapper(final ConduitWrapper<StreamSourceConduit> wrapper) {
-        List<ConduitWrapper<StreamSourceConduit>> wrappers = requestWrappers;
-        if (wrappers == null) {
-            throw UndertowMessages.MESSAGES.requestChannelAlreadyProvided();
-        }
-        wrappers.add(wrapper);
-    }
-
     /**
      * Adds a {@link ConduitWrapper} to the response wrapper chain.
      *
@@ -940,12 +909,10 @@ public final class HttpServerExchange extends AbstractAttachable {
         if (anyAreClear(state, FLAG_REQUEST_TERMINATED)) {
             //not really sure what the best thing to do here is
             //for now we are just going to drain the channel
-            if (requestChannel == null) {
-                getRequestChannel();
-            }
             int totalRead = 0;
             for (; ; ) {
                 try {
+                    ConduitStreamSourceChannel requestChannel = connection.getChannel().getSourceChannel();
                     long read = Channels.drain(requestChannel, Long.MAX_VALUE);
                     totalRead += read;
                     if (read == 0) {

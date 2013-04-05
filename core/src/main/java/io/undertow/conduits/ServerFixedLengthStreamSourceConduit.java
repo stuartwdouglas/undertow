@@ -1,8 +1,7 @@
 /*
  * JBoss, Home of Professional Open Source.
- *
- * Copyright 2012 Red Hat, Inc. and/or its affiliates, and individual
- * contributors as indicated by the @author tags.
+ * Copyright 2012 Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +23,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.TimeUnit;
 
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.ResetableConduit;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.conduits.AbstractStreamSourceConduit;
 import org.xnio.conduits.StreamSourceConduit;
@@ -50,12 +51,11 @@ import static org.xnio.Bits.longBitMask;
  * the EOF -1 value is read or the channel is closed.  Since this is a half-duplex channel, shutting down reads is
  * identical to closing the channel.
  */
-public final class FixedLengthStreamSourceConduit  extends AbstractStreamSourceConduit<StreamSourceConduit> {
-
-    private final ConduitListener<? super FixedLengthStreamSourceConduit> finishListener;
+public final class ServerFixedLengthStreamSourceConduit extends AbstractStreamSourceConduit<StreamSourceConduit> implements ResetableConduit {
 
     @SuppressWarnings("unused")
     private long state;
+    private HttpServerExchange exchange;
 
     private static final long FLAG_CLOSED = 1L << 63L;
     private static final long FLAG_FINISHED = 1L << 62L;
@@ -70,19 +70,10 @@ public final class FixedLengthStreamSourceConduit  extends AbstractStreamSourceC
      * restored from the {@code finishListener} object.  The underlying stream should not be closed while this wrapper
      * stream is active.
      *
-     * @param next       the stream source channel to read from
-     * @param contentLength  the amount of content to read
-     * @param finishListener the listener to call once the stream is exhausted or closed
+     * @param next the stream source channel to read from
      */
-    public FixedLengthStreamSourceConduit(final StreamSourceConduit next, final long contentLength, final ConduitListener<? super FixedLengthStreamSourceConduit> finishListener) {
+    public ServerFixedLengthStreamSourceConduit(final StreamSourceConduit next) {
         super(next);
-        this.finishListener = finishListener;
-        if (contentLength < 0L) {
-            throw new IllegalArgumentException("Content length must be greater than or equal to zero");
-        } else if (contentLength > MASK_COUNT) {
-            throw new IllegalArgumentException("Content length is too long");
-        }
-        state = contentLength;
     }
 
     public long transferTo(final long position, final long count, final FileChannel target) throws IOException {
@@ -266,7 +257,7 @@ public final class FixedLengthStreamSourceConduit  extends AbstractStreamSourceC
 
     private void exitShutdownReads(long oldVal) {
         if (!allAreClear(oldVal, MASK_COUNT)) {
-            finishListener.handleEvent(this);
+            exchange.terminateRequest();
         }
     }
 
@@ -280,8 +271,22 @@ public final class FixedLengthStreamSourceConduit  extends AbstractStreamSourceC
         long newVal = oldVal - consumed;
         state = newVal;
         if (anyAreSet(oldVal, MASK_COUNT) && allAreClear(newVal, MASK_COUNT)) {
-            finishListener.handleEvent(this);
+            exchange.terminateRequest();
         }
     }
 
+    public void setLength(long contentLength) {
+        if (contentLength < 0L) {
+            throw new IllegalArgumentException("Content length must be greater than or equal to zero");
+        } else if (contentLength > MASK_COUNT) {
+            throw new IllegalArgumentException("Content length is too long");
+        }
+        state = contentLength;
+    }
+
+    @Override
+    public void reset(final HttpServerExchange newExchange) {
+        state = 0;
+        exchange = newExchange;
+    }
 }

@@ -31,6 +31,10 @@ import org.xnio.conduits.StreamSourceConduit;
 import static org.xnio.IoUtils.safeClose;
 
 /**
+ *
+ * TODO----- FIX AJP BEFORE THIS GOES TO UPSTREAM
+ *
+ *
  * @author Stuart Douglas
  */
 
@@ -50,7 +54,7 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel> {
         this.connection = connection;
         maxRequestSize = connection.getUndertowOptions().get(UndertowOptions.MAX_HEADER_SIZE, UndertowOptions.DEFAULT_MAX_HEADER_SIZE);
 
-        httpServerExchange = new HttpServerExchange(connection, channel.getSourceChannel(), channel.getSinkChannel());
+        httpServerExchange = new HttpServerExchange(connection, channel.getSinkChannel());
         httpServerExchange.addExchangeCompleteListener(new StartNextRequestAction(channel.getSourceChannel(), channel.getSinkChannel()));
     }
 
@@ -135,7 +139,7 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel> {
             httpServerExchange.putAttachment(UndertowOptions.ATTACHMENT_KEY, connection.getUndertowOptions());
             AjpConduitWrapper channelWrapper = new AjpConduitWrapper(new AjpResponseConduit(new StreamSinkChannelWrappingConduit(this.channel.getSinkChannel()), connection.getBufferPool(), httpServerExchange));
             httpServerExchange.addResponseWrapper(channelWrapper);
-            httpServerExchange.addRequestWrapper(channelWrapper.getRequestWrapper());
+            //httpServerExchange.addRequestWrapper(channelWrapper.getRequestWrapper());
 
             try {
                 httpServerExchange.setRequestScheme(connection.getSslSession() != null ? "https" : "http"); //todo: determine if this is https
