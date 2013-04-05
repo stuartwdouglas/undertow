@@ -36,6 +36,8 @@ import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
 import org.xnio.channels.ConnectedChannel;
 import org.xnio.channels.SslChannel;
+import org.xnio.conduits.StreamSinkConduit;
+import org.xnio.conduits.StreamSourceConduit;
 
 /**
  * A server-side HTTP connection.
@@ -44,6 +46,9 @@ import org.xnio.channels.SslChannel;
  */
 public final class HttpServerConnection extends AbstractAttachable implements ConnectedChannel {
     private final StreamConnection channel;
+    private final StreamSinkConduit originalSinkConduit;
+    private final StreamSourceConduit originalSourceConduit;
+
     private final ChannelListener.Setter<HttpServerConnection> closeSetter;
     private final Pool<ByteBuffer> bufferPool;
     private final HttpHandler rootHandler;
@@ -55,8 +60,10 @@ public final class HttpServerConnection extends AbstractAttachable implements Co
      */
     private Pooled<ByteBuffer> extraBytes;
 
-    public HttpServerConnection(StreamConnection channel, final Pool<ByteBuffer> bufferPool, final HttpHandler rootHandler, final OptionMap undertowOptions, final int bufferSize) {
+    public HttpServerConnection(StreamConnection channel,final Pool<ByteBuffer> bufferPool, final HttpHandler rootHandler, final OptionMap undertowOptions, final int bufferSize) {
         this.channel = channel;
+        this.originalSinkConduit = channel.getSinkChannel().getConduit();
+        this.originalSourceConduit = channel.getSourceChannel().getConduit();
         this.bufferPool = bufferPool;
         this.rootHandler = rootHandler;
         this.undertowOptions = undertowOptions;
@@ -167,4 +174,42 @@ public final class HttpServerConnection extends AbstractAttachable implements Co
     public void setExtraBytes(final Pooled<ByteBuffer> extraBytes) {
         this.extraBytes = extraBytes;
     }
+
+    /**
+     * Removes all channel wrappers and changes the underlying channel back to a 'raw' NIO connection
+     */
+    public CurrentConduits revertToRawChannel() {
+        final CurrentConduits c = new CurrentConduits(channel.getSourceChannel().getConduit(), channel.getSinkChannel().getConduit());
+        channel.getSinkChannel().setConduit(originalSinkConduit);
+        channel.getSourceChannel().setConduit(originalSourceConduit);
+        return c;
+    }
+
+    /**
+     * Revert back to the original conduits encapulated by the CurrentConduits.
+     *
+     * TODO: THIS IS TEMPROARY, it is only here for 100-Continue responses until that is fixed up
+     *
+     * @param currentConduits
+     */
+    public void revertConduitState(final CurrentConduits currentConduits) {
+        channel.getSinkChannel().setConduit(currentConduits.streamSinkConduit);
+        channel.getSourceChannel().setConduit(currentConduits.streamSourceConduit);
+    }
+
+
+    /**
+     * An opaque handle to the current channels
+     */
+    public class CurrentConduits {
+
+        final StreamSourceConduit streamSourceConduit;
+        final StreamSinkConduit streamSinkConduit;
+
+        private CurrentConduits(final StreamSourceConduit streamSourceConduit, final StreamSinkConduit streamSinkConduit) {
+            this.streamSourceConduit = streamSourceConduit;
+            this.streamSinkConduit = streamSinkConduit;
+        }
+    }
+
 }

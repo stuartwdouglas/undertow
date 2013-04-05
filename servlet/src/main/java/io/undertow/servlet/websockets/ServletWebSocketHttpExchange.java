@@ -137,6 +137,7 @@ public class ServletWebSocketHttpExchange implements WebSocketHttpExchange {
         exchange.upgradeChannel(new ExchangeCompletionListener() {
             @Override
             public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
+                exchange.getConnection().revertToRawChannel();
                 upgradeCallback.handleUpgrade(exchange.getConnection().getChannel(), exchange.getConnection().getBufferPool());
             }
         });

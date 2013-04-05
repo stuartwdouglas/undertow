@@ -28,7 +28,6 @@ import io.undertow.conduits.ConduitListener;
 import io.undertow.conduits.FinishableStreamSinkConduit;
 import io.undertow.conduits.FixedLengthStreamSinkConduit;
 import io.undertow.conduits.FixedLengthStreamSourceConduit;
-import io.undertow.conduits.PipelingBufferingStreamSinkConduit;
 import io.undertow.conduits.ReadDataStreamSourceConduit;
 import io.undertow.util.ConduitFactory;
 import io.undertow.util.HeaderMap;
@@ -38,7 +37,6 @@ import io.undertow.util.Methods;
 import org.jboss.logging.Logger;
 import org.xnio.XnioExecutor;
 import org.xnio.conduits.EmptyStreamSourceConduit;
-import org.xnio.conduits.StreamSinkChannelWrappingConduit;
 import org.xnio.conduits.StreamSinkConduit;
 import org.xnio.conduits.StreamSourceConduit;
 
@@ -67,42 +65,29 @@ public class HttpTransferEncoding {
         final String contentLengthHeader = requestHeaders.getFirst(Headers.CONTENT_LENGTH);
 
         final HttpServerConnection connection = exchange.getConnection();
-        //if we are already using the pipelineing buffer add it to the exchange
-        PipelingBufferingStreamSinkConduit pipeliningBuffer = connection.getAttachment(PipelingBufferingStreamSinkConduit.ATTACHMENT_KEY);
-        if(pipeliningBuffer != null) {
-            exchange.addResponseWrapper(pipeliningBuffer.getChannelWrapper());
-        }
 
         exchange.addRequestWrapper(ReadDataStreamSourceConduit.WRAPPER);
 
         boolean persistentConnection = persistentConnection(exchange, connectionHeader);
 
         if(exchange.getRequestMethod().equals(Methods.GET)) {
-            if(persistentConnection
-                    && connection.getExtraBytes() != null
-                    && pipeliningBuffer == null
-                    && connection.getUndertowOptions().get(UndertowOptions.BUFFER_PIPELINED_DATA, false)) {
-                pipeliningBuffer = new PipelingBufferingStreamSinkConduit(new StreamSinkChannelWrappingConduit(connection.getChannel().getSinkChannel()), connection.getBufferPool());
-                connection.putAttachment(PipelingBufferingStreamSinkConduit.ATTACHMENT_KEY, pipeliningBuffer);
-                exchange.addResponseWrapper(pipeliningBuffer.getChannelWrapper());
-            }
+
             // no content - immediately start the next request, returning an empty stream for this one
             exchange.terminateRequest();
             exchange.addRequestWrapper(EMPTY_STREAM_SOURCE_CONDUIT_WRAPPER);
         } else {
-            persistentConnection = handleRequestEncoding(exchange, transferEncodingHeader, contentLengthHeader, connection, pipeliningBuffer, persistentConnection);
+            persistentConnection = handleRequestEncoding(exchange, transferEncodingHeader, contentLengthHeader, connection, persistentConnection);
         }
 
         exchange.setPersistent(persistentConnection);
 
-        exchange.addResponseWrapper(HttpResponseConduit.WRAPPER);
         //now the response wrapper, to add in the appropriate connection control headers
         exchange.addResponseWrapper(responseWrapper(persistentConnection));
 
         HttpHandlers.executeRootHandler(next, exchange, Thread.currentThread() instanceof XnioExecutor);
     }
 
-    private static boolean handleRequestEncoding(HttpServerExchange exchange, String transferEncodingHeader, String contentLengthHeader, HttpServerConnection connection, PipelingBufferingStreamSinkConduit pipeliningBuffer, boolean persistentConnection) {
+    private static boolean handleRequestEncoding(HttpServerExchange exchange, String transferEncodingHeader, String contentLengthHeader, HttpServerConnection connection, boolean persistentConnection) {
         HttpString transferEncoding = Headers.IDENTITY;
         if (transferEncodingHeader != null) {
             transferEncoding = new HttpString(transferEncodingHeader);
@@ -127,23 +112,8 @@ public class HttpTransferEncoding {
                 // make it not persistent
                 persistentConnection = false;
             }
-        } else if (persistentConnection) {
-            //we have no content and a persistent request. This may mean we need to use the pipelining buffer to improve
-            //performance
-            if (connection.getExtraBytes() != null
-                    && pipeliningBuffer == null
-                    && connection.getUndertowOptions().get(UndertowOptions.BUFFER_PIPELINED_DATA, false)) {
-                pipeliningBuffer = new PipelingBufferingStreamSinkConduit(new StreamSinkChannelWrappingConduit(connection.getChannel().getSinkChannel()), connection.getBufferPool());
-                connection.putAttachment(PipelingBufferingStreamSinkConduit.ATTACHMENT_KEY, pipeliningBuffer);
-                exchange.addResponseWrapper(pipeliningBuffer.getChannelWrapper());
-            }
-
+        } else {
             // no content - immediately start the next request, returning an empty stream for this one
-            exchange.terminateRequest();
-            exchange.addRequestWrapper(EMPTY_STREAM_SOURCE_CONDUIT_WRAPPER);
-        } else if (exchange.isHttp11()) {
-            //this is a http 1.1 non-persistent connection
-            //we still know there is no content
             exchange.terminateRequest();
             exchange.addRequestWrapper(EMPTY_STREAM_SOURCE_CONDUIT_WRAPPER);
         }

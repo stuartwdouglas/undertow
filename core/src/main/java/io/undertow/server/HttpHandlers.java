@@ -49,26 +49,28 @@ public final class HttpHandlers {
     public static void executeRootHandler(final HttpHandler handler, final HttpServerExchange exchange, boolean inIoThread) {
         try {
             exchange.setInIoThread(inIoThread);
-            exchange.setInCall(true);
+            exchange.startCall();
             handler.handleRequest(exchange);
-            exchange.setInCall(false);
-            if (exchange.isDispatched()) {
-                final Runnable dispatchTask = exchange.getAttachment(HttpServerExchange.DISPATCH_TASK);
-                Executor executor = exchange.getAttachment(HttpServerExchange.DISPATCH_EXECUTOR);
-                exchange.unDispatch();
-                if (dispatchTask != null) {
-                    executor = executor == null ? exchange.getConnection().getWorker() : executor;
-                    executor.execute(dispatchTask);
+            exchange.endCall();
+            if(!exchange.isComplete()) {
+                if (exchange.isDispatched()) {
+                    final Runnable dispatchTask = exchange.getAttachment(HttpServerExchange.DISPATCH_TASK);
+                    Executor executor = exchange.getAttachment(HttpServerExchange.DISPATCH_EXECUTOR);
+                    exchange.unDispatch();
+                    if (dispatchTask != null) {
+                        executor = executor == null ? exchange.getConnection().getWorker() : executor;
+                        executor.execute(dispatchTask);
+                    }
+                } else {
+                    exchange.endExchange();
                 }
-            } else {
-                exchange.endExchange();
             }
         } catch (Throwable t) {
-            exchange.setInCall(false);
             if (!exchange.isResponseStarted()) {
                 exchange.setResponseCode(500);
             }
             UndertowLogger.REQUEST_LOGGER.errorf(t, "Blocking request failed %s", exchange);
+            exchange.endCall();
             exchange.endExchange();
         }
     }

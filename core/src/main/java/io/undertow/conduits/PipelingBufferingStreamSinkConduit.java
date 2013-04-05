@@ -8,12 +8,12 @@ import java.nio.channels.FileChannel;
 import java.util.concurrent.TimeUnit;
 
 import io.undertow.UndertowLogger;
-import io.undertow.server.ConduitWrapper;
 import io.undertow.server.ExchangeCompletionListener;
 import io.undertow.server.HttpServerConnection;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.ResetableConduit;
 import io.undertow.util.AttachmentKey;
-import io.undertow.util.ConduitFactory;
+import io.undertow.util.Methods;
 import org.xnio.Buffers;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
@@ -37,7 +37,7 @@ import static org.xnio.Bits.anyAreSet;
  *
  * @author Stuart Douglas
  */
-public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkConduit<StreamSinkConduit> {
+public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkConduit<StreamSinkConduit> implements ResetableConduit {
 
     public static final AttachmentKey<PipelingBufferingStreamSinkConduit> ATTACHMENT_KEY = AttachmentKey.create(PipelingBufferingStreamSinkConduit.class);
 
@@ -46,9 +46,13 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
      */
     private static final int SHUTDOWN = 1;
     private static final int DELEGATE_SHUTDOWN = 1 << 1;
-    private static final int FLUSHING = 1 << 3;
+    private static final int FLUSHING = 1 << 2;
+    private static final int ACTIVE = 1 << 3;
+    private static final int NEW_REQUEST = 1 << 4;
 
+    private final HttpServerConnection connection;
     private int state;
+    private HttpServerExchange exchange;
 
     private final Pool<ByteBuffer> pool;
     private Pooled<ByteBuffer> buffer;
@@ -93,13 +97,33 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
         }
     };
 
-    public PipelingBufferingStreamSinkConduit(StreamSinkConduit next, final Pool<ByteBuffer> pool) {
+    private boolean enabled() {
+        int state = this.state;
+        if (anyAreSet(state, ACTIVE)) {
+            return true;
+        }
+        if (anyAreSet(state, NEW_REQUEST)) {
+            if (exchange.getRequestMethod().equals(Methods.GET) && connection.getExtraBytes() != null) {
+                this.state |= ACTIVE;
+                exchange.addExchangeCompleteListener(completionListener);
+                return true;
+            }
+            this.state &= ~NEW_REQUEST;
+        }
+        return false;
+    }
+
+    public PipelingBufferingStreamSinkConduit(StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerConnection connection) {
         super(next);
         this.pool = pool;
+        this.connection = connection;
     }
 
     @Override
     public long transferFrom(FileChannel src, long position, long count) throws IOException {
+        if (!enabled()) {
+            return next.transferFrom(src, position, count);
+        }
         if (anyAreSet(state, SHUTDOWN)) {
             throw new ClosedChannelException();
         }
@@ -108,11 +132,17 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
 
     @Override
     public long transferFrom(StreamSourceChannel source, long count, ByteBuffer throughBuffer) throws IOException {
+        if (!enabled()) {
+           return next.transferFrom(source, count, throughBuffer);
+        }
         return IoUtils.transfer(source, count, throughBuffer, new ConduitWritableByteChannel(this));
     }
 
     @Override
     public long write(ByteBuffer[] srcs, int offset, int length) throws IOException {
+        if (!enabled()) {
+            return next.write(srcs, offset, length);
+        }
         if (anyAreSet(state, SHUTDOWN)) {
             throw new ClosedChannelException();
         }
@@ -147,6 +177,9 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
 
     @Override
     public int write(ByteBuffer src) throws IOException {
+        if (!enabled()) {
+            return next.write(src);
+        }
         if (anyAreSet(state, SHUTDOWN)) {
             throw new ClosedChannelException();
         }
@@ -189,29 +222,15 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
      */
     public boolean flushPipelinedData() throws IOException {
         if (buffer == null || (buffer.getResource().position() == 0 && allAreClear(state, FLUSHING))) {
-            return next.flush();
+            return true;
         }
         return flushBuffer();
     }
 
-    /**
-     * Gets the channel wrapper that implements the buffering
-     *
-     * @return The channel wrapper
-     */
-    public ConduitWrapper<StreamSinkConduit> getChannelWrapper() {
-        return new ConduitWrapper<StreamSinkConduit>() {
-            @Override
-            public StreamSinkConduit wrap(ConduitFactory<StreamSinkConduit> factory, HttpServerExchange exchange) {
-                exchange.addExchangeCompleteListener(completionListener);
-                return PipelingBufferingStreamSinkConduit.this;
-            }
-        };
-    }
 
     private boolean flushBuffer() throws IOException {
         if (buffer == null) {
-            return next.flush();
+            return true;
         }
         final ByteBuffer byteBuffer = buffer.getResource();
         if (!anyAreSet(state, FLUSHING)) {
@@ -236,6 +255,10 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
 
     @Override
     public void awaitWritable(long time, TimeUnit timeUnit) throws IOException {
+        if (!enabled()) {
+            next.awaitWritable(time, timeUnit);
+            return;
+        }
         if (buffer != null) {
             if (buffer.getResource().hasRemaining()) {
                 return;
@@ -246,6 +269,10 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
 
     @Override
     public void awaitWritable() throws IOException {
+        if (!enabled()) {
+            next.awaitWritable();
+            return;
+        }
         if (buffer != null) {
             if (buffer.getResource().hasRemaining()) {
                 return;
@@ -256,6 +283,9 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
 
     @Override
     public boolean flush() throws IOException {
+        if (!enabled()) {
+            return next.flush();
+        }
         if (anyAreSet(state, SHUTDOWN)) {
             if (!flushBuffer()) {
                 return false;
@@ -272,6 +302,10 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
 
     @Override
     public void terminateWrites() throws IOException {
+        if (!enabled()) {
+            next.terminateWrites();
+            return;
+        }
         state |= SHUTDOWN;
         if (buffer == null) {
             state |= DELEGATE_SHUTDOWN;
@@ -280,12 +314,25 @@ public class PipelingBufferingStreamSinkConduit extends AbstractStreamSinkCondui
     }
 
     public void truncateWrites() throws IOException {
+        if (!enabled()) {
+            next.truncateWrites();
+            return;
+        }
         try {
             next.truncateWrites();
         } finally {
             if (buffer != null) {
                 buffer.free();
             }
+        }
+    }
+
+    @Override
+    public void reset(final HttpServerExchange newExchange) {
+        this.exchange = newExchange;
+        state |= NEW_REQUEST;
+        if(anyAreSet(state, ACTIVE)) {
+            exchange.addExchangeCompleteListener(completionListener);
         }
     }
 }

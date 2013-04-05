@@ -25,7 +25,6 @@ import java.nio.channels.FileChannel;
 import java.util.Iterator;
 import java.util.List;
 
-import io.undertow.util.ConduitFactory;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 import io.undertow.util.StatusCodes;
@@ -42,14 +41,14 @@ import static org.xnio.Bits.allAreSet;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkConduit> {
+final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkConduit> implements ResetableConduit {
 
     private final Pool<ByteBuffer> pool;
 
     private int state = STATE_START;
 
     private Pooled<ByteBuffer> pooledBuffer;
-    private final HttpServerExchange exchange;
+    private HttpServerExchange exchange;
 
     private static final int STATE_BODY = 0; // Message body, normal pass-through operation
     private static final int STATE_START = 1; // No headers written yet
@@ -58,18 +57,10 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
     private static final int MASK_STATE = 0x0000000F;
     private static final int FLAG_SHUTDOWN = 0x00000010;
 
-    public static final ConduitWrapper<StreamSinkConduit> WRAPPER = new ConduitWrapper<StreamSinkConduit>() {
-        @Override
-        public StreamSinkConduit wrap(ConduitFactory<StreamSinkConduit> factory, HttpServerExchange exchange) {
-            final StreamSinkConduit channel = factory.create();
-            return new HttpResponseConduit(channel, exchange.getConnection().getBufferPool(), exchange);
-        }
-    };
 
-    HttpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerExchange exchange) {
+    HttpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool) {
         super(next);
         this.pool = pool;
-        this.exchange = exchange;
     }
 
     /**
@@ -323,5 +314,15 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
 
     public XnioWorker getWorker() {
         return next.getWorker();
+    }
+
+    @Override
+    public void reset(final HttpServerExchange newExchange) {
+        this.exchange = newExchange;
+        state = STATE_START;
+        if (pooledBuffer != null) {
+            pooledBuffer.free();
+            pooledBuffer = null;
+        }
     }
 }

@@ -20,15 +20,14 @@ package io.undertow.server;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowOptions;
 import org.xnio.ChannelListener;
-import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
 import org.xnio.Pooled;
-import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
 
 import static org.xnio.IoUtils.safeClose;
@@ -38,24 +37,20 @@ import static org.xnio.IoUtils.safeClose;
  *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-final class HttpReadListener implements ChannelListener<StreamSourceChannel> {
+final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Runnable, ExchangeCompletionListener {
 
-    private final StreamSinkChannel responseChannel;
-
-    private ParseState state = new ParseState();
-    private HttpServerExchange httpServerExchange;
-
+    private final List<ResetableConduit> resetableConduits;
     private final HttpServerConnection connection;
-
-    private int read = 0;
     private final int maxRequestSize;
 
-    HttpReadListener(final StreamSinkChannel responseChannel, final StreamSourceChannel requestChannel, final HttpServerConnection connection) {
-        this.responseChannel = responseChannel;
+    private ParseState state;
+    private HttpServerExchange httpServerExchange;
+    private int read = 0;
+
+    HttpReadListener(final List<ResetableConduit> resetableConduits, final HttpServerConnection connection) {
+        this.resetableConduits = resetableConduits;
         this.connection = connection;
         maxRequestSize = connection.getUndertowOptions().get(UndertowOptions.MAX_HEADER_SIZE, UndertowOptions.DEFAULT_MAX_HEADER_SIZE);
-        httpServerExchange = new HttpServerExchange(connection, requestChannel, this.responseChannel);
-        httpServerExchange.addExchangeCompleteListener(new StartNextRequestAction(requestChannel, responseChannel));
     }
 
     public void handleEvent(final StreamSourceChannel channel) {
@@ -91,24 +86,8 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel> {
                     }
                     return;
                 } else if (res == -1) {
-                    try {
-                        channel.suspendReads();
-                        channel.shutdownReads();
-                        final StreamSinkChannel responseChannel = this.responseChannel;
-                        responseChannel.shutdownWrites();
-                        // will return false if there's a response queued ahead of this one, so we'll set up a listener then
-                        if (!responseChannel.flush()) {
-                            responseChannel.getWriteSetter().set(ChannelListeners.flushingChannelListener(null, null));
-                            responseChannel.resumeWrites();
-                        }
-                    } catch (IOException e) {
-                        if (UndertowLogger.REQUEST_LOGGER.isDebugEnabled()) {
-                            UndertowLogger.REQUEST_LOGGER.debugf(e, "Connection closed with IOException when attempting to shut down reads");
-                        }
-                        // fuck it, it's all ruined
-                        IoUtils.safeClose(channel);
-                        return;
-                    }
+                    //EOF while reading a request, we just close the channel
+                    IoUtils.safeClose(channel);
                     return;
                 }
                 //TODO: we need to handle parse errors
@@ -141,10 +120,8 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel> {
             final HttpServerExchange httpServerExchange = this.httpServerExchange;
             httpServerExchange.putAttachment(UndertowOptions.ATTACHMENT_KEY, connection.getUndertowOptions());
             try {
-                httpServerExchange.setRequestScheme(connection.getSslSession() != null ? "https" : "http"); //todo: determine if this is https
+                httpServerExchange.setRequestScheme(connection.getSslSession() != null ? "https" : "http");
                 state = null;
-                this.httpServerExchange = null;
-                this.httpServerExchange = null;
                 HttpTransferEncoding.handleRequest(httpServerExchange, connection.getRootHandler());
 
             } catch (Throwable t) {
@@ -161,64 +138,59 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel> {
         }
     }
 
+    public void startRequest() {
 
-    /**
-     * Action that starts the next request
-     */
-    private static class StartNextRequestAction implements ExchangeCompletionListener {
+        final HttpServerExchange oldExchange = this.httpServerExchange;
+        HttpServerConnection connection = this.connection;
 
-        private StreamSourceChannel requestChannel;
-        private StreamSinkChannel responseChannel;
+        state = new ParseState();
+        read = 0;
+        HttpServerExchange exchange  = new HttpServerExchange(connection, connection.getChannel().getSourceChannel(), connection.getChannel().getSinkChannel());
+        this.httpServerExchange = exchange;
+        exchange.addExchangeCompleteListener(this);
 
-
-        public StartNextRequestAction(final StreamSourceChannel requestChannel, final StreamSinkChannel responseChannel) {
-            this.requestChannel = requestChannel;
-            this.responseChannel = responseChannel;
+        for (final ResetableConduit conduit : resetableConduits) {
+            conduit.reset(exchange);
         }
 
-        @Override
-        public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
-            if (exchange.isPersistent() && !exchange.isUpgrade()) {
-                final StreamSourceChannel channel = this.requestChannel;
-                final HttpReadListener listener = new HttpReadListener(responseChannel, channel, exchange.getConnection());
-                if (exchange.getConnection().getExtraBytes() == null) {
-                    //if we are not pipelining we just register a listener
-                    channel.getReadSetter().set(listener);
-                    channel.resumeReads();
-                } else {
-                    if(channel.isReadResumed()) {
-                        channel.suspendReads();
-                    }
-                    if (exchange.isInIoThread()) {
-                        channel.getIoThread().execute(new DoNextRequestRead(listener, channel));
-                    } else {
-                        Executor executor = exchange.getDispatchExecutor();
-                        if(executor == null) {
-                            executor = exchange.getConnection().getWorker();
-                        }
-                        executor.execute(new DoNextRequestRead(listener, channel));
-                    }
+        if(oldExchange == null) {
+            //only on the initial request, we just run the read listener directly
+            handleEvent(connection.getChannel().getSourceChannel());
+        } else if (oldExchange.isPersistent() && !oldExchange.isUpgrade()) {
+            final StreamSourceChannel channel = connection.getChannel().getSourceChannel();
+            if (connection.getExtraBytes() == null) {
+                //if we are not pipelining we just register a listener
+                channel.getReadSetter().set(this);
+                channel.resumeReads();
+            } else {
+                if (channel.isReadResumed()) {
+                    channel.suspendReads();
                 }
-                responseChannel = null;
-                this.requestChannel = null;
-            }
-            nextListener.proceed();
-        }
-
-        private static class DoNextRequestRead implements Runnable {
-
-            private final HttpReadListener listener;
-            private final StreamSourceChannel channel;
-
-            public DoNextRequestRead(HttpReadListener listener, StreamSourceChannel channel) {
-                this.listener = listener;
-                this.channel = channel;
-            }
-
-            @Override
-            public void run() {
-                listener.handleEvent(channel);
+                if (oldExchange.isInIoThread()) {
+                    channel.getIoThread().execute(this);
+                } else {
+                    Executor executor = oldExchange.getDispatchExecutor();
+                    if (executor == null) {
+                        executor = connection.getWorker();
+                    }
+                    executor.execute(this);
+                }
             }
         }
     }
+
+    /**
+     * perform a read
+     */
+    @Override
+    public void run() {
+        handleEvent(connection.getChannel().getSourceChannel());
+    }
+
+    @Override
+    public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
+        startRequest();
+        nextListener.proceed();
+    }
+
 }
