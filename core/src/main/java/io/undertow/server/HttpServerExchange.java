@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -51,7 +50,6 @@ import org.xnio.ChannelExceptionHandler;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
-import org.xnio.Pooled;
 import org.xnio.XnioExecutor;
 import org.xnio.channels.Channels;
 import org.xnio.channels.StreamSinkChannel;
@@ -65,6 +63,7 @@ import org.xnio.conduits.StreamSinkConduit;
 import org.xnio.conduits.StreamSourceChannelWrappingConduit;
 import org.xnio.conduits.StreamSourceConduit;
 
+import static org.xnio.Bits.allAreClear;
 import static org.xnio.Bits.allAreSet;
 import static org.xnio.Bits.anyAreClear;
 import static org.xnio.Bits.anyAreSet;
@@ -158,6 +157,7 @@ public final class HttpServerExchange extends AbstractAttachable {
     private static final int FLAG_RESPONSE_SENT = 1 << 10;
     private static final int FLAG_RESPONSE_TERMINATED = 1 << 11;
     private static final int FLAG_REQUEST_TERMINATED = 1 << 12;
+    private static final int FLAG_COMPLETION_LISTENERS_CALLED = 1 << 13;
     private static final int FLAG_PERSISTENT = 1 << 14;
 
     /**
@@ -510,7 +510,7 @@ public final class HttpServerExchange extends AbstractAttachable {
      * @param executor The executor to use
      */
     public void setDispatchExecutor(final Executor executor) {
-        if(executor == null) {
+        if (executor == null) {
             removeAttachment(DISPATCH_EXECUTOR);
         } else {
             putAttachment(DISPATCH_EXECUTOR, executor);
@@ -530,11 +530,14 @@ public final class HttpServerExchange extends AbstractAttachable {
         return anyAreSet(state, FLAG_IN_CALL);
     }
 
-    void setInCall(boolean value) {
-        if (value) {
-            state |= FLAG_IN_CALL;
-        } else {
-            state &= ~FLAG_IN_CALL;
+    void startCall() {
+        state |= FLAG_IN_CALL;
+    }
+
+    void endCall() {
+        state &=  ~FLAG_IN_CALL;
+        if(isComplete() && allAreClear(state, FLAG_COMPLETION_LISTENERS_CALLED)) {
+            invokeExchangeCompleteListeners();
         }
     }
 
@@ -696,65 +699,18 @@ public final class HttpServerExchange extends AbstractAttachable {
         }
         this.state = oldVal | FLAG_REQUEST_TERMINATED;
         if (anyAreSet(oldVal, FLAG_RESPONSE_TERMINATED)) {
-            invokeExchangeCompleteListeners();
+            if(!isInCall()) {
+                invokeExchangeCompleteListeners();
+            }
         }
     }
 
     private void invokeExchangeCompleteListeners() {
+        state |= FLAG_COMPLETION_LISTENERS_CALLED;
         if (!exchangeCompleteListeners.isEmpty()) {
             int i = exchangeCompleteListeners.size() - 1;
             ExchangeCompletionListener next = exchangeCompleteListeners.get(i);
             next.exchangeEvent(this, new ExchangeCompleteNextListener(exchangeCompleteListeners, this, i));
-        }
-    }
-
-    /**
-     * Pushes back the given data. This should only be used by transfer coding handlers that have read past
-     * the end of the request when handling pipelined requests
-     *
-     * @param unget The buffer to push back
-     */
-    public void ungetRequestBytes(final Pooled<ByteBuffer> unget) {
-        if (connection.getExtraBytes() == null) {
-            connection.setExtraBytes(unget);
-        } else {
-            Pooled<ByteBuffer> eb = connection.getExtraBytes();
-            ByteBuffer buf = eb.getResource();
-            final ByteBuffer ugBuffer = unget.getResource();
-
-            if (ugBuffer.limit() - ugBuffer.remaining() > buf.remaining()) {
-                //stuff the existing data after the data we are ungetting
-                ugBuffer.compact();
-                ugBuffer.put(buf);
-                ugBuffer.flip();
-                eb.free();
-                connection.setExtraBytes(unget);
-            } else {
-                //TODO: this is horrible, but should not happen often
-                final byte[] data = new byte[ugBuffer.remaining() + buf.remaining()];
-                int first = ugBuffer.remaining();
-                ugBuffer.get(data);
-                buf.get(data, first, buf.remaining());
-                eb.free();
-                unget.free();
-                final ByteBuffer newBuffer = ByteBuffer.wrap(data);
-                connection.setExtraBytes(new Pooled<ByteBuffer>() {
-                    @Override
-                    public void discard() {
-
-                    }
-
-                    @Override
-                    public void free() {
-
-                    }
-
-                    @Override
-                    public ByteBuffer getResource() throws IllegalStateException {
-                        return newBuffer;
-                    }
-                });
-            }
         }
     }
 
@@ -948,7 +904,9 @@ public final class HttpServerExchange extends AbstractAttachable {
         }
         this.state = oldVal | FLAG_RESPONSE_TERMINATED;
         if (anyAreSet(oldVal, FLAG_REQUEST_TERMINATED)) {
-            invokeExchangeCompleteListeners();
+            if(!isInCall()) {
+                invokeExchangeCompleteListeners();
+            }
         }
     }
 
@@ -962,7 +920,7 @@ public final class HttpServerExchange extends AbstractAttachable {
      */
     public void endExchange() {
         final int state = this.state;
-        if(allAreSet(state, FLAG_REQUEST_TERMINATED | FLAG_RESPONSE_TERMINATED)) {
+        if (allAreSet(state, FLAG_REQUEST_TERMINATED | FLAG_RESPONSE_TERMINATED)) {
             return;
         }
         while (!defaultResponseListeners.isEmpty()) {

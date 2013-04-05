@@ -24,7 +24,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
 
-import io.undertow.util.ConduitFactory;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 import io.undertow.util.StatusCodes;
@@ -41,7 +40,7 @@ import static org.xnio.Bits.allAreSet;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkConduit> {
+final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkConduit> implements ResetableConduit {
 
     private final Pool<ByteBuffer> pool;
 
@@ -53,7 +52,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
     private Iterator<String> valueIterator;
     private int charIndex;
     private Pooled<ByteBuffer> pooledBuffer;
-    private final HttpServerExchange exchange;
+    private HttpServerExchange exchange;
 
     private static final int STATE_BODY = 0; // Message body, normal pass-through operation
     private static final int STATE_START = 1; // No headers written yet
@@ -67,30 +66,23 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
     private static final int STATE_HDR_FINAL_LF = 9; // Final LF
     private static final int STATE_BUF_FLUSH = 10; // flush the buffer and go to writing body
 
-    private static final int MASK_STATE         = 0x0000000F;
-    private static final int FLAG_SHUTDOWN      = 0x00000010;
+    private static final int MASK_STATE = 0x0000000F;
+    private static final int FLAG_SHUTDOWN = 0x00000010;
 
-    public static final ConduitWrapper<StreamSinkConduit> WRAPPER = new ConduitWrapper<StreamSinkConduit>() {
-        @Override
-        public StreamSinkConduit wrap(ConduitFactory<StreamSinkConduit> factory, HttpServerExchange exchange) {
-            final StreamSinkConduit channel = factory.create();
-            return new HttpResponseConduit(channel, exchange.getConnection().getBufferPool(), exchange);
-        }
-    };
 
-    HttpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerExchange exchange) {
+    HttpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool) {
         super(next);
         this.pool = pool;
-        this.exchange = exchange;
     }
 
     /**
      * Handles writing out the header data. It can also take a byte buffer of user
      * data, to enable both user data and headers to be written out in a single operation,
      * which has a noticable performance impact.
-     *
+     * <p/>
      * It is up to the caller to note the current position of this buffer before and after they
      * call this method, and use this to figure out how many bytes (if any) have been written.
+     *
      * @param state
      * @param userData
      * @return
@@ -119,7 +111,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
         }
         buffer.clear();
         // BUFFER IS NOW EMPTY FOR FILLING
-        for (;;) {
+        for (; ; ) {
             switch (state) {
                 case STATE_BODY: {
                     // shouldn't be possible, but might as well do the right thing anyway
@@ -138,13 +130,13 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                     buffer.put((byte) ' ');
                     string = StatusCodes.getReason(code);
                     length = string.length();
-                    for (charIndex = 0; charIndex < length; charIndex ++) {
+                    for (charIndex = 0; charIndex < length; charIndex++) {
                         buffer.put((byte) string.charAt(charIndex));
                     }
                     buffer.put((byte) '\r').put((byte) '\n');
                     HeaderMap headers = exchange.getResponseHeaders();
                     nameIterator = headers.iterator();
-                    if (! nameIterator.hasNext()) {
+                    if (!nameIterator.hasNext()) {
                         buffer.put((byte) '\r').put((byte) '\n');
                         buffer.flip();
                         while (buffer.hasRemaining()) {
@@ -185,7 +177,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                     // fall thru
                 }
                 case STATE_HDR_D: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         buffer.flip();
                         do {
                             res = next.write(buffer);
@@ -204,7 +196,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                     // fall thru
                 }
                 case STATE_HDR_DS: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         buffer.flip();
                         do {
                             res = next.write(buffer);
@@ -220,7 +212,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                         buffer.clear();
                     }
                     buffer.put((byte) ' ');
-                    if(valueIterator == null) {
+                    if (valueIterator == null) {
                         valueIterator = exchange.getResponseHeaders().get(headerName).iterator();
                     }
                     assert valueIterator.hasNext();
@@ -250,12 +242,12 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                         }
                     }
                     charIndex = 0;
-                    if (! valueIterator.hasNext()) {
-                        if (! buffer.hasRemaining()) {
+                    if (!valueIterator.hasNext()) {
+                        if (!buffer.hasRemaining()) {
                             if (flushHeaderBuffer(buffer)) return STATE_HDR_EOL_CR;
                         }
                         buffer.put((byte) 13); // CR
-                        if (! buffer.hasRemaining()) {
+                        if (!buffer.hasRemaining()) {
                             if (flushHeaderBuffer(buffer)) return STATE_HDR_EOL_LF;
                         }
                         buffer.put((byte) 10); // LF
@@ -265,11 +257,11 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                             state = STATE_HDR_NAME;
                             break;
                         } else {
-                            if (! buffer.hasRemaining()) {
+                            if (!buffer.hasRemaining()) {
                                 if (flushHeaderBuffer(buffer)) return STATE_HDR_FINAL_CR;
                             }
                             buffer.put((byte) 13); // CR
-                            if (! buffer.hasRemaining()) {
+                            if (!buffer.hasRemaining()) {
                                 if (flushHeaderBuffer(buffer)) return STATE_HDR_FINAL_LF;
                             }
                             buffer.put((byte) 10); // LF
@@ -278,7 +270,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                             this.string = null;
                             buffer.flip();
                             //for performance reasons we use a gather write if there is user data
-                            if(userData == null) {
+                            if (userData == null) {
                                 do {
                                     res = next.write(buffer);
                                     if (res == 0) {
@@ -304,17 +296,17 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                 }
                 // Clean-up states
                 case STATE_HDR_EOL_CR: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         if (flushHeaderBuffer(buffer)) return STATE_HDR_EOL_CR;
                     }
                     buffer.put((byte) 13); // CR
                 }
                 case STATE_HDR_EOL_LF: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         if (flushHeaderBuffer(buffer)) return STATE_HDR_EOL_LF;
                     }
                     buffer.put((byte) 10); // LF
-                    if(valueIterator.hasNext()) {
+                    if (valueIterator.hasNext()) {
                         state = STATE_HDR_NAME;
                         break;
                     } else if (nameIterator.hasNext()) {
@@ -326,14 +318,14 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                     // fall thru
                 }
                 case STATE_HDR_FINAL_CR: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         if (flushHeaderBuffer(buffer)) return STATE_HDR_FINAL_CR;
                     }
                     buffer.put((byte) 13); // CR
                     // fall thru
                 }
                 case STATE_HDR_FINAL_LF: {
-                    if (! buffer.hasRemaining()) {
+                    if (!buffer.hasRemaining()) {
                         if (flushHeaderBuffer(buffer)) return STATE_HDR_FINAL_LF;
                     }
                     buffer.put((byte) 10); // LF
@@ -342,7 +334,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                     this.string = null;
                     buffer.flip();
                     //for performance reasons we use a gather write if there is user data
-                    if(userData == null) {
+                    if (userData == null) {
                         do {
                             res = next.write(buffer);
                             if (res == 0) {
@@ -390,7 +382,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
         int oldState = this.state;
         int state = oldState & MASK_STATE;
         int alreadyWritten = 0;
-        int originalRemaining = - 1;
+        int originalRemaining = -1;
         try {
             if (state != 0) {
                 originalRemaining = src.remaining();
@@ -404,7 +396,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
                     throw new ClosedChannelException();
                 }
             }
-            if(alreadyWritten != originalRemaining) {
+            if (alreadyWritten != originalRemaining) {
                 return next.write(src) + alreadyWritten;
             }
             return alreadyWritten;
@@ -537,5 +529,20 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
 
     public XnioWorker getWorker() {
         return next.getWorker();
+    }
+
+    @Override
+    public void reset(final HttpServerExchange newExchange) {
+        this.exchange = newExchange;
+        state = STATE_START;
+        nameIterator = null;
+        string = null;
+        headerName = null;
+        valueIterator = null;
+        charIndex = 0;
+        if (pooledBuffer != null) {
+            pooledBuffer.free();
+            pooledBuffer = null;
+        }
     }
 }

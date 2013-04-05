@@ -66,7 +66,7 @@ public class HttpContinue {
         if (!exchange.isResponseChannelAvailable()) {
             throw UndertowMessages.MESSAGES.responseChannelAlreadyProvided();
         }
-        final PipelingBufferingStreamSinkConduit pipelingbuffer = exchange.getAttachment(PipelingBufferingStreamSinkConduit.ATTACHMENT_KEY);
+        final PipelingBufferingStreamSinkConduit pipelingbuffer = exchange.getConnection().getAttachment(PipelingBufferingStreamSinkConduit.ATTACHMENT_KEY);
         final StreamConnection channel = exchange.getConnection().getChannel();
         final ConduitStreamSinkChannel sinkChannel = channel.getSinkChannel();
         if (pipelingbuffer != null) {
@@ -78,7 +78,7 @@ public class HttpContinue {
                             try {
                                 if (pipelingbuffer.flushPipelinedData()) {
                                     channel.suspendWrites();
-                                    internalSendContinueResponse(exchange, channel, callback);
+                                    internalSendContinueResponse(exchange, callback);
                                 }
                             } catch (IOException e) {
                                 callback.onException(exchange, null, e);
@@ -88,13 +88,14 @@ public class HttpContinue {
                         }
                     });
                     sinkChannel.resumeWrites();
+                    return;
                 }
             } catch (IOException e) {
                 callback.onException(exchange, null, e);
                 return;
             }
         }
-        internalSendContinueResponse(exchange, sinkChannel, callback);
+        internalSendContinueResponse(exchange, callback);
     }
 
 
@@ -108,20 +109,26 @@ public class HttpContinue {
             throw UndertowMessages.MESSAGES.responseChannelAlreadyProvided();
         }
         final PipelingBufferingStreamSinkConduit pipelingBuffer = exchange.getAttachment(PipelingBufferingStreamSinkConduit.ATTACHMENT_KEY);
-        final StreamConnection channel = exchange.getConnection().getChannel();
-        if (pipelingBuffer != null) {
-            if (!pipelingBuffer.flushPipelinedData()) {
+        HttpServerConnection connection = exchange.getConnection();
+        final HttpServerConnection.CurrentConduits conduits = connection.revertToRawChannel();
+        try {
+            final StreamConnection channel = connection.getChannel();
+            if (pipelingBuffer != null) {
+                if (!pipelingBuffer.flushPipelinedData()) {
+                    channel.getSinkChannel().awaitWritable();
+                }
+            }
+            final ByteBuffer buf = BUFFER.duplicate();
+            channel.getSinkChannel().write(buf);
+            while (buf.hasRemaining()) {
+                channel.getSinkChannel().awaitWritable();
+                channel.getSinkChannel().write(buf);
+            }
+            while (!channel.getSinkChannel().flush()) {
                 channel.getSinkChannel().awaitWritable();
             }
-        }
-        final ByteBuffer buf = BUFFER.duplicate();
-        channel.getSinkChannel().write(buf);
-        while (buf.hasRemaining()) {
-            channel.getSinkChannel().awaitWritable();
-            channel.getSinkChannel().write(buf);
-        }
-        while (!channel.getSinkChannel().flush()) {
-            channel.getSinkChannel().awaitWritable();
+        } finally {
+            connection.revertConduitState(conduits);
         }
     }
 
@@ -136,7 +143,10 @@ public class HttpContinue {
     }
 
 
-    private static void internalSendContinueResponse(final HttpServerExchange exchange, final StreamSinkChannel channel, final IoCallback callback) {
+    private static void internalSendContinueResponse(final HttpServerExchange exchange, final IoCallback callback) {
+        HttpServerConnection connection = exchange.getConnection();
+        final HttpServerConnection.CurrentConduits conduits = connection.revertToRawChannel();
+        final ConduitStreamSinkChannel channel = connection.getChannel().getSinkChannel();
         final ByteBuffer buf = BUFFER.duplicate();
         int res = 0;
         do {
@@ -159,7 +169,7 @@ public class HttpContinue {
                                 }
                             } while (buf.hasRemaining());
                             channel.suspendWrites();
-                            flushChannel(exchange, channel, callback);
+                            flushChannel(exchange, channel, conduits, callback);
                         }
                     });
                     channel.resumeWrites();
@@ -169,10 +179,10 @@ public class HttpContinue {
                 return;
             }
         } while (buf.hasRemaining());
-        flushChannel(exchange, channel, callback);
+        flushChannel(exchange, channel, conduits, callback);
     }
 
-    private static void flushChannel(final HttpServerExchange exchange, final StreamSinkChannel channel, final IoCallback callback) {
+    private static void flushChannel(final HttpServerExchange exchange, final StreamSinkChannel channel, final HttpServerConnection.CurrentConduits conduits, final IoCallback callback) {
         try {
             if (!channel.flush()) {
                 channel.getWriteSetter().set(ChannelListeners.flushingChannelListener(
@@ -192,9 +202,11 @@ public class HttpContinue {
                 ));
                 channel.resumeWrites();
             } else {
+                exchange.getConnection().revertConduitState(conduits);
                 callback.onComplete(exchange, null);
             }
         } catch (IOException e) {
+            exchange.getConnection().revertConduitState(conduits);
             callback.onException(exchange, null, e);
             return;
         }

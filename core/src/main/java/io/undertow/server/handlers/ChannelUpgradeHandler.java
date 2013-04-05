@@ -96,6 +96,7 @@ public final class ChannelUpgradeHandler implements HttpHandler {
                     exchange.upgradeChannel(string, new ExchangeCompletionListener() {
                         @Override
                         public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
+                            exchange.getConnection().revertToRawChannel();
                             ChannelListeners.invokeChannelListener(exchange.getConnection().getChannel(), listener);
                         }
                     });

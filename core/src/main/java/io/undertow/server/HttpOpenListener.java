@@ -19,13 +19,18 @@
 package io.undertow.server;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
+import io.undertow.UndertowOptions;
+import io.undertow.conduits.PipelingBufferingStreamSinkConduit;
 import org.xnio.ChannelListener;
 import org.xnio.OptionMap;
 import org.xnio.Pool;
 import org.xnio.StreamConnection;
+import org.xnio.conduits.StreamSinkConduit;
 
 /**
  * Open listener for HTTP server.  XNIO should be set up to chain the accept handler to post-accept open
@@ -57,9 +62,25 @@ public final class HttpOpenListener implements ChannelListener<StreamConnection>
             UndertowLogger.REQUEST_LOGGER.tracef("Opened connection with %s", channel.getPeerAddress());
         }
         HttpServerConnection connection = new HttpServerConnection(channel, bufferPool, rootHandler, undertowOptions, bufferSize);
-        HttpReadListener readListener = new HttpReadListener(channel.getSinkChannel(), channel.getSourceChannel(), connection);
-        channel.getSourceChannel().setReadListener(readListener);
-        readListener.handleEvent(channel.getSourceChannel());
+
+        final List<ResetableConduit> resetableConduits = new ArrayList<>();
+        StreamSinkConduit sinkConduit = channel.getSinkChannel().getConduit();
+        //now we setup the conduits
+        if(undertowOptions.get(UndertowOptions.BUFFER_PIPELINED_DATA, false)) {
+            PipelingBufferingStreamSinkConduit bufferingStreamSinkConduit = new PipelingBufferingStreamSinkConduit(sinkConduit, connection.getBufferPool(), connection);
+            connection.putAttachment(PipelingBufferingStreamSinkConduit.ATTACHMENT_KEY, bufferingStreamSinkConduit);
+            sinkConduit = bufferingStreamSinkConduit;
+            resetableConduits.add(bufferingStreamSinkConduit);
+        }
+
+        HttpResponseConduit httpResponseConduit = new HttpResponseConduit(sinkConduit, connection.getBufferPool());
+        sinkConduit = httpResponseConduit;
+        resetableConduits.add(httpResponseConduit);
+
+        channel.getSinkChannel().setConduit(sinkConduit);
+
+        HttpReadListener readListener = new HttpReadListener(resetableConduits, connection);
+        readListener.startRequest();
     }
 
     @Override

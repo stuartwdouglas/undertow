@@ -25,6 +25,7 @@ public class ServletUpgradeListener<T extends HttpUpgradeHandler> implements Exc
 
     @Override
     public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
+        exchange.getConnection().revertToRawChannel();
         final StreamConnection channel = exchange.getConnection().getChannel();
         channel.getCloseSetter().set(new ChannelListener<Channel>() {
             @Override

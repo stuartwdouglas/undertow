@@ -26,6 +26,6 @@ package io.undertow.server;
  */
 public interface ResetableConduit {
 
-    void reset();
+    void reset(final HttpServerExchange newExchange);
 
 }

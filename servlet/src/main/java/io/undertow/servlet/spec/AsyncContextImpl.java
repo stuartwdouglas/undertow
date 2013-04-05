@@ -361,7 +361,7 @@ public class AsyncContextImpl implements AsyncContext {
     }
 
     private synchronized void processAsyncTask() {
-        if (!initialRequestDone) {
+        if (!initialRequestDone || exchange.isComplete()) {
             return;
         }
         updateTimeout();
