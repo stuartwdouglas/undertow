@@ -90,7 +90,6 @@ public final class HttpServerExchange extends AbstractAttachable {
      */
     public static final AttachmentKey<Runnable> DISPATCH_TASK = AttachmentKey.create(Runnable.class);
 
-
     private static final Logger log = Logger.getLogger(HttpServerExchange.class);
 
     private final HttpServerConnection connection;
@@ -150,7 +149,8 @@ public final class HttpServerExchange extends AbstractAttachable {
     private String queryString = "";
 
     private List<ConduitWrapper<StreamSourceConduit>> requestWrappers = new ArrayList<ConduitWrapper<StreamSourceConduit>>(3);
-    private List<ConduitWrapper<StreamSinkConduit>> responseWrappers = new ArrayList<ConduitWrapper<StreamSinkConduit>>(3);
+    int responseWrapperCount = 0;
+    private ConduitWrapper<StreamSinkConduit>[] responseWrappers = new ConduitWrapper[4];
 
     private static final int MASK_RESPONSE_CODE = intBitMask(0, 9);
     private static final int FLAG_RESPONSE_SENT = 1 << 10;
@@ -778,14 +778,15 @@ public final class HttpServerExchange extends AbstractAttachable {
      * @return the response channel, or {@code null} if another party already acquired the channel
      */
     public StreamSinkChannel getResponseChannel() {
-        final List<ConduitWrapper<StreamSinkConduit>> wrappers = responseWrappers;
+        final ConduitWrapper<StreamSinkConduit>[] wrappers = responseWrappers;
         this.responseWrappers = null;
         if (wrappers == null) {
             return null;
         }
 
         ConduitFactory<StreamSinkConduit> factory = new ImmediateConduitFactory<>(connection.getChannel().getSinkChannel().getConduit());
-        for (final ConduitWrapper<StreamSinkConduit> wrapper : wrappers) {
+        for (int i = 0; i < responseWrapperCount; ++i) {
+            final ConduitWrapper<StreamSinkConduit> wrapper = wrappers[i];
             final ConduitFactory oldFactory = factory;
             factory = new ConduitFactory<StreamSinkConduit>() {
                 @Override
@@ -859,11 +860,11 @@ public final class HttpServerExchange extends AbstractAttachable {
      * @param wrapper the wrapper
      */
     public void addResponseWrapper(final ConduitWrapper<StreamSinkConduit> wrapper) {
-        List<ConduitWrapper<StreamSinkConduit>> wrappers = responseWrappers;
+        ConduitWrapper<StreamSinkConduit>[] wrappers = responseWrappers;
         if (wrappers == null) {
             throw UndertowMessages.MESSAGES.requestChannelAlreadyProvided();
         }
-        wrappers.add(wrapper);
+        wrappers[responseWrapperCount++] = wrapper;
     }
 
     /**
