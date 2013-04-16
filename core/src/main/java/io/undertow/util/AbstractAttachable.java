@@ -100,4 +100,8 @@ public abstract class AbstractAttachable implements Attachable {
         }
     }
 
+    protected void clearAttachments() {
+        attachments.clear();
+    }
+
 }

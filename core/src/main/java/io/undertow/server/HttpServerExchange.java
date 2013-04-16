@@ -43,6 +43,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.Protocols;
+import io.undertow.util.Reusable;
 import io.undertow.util.SameThreadExecutor;
 import io.undertow.util.SecureHashMap;
 import io.undertow.util.WrapperConduitFactory;
@@ -75,7 +76,7 @@ import static org.xnio.Bits.intBitMask;
  *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class HttpServerExchange extends AbstractAttachable {
+public final class HttpServerExchange extends AbstractAttachable implements Reusable {
     // immutable state
 
     /**
@@ -180,6 +181,34 @@ public final class HttpServerExchange extends AbstractAttachable {
 
     public HttpServerExchange(final HttpServerConnection connection) {
         this.connection = connection;
+    }
+
+
+    @Override
+    public void reuse() {
+        requestHeaders.clear();
+        responseHeaders.clear();
+        exchangeCompletionListenersCount = 0;
+        exchangeCompleteListeners = new ExchangeCompletionListener[2];
+        queryParameters = null;
+        responseChannel = null;
+        requestChannel = null;
+        blockingHttpExchange = null;
+        protocol = null;
+        state = 200;
+        requestMethod = null;
+        requestScheme = null;
+        requestURI = null;
+        requestPath = null;
+        canonicalPath = null;
+        relativePath = null;
+        resolvedPath = "";
+        queryString = "";
+        requestWrapperCount = 0;
+        requestWrappers = new ConduitWrapper[2];
+        responseWrapperCount = 0;
+        responseWrappers = new ConduitWrapper[4];
+        clearAttachments();
     }
 
     /**

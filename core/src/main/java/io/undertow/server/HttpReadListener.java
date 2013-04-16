@@ -44,7 +44,7 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ex
     private final HttpServerConnection connection;
     private final ParseState state = new ParseState();
 
-    private HttpServerExchange httpServerExchange;
+    private final HttpServerExchange httpServerExchange;
 
     private int read = 0;
     private final int maxRequestSize;
@@ -52,12 +52,13 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ex
     HttpReadListener(final HttpServerConnection connection) {
         this.connection = connection;
         maxRequestSize = connection.getUndertowOptions().get(UndertowOptions.MAX_HEADER_SIZE, UndertowOptions.DEFAULT_MAX_HEADER_SIZE);
+        httpServerExchange = new HttpServerExchange(connection);
     }
 
     public void newRequest() {
         state.reset();
         read = 0;
-        httpServerExchange = new HttpServerExchange(connection);
+        httpServerExchange.reuse();
         httpServerExchange.addExchangeCompleteListener(this);
     }
 
@@ -144,9 +145,7 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ex
             final HttpServerExchange httpServerExchange = this.httpServerExchange;
             httpServerExchange.putAttachment(UndertowOptions.ATTACHMENT_KEY, connection.getUndertowOptions());
             try {
-                httpServerExchange.setRequestScheme(connection.getSslSession() != null ? "https" : "http"); //todo: determine if this is https
-                this.httpServerExchange = null;
-                this.httpServerExchange = null;
+                httpServerExchange.setRequestScheme(connection.getSslSession() != null ? "https" : "http");
                 HttpTransferEncoding.handleRequest(httpServerExchange, connection.getRootHandler());
 
             } catch (Throwable t) {
