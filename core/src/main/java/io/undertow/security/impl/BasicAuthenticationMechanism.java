@@ -68,7 +68,7 @@ public class BasicAuthenticationMechanism implements AuthenticationMechanism {
     @Override
     public AuthenticationMechanismOutcome authenticate(HttpServerExchange exchange, SecurityContext securityContext) {
 
-        List<String> authHeaders = exchange.getRequestHeaders().get(AUTHORIZATION);
+        List<String> authHeaders = exchange.getRequestHeaders(AUTHORIZATION);
         if (authHeaders != null) {
             for (String current : authHeaders) {
                 if (current.startsWith(BASIC_PREFIX)) {
@@ -115,7 +115,7 @@ public class BasicAuthenticationMechanism implements AuthenticationMechanism {
 
     @Override
     public ChallengeResult sendChallenge(HttpServerExchange exchange, SecurityContext securityContext) {
-        exchange.getResponseHeaders().add(WWW_AUTHENTICATE, challenge);
+        exchange.addResponseHeader(WWW_AUTHENTICATE, challenge);
         return new ChallengeResult(true, UNAUTHORIZED);
     }
 

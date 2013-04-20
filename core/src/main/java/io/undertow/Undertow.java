@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.undertow.ajp.AjpOpenListener;
+import io.undertow.server.protocol.ajp.AjpOpenListener;
 import io.undertow.security.api.AuthenticationMechanism;
 import io.undertow.security.api.AuthenticationMode;
 import io.undertow.security.api.GSSAPIServerSubjectFactory;
@@ -22,7 +22,7 @@ import io.undertow.security.impl.FormAuthenticationMechanism;
 import io.undertow.security.impl.GSSAPIAuthenticationMechanism;
 import io.undertow.server.HandlerWrapper;
 import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpOpenListener;
+import io.undertow.server.protocol.http.HttpOpenListener;
 import io.undertow.server.handlers.CookieHandler;
 import io.undertow.server.handlers.NameVirtualHostHandler;
 import io.undertow.server.handlers.PathHandler;

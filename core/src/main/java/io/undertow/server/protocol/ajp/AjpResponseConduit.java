@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.undertow.ajp;
+package io.undertow.server.protocol.ajp;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import io.undertow.UndertowLogger;
 import io.undertow.conduits.ConduitListener;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
@@ -83,7 +84,7 @@ final class AjpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCondu
      */
     private ByteBuffer[] packetHeaderAndDataBuffer;
 
-    private final HttpServerExchange exchange;
+    private final HttpServerExchangeImpl exchange;
 
     private final ConduitListener<? super AjpResponseConduit> finishListener;
 
@@ -121,7 +122,7 @@ final class AjpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCondu
         HEADER_MAP = Collections.unmodifiableMap(headers);
     }
 
-    AjpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerExchange exchange, ConduitListener<? super AjpResponseConduit> finishListener) {
+    AjpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerExchangeImpl exchange, ConduitListener<? super AjpResponseConduit> finishListener) {
         super(next);
         this.pool = pool;
         this.exchange = exchange;

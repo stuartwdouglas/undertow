@@ -25,11 +25,11 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketVersion;
 import io.undertow.websockets.core.protocol.Handshake;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.xnio.IoFuture;
 import org.xnio.Pool;
 import org.xnio.channels.ConnectedStreamChannel;
@@ -49,24 +49,24 @@ public class Hybi00Handshake extends Handshake {
     }
 
     @Override
-    protected void handshakeInternal(final WebSocketHttpExchange exchange) {
+    protected void handshakeInternal(final HttpServerExchange exchange) {
 
-        String origin = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_ORIGIN_STRING);
+        String origin = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_ORIGIN);
         if (origin != null) {
-            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_ORIGIN_STRING, origin);
+            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_ORIGIN, origin);
         }
 
-        exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_LOCATION_STRING, getWebSocketLocation(exchange));
+        exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_LOCATION, getWebSocketLocation(exchange));
 
-        String protocol = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_PROTOCOL_STRING);
+        String protocol = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_PROTOCOL);
         if (protocol != null) {
-            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_PROTOCOL_STRING, protocol);
+            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_PROTOCOL, protocol);
         }
 
         // Calculate the answer of the challenge.
-        final String key1 = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY1_STRING);
-        final String key2 = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY2_STRING);
-
+        final String key1 = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY1);
+        final String key2 = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY2);
+/*
         exchange.readRequestData().addNotifier(new IoFuture.Notifier<byte[], Object>() {
             @Override
             public void notify(final IoFuture ioFuture, final Object attachment) {
@@ -79,17 +79,17 @@ public class Hybi00Handshake extends Handshake {
                     exchange.close();
                 }
             }
-        }, null);
+        }, null);*/
     }
 
     @Override
-    public boolean matches(final WebSocketHttpExchange exchange) {
-        return exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY1_STRING) != null &&
-                exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY2_STRING) != null;
+    public boolean matches(final HttpServerExchange exchange) {
+        return exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY1) != null &&
+                exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY2) != null;
     }
 
     @Override
-    public WebSocketChannel createChannel(WebSocketHttpExchange exchange, final ConnectedStreamChannel channel, final Pool<ByteBuffer> pool) {
+    public WebSocketChannel createChannel(HttpServerExchange exchange, final ConnectedStreamChannel channel, final Pool<ByteBuffer> pool) {
         return new WebSocket00Channel(channel, pool, getWebSocketLocation(exchange), subprotocols, false);
     }
 

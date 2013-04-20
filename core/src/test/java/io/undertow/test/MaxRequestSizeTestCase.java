@@ -65,7 +65,7 @@ public class MaxRequestSizeTestCase {
                     outputStream.close();
                 } catch (IOException e) {
                     try {
-                        exchange.getResponseHeaders().put(Headers.CONNECTION, "close");
+                        exchange.setResponseHeader(Headers.CONNECTION, "close");
                         exchange.setResponseCode(500);
                     } catch (Exception ignore) {
 

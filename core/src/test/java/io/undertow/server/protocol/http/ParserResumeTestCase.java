@@ -16,10 +16,13 @@
  * limitations under the License.
  */
 
-package io.undertow.server;
+package io.undertow.server.protocol.http;
 
 import java.nio.ByteBuffer;
 
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.protocol.http.HttpRequestParser;
+import io.undertow.server.protocol.http.ParseState;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import io.undertow.util.Protocols;
@@ -83,7 +86,7 @@ public class ParserResumeTestCase {
         Assert.assertEquals("some value", result.getRequestHeaders().getFirst(new HttpString("OtherHeader")));
         Assert.assertEquals("another", result.getRequestHeaders().getFirst(new HttpString("Hostee")));
         Assert.assertEquals("a", result.getRequestHeaders().getFirst(new HttpString("Accept-garbage")));
-        Assert.assertEquals(4, result.getRequestHeaders().getHeaderNames().size());
+        Assert.assertEquals(4, result.getRequestHeaderNames().size());
 
         Assert.assertEquals(ParseState.PARSE_COMPLETE, context.state);
         Assert.assertEquals("key1=value1&key2=value2", result.getQueryString());

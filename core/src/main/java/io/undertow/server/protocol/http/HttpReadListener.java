@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.undertow.server;
+package io.undertow.server.protocol.http;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -24,6 +24,10 @@ import java.util.concurrent.Executor;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowOptions;
+import io.undertow.server.ExchangeCompletionListener;
+import io.undertow.server.HttpServerConnection;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
@@ -44,7 +48,7 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ex
     private final HttpServerConnection connection;
     private final ParseState state = new ParseState();
 
-    private HttpServerExchange httpServerExchange;
+    private HttpServerExchangeImpl httpServerExchange;
 
     private int read = 0;
     private final int maxRequestSize;
@@ -57,7 +61,7 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ex
     public void newRequest() {
         state.reset();
         read = 0;
-        httpServerExchange = new HttpServerExchange(connection);
+        httpServerExchange = new HttpServerExchangeImpl(connection);
         httpServerExchange.addExchangeCompleteListener(this);
     }
 
@@ -141,7 +145,7 @@ final class HttpReadListener implements ChannelListener<StreamSourceChannel>, Ex
             channel.getReadSetter().set(null);
             channel.suspendReads();
 
-            final HttpServerExchange httpServerExchange = this.httpServerExchange;
+            final HttpServerExchangeImpl httpServerExchange = this.httpServerExchange;
             httpServerExchange.putAttachment(UndertowOptions.ATTACHMENT_KEY, connection.getUndertowOptions());
             try {
                 httpServerExchange.setRequestScheme(connection.getSslSession() != null ? "https" : "http"); //todo: determine if this is https

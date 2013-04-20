@@ -20,7 +20,7 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Set;
 
-import io.undertow.websockets.spi.WebSocketHttpExchange;
+import io.undertow.server.HttpServerExchange;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketVersion;
 import io.undertow.websockets.core.protocol.version07.Hybi07Handshake;
@@ -43,7 +43,7 @@ public class Hybi08Handshake extends Hybi07Handshake {
     }
 
     @Override
-    public WebSocketChannel createChannel(final WebSocketHttpExchange exchange, final ConnectedStreamChannel channel, final Pool<ByteBuffer> pool) {
+    public WebSocketChannel createChannel(final HttpServerExchange exchange, final ConnectedStreamChannel channel, final Pool<ByteBuffer> pool) {
         return new WebSocket08Channel(channel, pool, getWebSocketLocation(exchange), subprotocols, false, allowExtensions);
 
     }

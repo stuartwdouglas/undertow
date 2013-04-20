@@ -1,7 +1,7 @@
 package io.undertow.server;
 
 /**
- * Interface that can be used to wrap the handler chains, adding additional handlers.
+ * Interface that can be used to wrap the handler chains during deployment.
  *
  * @author Stuart Douglas
  */

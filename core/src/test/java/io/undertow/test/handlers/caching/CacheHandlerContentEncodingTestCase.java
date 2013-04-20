@@ -52,7 +52,7 @@ public class CacheHandlerContentEncodingTestCase {
                 final ResponseCache cache = exchange.getAttachment(ResponseCache.ATTACHMENT_KEY);
                 if (!cache.tryServeResponse()) {
                     final String data = "Response " + responseCount.incrementAndGet();
-                    exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, data.length() + "");
+                    exchange.setResponseHeader(Headers.CONTENT_LENGTH, data.length() + "");
                     exchange.getResponseSender().send(data, IoCallback.END_EXCHANGE);
                 }
             }
@@ -62,7 +62,7 @@ public class CacheHandlerContentEncodingTestCase {
         handler.addEncodingHandler("deflate", new DeflateEncodingProvider(), 50, new Predicate<HttpServerExchange>() {
             @Override
             public boolean resolve(final HttpServerExchange value) {
-                return value.getRequestHeaders().contains(ACTUALLY_DEFLATE);
+                return value.isRequestHeaderPresent(ACTUALLY_DEFLATE);
             }
         });
         DefaultServer.setRootHandler(handler);

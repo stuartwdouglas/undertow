@@ -36,7 +36,7 @@ public class ETagUtils {
      * @return
      */
     public static boolean handleIfMatch(final HttpServerExchange exchange, final List<ETag> etags, boolean allowWeak) {
-        final String ifMatch = exchange.getRequestHeaders().getFirst(Headers.IF_MATCH);
+        final String ifMatch = exchange.getRequestHeader(Headers.IF_MATCH);
         if (ifMatch == null) {
             return true;
         }
@@ -81,7 +81,7 @@ public class ETagUtils {
      * @return
      */
     public static boolean handleIfNoneMatch(final HttpServerExchange exchange, final List<ETag> etags, boolean allowWeak) {
-        final String ifMatch = exchange.getRequestHeaders().getFirst(Headers.IF_NONE_MATCH);
+        final String ifMatch = exchange.getRequestHeader(Headers.IF_NONE_MATCH);
         if (ifMatch == null) {
             return true;
         }
@@ -179,7 +179,7 @@ public class ETagUtils {
      * @return The ETag for the exchange, or null if the etag is not set
      */
     public static ETag getETag(final HttpServerExchange exchange) {
-        final String tag = exchange.getResponseHeaders().getFirst(Headers.ETAG);
+        final String tag = exchange.getResponseHeader(Headers.ETAG);
         if (tag == null) {
             return null;
         }

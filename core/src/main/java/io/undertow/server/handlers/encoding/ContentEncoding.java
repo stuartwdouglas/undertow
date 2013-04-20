@@ -43,7 +43,7 @@ public class ContentEncoding implements ConduitWrapper<StreamSinkConduit> {
     public StreamSinkConduit wrap(final ConduitFactory<StreamSinkConduit> factory, final HttpServerExchange exchange) {
         for (EncodingMapping encoding : encodings) {
             if (encoding.getAllowed().resolve(exchange)) {
-                exchange.getResponseHeaders().put(Headers.CONTENT_ENCODING, encoding.getName());
+                exchange.setResponseHeader(Headers.CONTENT_ENCODING, encoding.getName());
                 return encoding.getEncoding().getResponseWrapper().wrap(factory, exchange);
             }
         }

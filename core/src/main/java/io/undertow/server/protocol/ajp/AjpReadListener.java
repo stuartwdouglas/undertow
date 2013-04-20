@@ -1,4 +1,4 @@
-package io.undertow.ajp;
+package io.undertow.server.protocol.ajp;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -12,6 +12,7 @@ import io.undertow.server.ExchangeCompletionListener;
 import io.undertow.server.HttpHandlers;
 import io.undertow.server.HttpServerConnection;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
@@ -38,7 +39,7 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel>, Exc
     private static final byte[] CPONG = {'A', 'B', 0, 0, 0, 1, 9}; //CPONG response data
 
     private AjpParseState state = new AjpParseState();
-    private HttpServerExchange httpServerExchange;
+    private HttpServerExchangeImpl httpServerExchange;
     private final HttpServerConnection connection;
 
     private volatile int read = 0;
@@ -53,7 +54,7 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel>, Exc
     public void startRequest() {
         connection.resetChannel();
         state = new AjpParseState();
-        httpServerExchange = new HttpServerExchange(connection);
+        httpServerExchange = new HttpServerExchangeImpl(connection);
         httpServerExchange.addExchangeCompleteListener(this);
         read = 0;
     }
@@ -146,7 +147,7 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel>, Exc
             channel.getReadSetter().set(null);
             channel.suspendReads();
 
-            final HttpServerExchange httpServerExchange = this.httpServerExchange;
+            final HttpServerExchangeImpl httpServerExchange = this.httpServerExchange;
             httpServerExchange.putAttachment(UndertowOptions.ATTACHMENT_KEY, connection.getUndertowOptions());
             final AjpResponseConduit responseConduit = new AjpResponseConduit(connection.getChannel().getSinkChannel().getConduit(), connection.getBufferPool(), httpServerExchange, new ConduitListener<AjpResponseConduit>() {
                 @Override
@@ -228,7 +229,7 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel>, Exc
         nextListener.proceed();
     }
 
-    private  StreamSourceConduit createSourceConduit(StreamSourceConduit underlyingConduit, AjpResponseConduit responseConduit, final HttpServerExchange exchange) {
+    private  StreamSourceConduit createSourceConduit(StreamSourceConduit underlyingConduit, AjpResponseConduit responseConduit, final HttpServerExchangeImpl exchange) {
         ReadDataStreamSourceConduit conduit = new ReadDataStreamSourceConduit(underlyingConduit, exchange.getConnection());
 
         final HeaderMap requestHeaders = exchange.getRequestHeaders();

@@ -312,9 +312,9 @@ public class DeflatingStreamSinkConduit implements StreamSinkConduit {
             if(additionalBuffer != null) {
                 remaining += additionalBuffer.remaining();
             }
-            exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, Integer.toString(remaining));
+            exchange.setResponseHeader(Headers.CONTENT_LENGTH, Integer.toString(remaining));
         } else {
-            exchange.getResponseHeaders().remove(Headers.CONTENT_LENGTH);
+            exchange.removeResponseHeader(Headers.CONTENT_LENGTH);
         }
         this.next = conduitFactory.create();
     }

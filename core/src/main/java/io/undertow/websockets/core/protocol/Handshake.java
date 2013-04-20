@@ -16,19 +16,21 @@
 
 package io.undertow.websockets.core.protocol;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import io.undertow.io.IoCallback;
+import io.undertow.io.Sender;
+import io.undertow.server.ExchangeCompletionListener;
+import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketHandshakeException;
 import io.undertow.websockets.core.WebSocketMessages;
 import io.undertow.websockets.core.WebSocketVersion;
 import io.undertow.websockets.core.handler.WebSocketConnectionCallback;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
-import io.undertow.websockets.spi.UpgradeCallback;
-import org.xnio.IoFuture;
 import org.xnio.Pool;
 import org.xnio.StreamConnection;
 import org.xnio.channels.AssembledConnectedStreamChannel;
@@ -78,14 +80,14 @@ public abstract class Handshake {
     /**
      * Return the full url of the websocket location of the given {@link HttpServerExchange}
      */
-    protected static String getWebSocketLocation(WebSocketHttpExchange exchange) {
+    protected static String getWebSocketLocation(HttpServerExchange exchange) {
         String scheme;
         if ("https".equals(exchange.getRequestScheme())) {
             scheme = "wss";
         } else {
             scheme = "ws";
         }
-        return scheme + "://" + exchange.getRequestHeader(Headers.HOST_STRING) + exchange.getRequestURI();
+        return scheme + "://" + exchange.getRequestHeader(Headers.HOST) + exchange.getRequestURI();
     }
 
     /**
@@ -94,43 +96,45 @@ public abstract class Handshake {
      * @param exchange The {@link HttpServerExchange} for which the handshake and upgrade should occur.
      * @param callback The callback to call once the exchange is upgraded
      */
-    public final void handshake(final WebSocketHttpExchange exchange, final WebSocketConnectionCallback callback) {
+    public final void handshake(final HttpServerExchange exchange, final WebSocketConnectionCallback callback) {
 
-        exchange.upgradeChannel(new UpgradeCallback() {
+        exchange.upgradeChannel(new ExchangeCompletionListener() {
 
             @Override
-            public void handleUpgrade(final StreamConnection channel, final Pool<ByteBuffer> buffers) {
+            public void exchangeEvent(final HttpServerExchange exchange, final NextListener nextListener) {
+                exchange.getConnection().resetChannel(); //make sure we have the raw conduit
                 //TODO: fix this up to use the new API and not assembled
-                WebSocketChannel webSocket = createChannel(exchange, new AssembledConnectedStreamChannel(channel, channel.getSourceChannel(), channel.getSinkChannel()), buffers);
+                StreamConnection channel = exchange.getConnection().getChannel();
+                WebSocketChannel webSocket = createChannel(exchange, new AssembledConnectedStreamChannel(channel, channel.getSourceChannel(), channel.getSinkChannel()), exchange.getConnection().getBufferPool());
                 callback.onConnect(exchange, webSocket);
             }
         });
         handshakeInternal(exchange);
     }
 
-    protected abstract void handshakeInternal(final WebSocketHttpExchange exchange);
+    protected abstract void handshakeInternal(final HttpServerExchange exchange);
 
     /**
      * Return {@code true} if this implementation can be used to issue a handshake.
      */
-    public abstract boolean matches(WebSocketHttpExchange exchange);
+    public abstract boolean matches(HttpServerExchange exchange);
 
     /**
      * Create the {@link WebSocketChannel} from the {@link HttpServerExchange}
      */
-    public abstract WebSocketChannel createChannel(WebSocketHttpExchange exchange, final ConnectedStreamChannel channel, final Pool<ByteBuffer> pool);
+    public abstract WebSocketChannel createChannel(HttpServerExchange exchange, final ConnectedStreamChannel channel, final Pool<ByteBuffer> pool);
 
     /**
      * convenience method to perform the upgrade
      */
-    protected final void performUpgrade(final WebSocketHttpExchange exchange, final byte[] data) {
-        exchange.setResponseHeader(Headers.CONTENT_LENGTH_STRING, String.valueOf(data.length));
-        exchange.setResponseHeader(Headers.UPGRADE_STRING, "WebSocket");
-        exchange.setResponseHeader(Headers.CONNECTION_STRING, "Upgrade");
+    protected final void performUpgrade(final HttpServerExchange exchange, final byte[] data) {
+        exchange.setResponseHeader(Headers.CONTENT_LENGTH, String.valueOf(data.length));
+        exchange.setResponseHeader(Headers.UPGRADE, "WebSocket");
+        exchange.setResponseHeader(Headers.CONNECTION, "Upgrade");
         upgradeChannel(exchange, data);
     }
 
-    protected void upgradeChannel(final WebSocketHttpExchange exchange, final byte[] data) {
+    protected void upgradeChannel(final HttpServerExchange exchange, final byte[] data) {
         if (data.length > 0) {
             writePayload(exchange, ByteBuffer.wrap(data));
         } else {
@@ -138,23 +142,24 @@ public abstract class Handshake {
         }
     }
 
-    private static void writePayload(final WebSocketHttpExchange exchange, final ByteBuffer payload) {
-        exchange.sendData(payload).addNotifier(new IoFuture.Notifier<Void, Object>() {
+    private static void writePayload(final HttpServerExchange exchange, final ByteBuffer payload) {
+        exchange.getResponseSender().send(payload, new IoCallback() {
             @Override
-            public void notify(final IoFuture<? extends Void> ioFuture, final Object attachment) {
-                if(ioFuture.getStatus() == IoFuture.Status.DONE) {
-                    exchange.endExchange();
-                } else {
-                    exchange.close();
-                }
+            public void onComplete(final HttpServerExchange exchange, final Sender sender) {
+                exchange.endExchange();
             }
-        }, null);
+
+            @Override
+            public void onException(final HttpServerExchange exchange, final Sender sender, final IOException exception) {
+
+            }
+        });
     }
 
     /**
      * Perform the upgrade using no payload
      */
-    protected final void performUpgrade(final WebSocketHttpExchange exchange) {
+    protected final void performUpgrade(final HttpServerExchange exchange) {
         performUpgrade(exchange, EMPTY);
     }
 
@@ -163,8 +168,8 @@ public abstract class Handshake {
      *
      * @throws WebSocketHandshakeException Get thrown if no subprotocol could be found
      */
-    protected final void selectSubprotocol(final WebSocketHttpExchange exchange) throws WebSocketHandshakeException {
-        String requestedSubprotocols = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_PROTOCOL_STRING);
+    protected final void selectSubprotocol(final HttpServerExchange exchange) throws WebSocketHandshakeException {
+        String requestedSubprotocols = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_PROTOCOL);
         if (requestedSubprotocols == null) {
             return;
         }
@@ -175,7 +180,7 @@ public abstract class Handshake {
             // No match found
             throw WebSocketMessages.MESSAGES.unsupportedProtocol(requestedSubprotocols, subprotocols);
         }
-        exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_PROTOCOL_STRING, subProtocol);
+        exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_PROTOCOL, subProtocol);
 
     }
 

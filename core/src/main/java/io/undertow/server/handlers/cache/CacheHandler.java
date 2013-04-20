@@ -42,7 +42,7 @@ public class CacheHandler implements HttpHandler {
                 if(!responseCache.isResponseCachable()) {
                     return factory.create();
                 }
-                String lengthString = exchange.getResponseHeaders().getFirst(CONTENT_LENGTH);
+                String lengthString = exchange.getResponseHeader(CONTENT_LENGTH);
                 if(lengthString == null) {
                     //we don't cache chunked requests
                     return factory.create();

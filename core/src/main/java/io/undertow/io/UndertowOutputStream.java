@@ -63,7 +63,7 @@ public class UndertowOutputStream extends OutputStream {
      */
     public UndertowOutputStream(HttpServerExchange exchange) {
         this.exchange = exchange;
-        final String cl = exchange.getResponseHeaders().getFirst(Headers.CONTENT_LENGTH);
+        final String cl = exchange.getResponseHeader(Headers.CONTENT_LENGTH);
         if (cl != null) {
             contentLength = Integer.parseInt(cl);
         } else {
@@ -174,9 +174,9 @@ public class UndertowOutputStream extends OutputStream {
             state |= FLAG_CLOSED;
             if (anyAreClear(state, FLAG_WRITE_STARTED) && channel == null) {
                 if (buffer == null) {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, "0");
+                    exchange.setResponseHeader(Headers.CONTENT_LENGTH, "0");
                 } else {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, "" + buffer.position());
+                    exchange.setResponseHeader(Headers.CONTENT_LENGTH, "" + buffer.position());
                 }
             }
             if (buffer != null) {
@@ -215,9 +215,9 @@ public class UndertowOutputStream extends OutputStream {
         state |= FLAG_CLOSED;
         if (anyAreClear(state, FLAG_WRITE_STARTED) && channel == null) {
             if (buffer == null) {
-                exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, "0");
+                exchange.setResponseHeader(Headers.CONTENT_LENGTH, "0");
             } else {
-                exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, "" + buffer.position());
+                exchange.setResponseHeader(Headers.CONTENT_LENGTH, "" + buffer.position());
             }
         }
 

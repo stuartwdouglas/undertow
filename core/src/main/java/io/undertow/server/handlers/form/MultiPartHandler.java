@@ -67,7 +67,7 @@ public class MultiPartHandler implements HttpHandler {
 
     @Override
     public void handleRequest(final HttpServerExchange exchange) throws Exception {
-        String mimeType = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
+        String mimeType = exchange.getRequestHeader(Headers.CONTENT_TYPE);
         if (mimeType != null && mimeType.startsWith(MULTIPART_FORM_DATA)) {
             String boundary = Headers.extractTokenFromHeader(mimeType, "boundary");
             final MultiPartUploadHandler multiPartUploadHandler = new MultiPartUploadHandler(exchange, boundary, defaultEncoding);

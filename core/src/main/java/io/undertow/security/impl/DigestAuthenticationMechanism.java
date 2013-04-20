@@ -124,7 +124,7 @@ public class DigestAuthenticationMechanism implements AuthenticationMechanism {
 
     public AuthenticationMechanismOutcome authenticate(final HttpServerExchange exchange,
                                                        final SecurityContext securityContext) {
-        List<String> authHeaders = exchange.getRequestHeaders().get(AUTHORIZATION);
+        List<String> authHeaders = exchange.getRequestHeaders(AUTHORIZATION);
         if (authHeaders != null) {
             for (String current : authHeaders) {
                 if (current.startsWith(DIGEST_PREFIX)) {
@@ -449,13 +449,12 @@ public class DigestAuthenticationMechanism implements AuthenticationMechanism {
         }
 
         String theChallenge = rb.toString();
-        HeaderMap responseHeader = exchange.getResponseHeaders();
         if (supportedAlgorithms.size() > 0) {
             for (DigestAlgorithm current : supportedAlgorithms) {
-                responseHeader.add(WWW_AUTHENTICATE, String.format(theChallenge, current.getToken()));
+                exchange.addResponseHeader(WWW_AUTHENTICATE, String.format(theChallenge, current.getToken()));
             }
         } else {
-            responseHeader.add(WWW_AUTHENTICATE, theChallenge);
+            exchange.addResponseHeader(WWW_AUTHENTICATE, theChallenge);
         }
     }
 
@@ -484,9 +483,7 @@ public class DigestAuthenticationMechanism implements AuthenticationMechanism {
                 sb.append(",").append(Headers.CNONCE.toString()).append("=\"").append(parsedHeader.get(DigestAuthorizationToken.CNONCE)).append("\"");
                 sb.append(",").append(Headers.NONCE_COUNT.toString()).append("=").append(parsedHeader.get(DigestAuthorizationToken.NONCE_COUNT));
             }
-
-            HeaderMap responseHeader = exchange.getResponseHeaders();
-            responseHeader.add(AUTHENTICATION_INFO, sb.toString());
+            exchange.addResponseHeader(AUTHENTICATION_INFO, sb.toString());
         }
 
         exchange.removeAttachment(DigestContext.ATTACHMENT_KEY);

@@ -64,7 +64,7 @@ public class CookieHandler implements HttpHandler {
     }
 
     private static Map<String, Cookie> parseCookies(final HttpServerExchange exchange) {
-        List<String> cookies = exchange.getRequestHeaders().get(Headers.COOKIE);
+        List<String> cookies = exchange.getRequestHeaders(Headers.COOKIE);
 
         if (cookies == null) {
             return Collections.emptyMap();
@@ -277,7 +277,7 @@ public class CookieHandler implements HttpHandler {
                     StringBuilder builder = new StringBuilder();
                     Cookie cookie = it.next();
                     builder.append(getCookieString(cookie));
-                    exchange.getResponseHeaders().add(Headers.SET_COOKIE, builder.toString());
+                    exchange.addResponseHeader(Headers.SET_COOKIE, builder.toString());
                 }
             }
             return factory.create();

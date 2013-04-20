@@ -86,13 +86,13 @@ public class ResourceHandler implements HttpHandler {
 
         //we set caching headers before we try and serve from the cache
         if(cachable && cacheTime != null) {
-            exchange.getResponseHeaders().put(Headers.CACHE_CONTROL, "public, max-age=" + cacheTime);
+            exchange.setResponseHeader(Headers.CACHE_CONTROL, "public, max-age=" + cacheTime);
             if(System.currentTimeMillis() > lastExpiryDate ) {
                 long date = System.currentTimeMillis();
                 lastExpiryHeader = DateUtils.toDateString(new Date(date));
                 lastExpiryDate = date;
             }
-            exchange.getResponseHeaders().put(Headers.EXPIRES, lastExpiryHeader);
+            exchange.setResponseHeader(Headers.EXPIRES, lastExpiryHeader);
         }
 
         if (cache != null && cachable) {
@@ -154,19 +154,19 @@ public class ResourceHandler implements HttpHandler {
                 //we are going to proceed. Set the appropriate headers
                 final String contentType = resource.getContentType(mimeMappings);
                 if (contentType != null) {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, contentType);
+                    exchange.setResponseHeader(Headers.CONTENT_TYPE, contentType);
                 } else {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/octet-stream");
+                    exchange.setResponseHeader(Headers.CONTENT_TYPE, "application/octet-stream");
                 }
                 if (lastModified != null) {
-                    exchange.getResponseHeaders().put(Headers.LAST_MODIFIED, DateUtils.toDateString(lastModified));
+                    exchange.setResponseHeader(Headers.LAST_MODIFIED, DateUtils.toDateString(lastModified));
                 }
                 if (etag != null) {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_LANGUAGE, etag.toString());
+                    exchange.setResponseHeader(Headers.CONTENT_LANGUAGE, etag.toString());
                 }
                 Long contentLength = resource.getContentLength();
                 if (contentLength != null) {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, contentLength.toString());
+                    exchange.setResponseHeader(Headers.CONTENT_LENGTH, contentLength.toString());
                 }
                 if (!sendContent) {
                     exchange.endExchange();

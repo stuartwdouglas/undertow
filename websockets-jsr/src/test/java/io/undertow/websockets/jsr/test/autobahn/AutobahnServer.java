@@ -22,7 +22,7 @@ import java.net.InetSocketAddress;
 import javax.servlet.DispatcherType;
 
 import io.undertow.client.HttpClient;
-import io.undertow.server.HttpOpenListener;
+import io.undertow.server.protocol.http.HttpOpenListener;
 import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.DeploymentManager;
 import io.undertow.servlet.api.FilterInfo;

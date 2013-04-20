@@ -22,6 +22,8 @@ import org.xnio.conduits.ConduitStreamSinkChannel;
  * Note that if a client is pipelining some requests and sending continue for others this
  * could cause problems if the pipelining buffer is enabled.
  *
+ * TODO: we need to provide a general mechanism for out of band replies, as this is also needed for SPDY
+ *
  * @author Stuart Douglas
  */
 public class HttpContinue {
@@ -45,7 +47,7 @@ public class HttpContinue {
             //so according to the RFC we do not need to send the Continue
             return false;
         }
-        List<String> expect = exchange.getRequestHeaders().get(Headers.EXPECT);
+        List<String> expect = exchange.getRequestHeaders(Headers.EXPECT);
         if (expect != null) {
             for (String header : expect) {
                 if (header.toLowerCase().equals(CONTINUE)) {

@@ -25,6 +25,7 @@ import java.nio.channels.FileChannel;
 
 import io.undertow.UndertowMessages;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.Attachable;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.HeaderMap;
@@ -92,7 +93,7 @@ public class ChunkedStreamSourceConduit extends AbstractStreamSourceConduit<Stre
         }, finishListener, maxLength, null);
     }
 
-    public ChunkedStreamSourceConduit(final StreamSourceConduit next, final HttpServerExchange exchange, final ConduitListener<? super ChunkedStreamSourceConduit> finishListener, final long maxLength) {
+    public ChunkedStreamSourceConduit(final StreamSourceConduit next, final HttpServerExchangeImpl exchange, final ConduitListener<? super ChunkedStreamSourceConduit> finishListener, final long maxLength) {
         this(next, new BufferWrapper() {
             @Override
             public Pooled<ByteBuffer> allocate() {

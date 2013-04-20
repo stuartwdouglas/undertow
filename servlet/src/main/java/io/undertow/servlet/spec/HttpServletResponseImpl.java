@@ -166,7 +166,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
             host = exchange.getDestinationAddress().getAddress().getHostAddress();
         }
         String loc = exchange.getRequestScheme() + "://" + host + realPath;
-        exchange.getResponseHeaders().put(Headers.LOCATION, loc);
+        exchange.setResponseHeader(Headers.LOCATION, loc);
         responseDone();
     }
 
@@ -190,7 +190,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
         if (insideInclude) {
             return;
         }
-        exchange.getResponseHeaders().put(name, value);
+        exchange.setResponseHeader(name, value);
     }
 
     @Override
@@ -317,7 +317,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
         charsetSet = true;
         this.charset = charset;
         if (contentType != null) {
-            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, getContentType());
+            exchange.setResponseHeader(Headers.CONTENT_TYPE, getContentType());
         }
     }
 
@@ -326,7 +326,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
         if (insideInclude || exchange.isResponseStarted()) {
             return;
         }
-        exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, "" + len);
+        exchange.setResponseHeader(Headers.CONTENT_LENGTH, "" + len);
         this.contentLength = (long) len;
     }
 
@@ -335,7 +335,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
         if (insideInclude || exchange.isResponseStarted()) {
             return;
         }
-        exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, "" + len);
+        exchange.setResponseHeader(Headers.CONTENT_LENGTH, "" + len);
         this.contentLength = len;
     }
 
@@ -383,7 +383,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
                 break;
             }
         }
-        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, getContentType());
+        exchange.setResponseHeader(Headers.CONTENT_TYPE, getContentType());
     }
 
     @Override
@@ -459,7 +459,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
             return;
         }
         this.locale = loc;
-        exchange.getResponseHeaders().put(Headers.CONTENT_LANGUAGE, loc.getLanguage() + "-" + loc.getCountry());
+        exchange.setResponseHeader(Headers.CONTENT_LANGUAGE, loc.getLanguage() + "-" + loc.getCountry());
         if (!charsetSet && writer == null) {
             final Map<String, String> localeCharsetMapping = servletContext.getDeployment().getDeploymentInfo().getLocaleCharsetMapping();
             // Match full language_country_variant first, then language_country,
@@ -475,7 +475,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
             if (charset != null) {
                 this.charset = charset;
                 if (contentType != null) {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, getContentType());
+                    exchange.setResponseHeader(Headers.CONTENT_TYPE, getContentType());
                 }
             }
         }

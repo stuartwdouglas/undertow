@@ -124,7 +124,7 @@ public class PathTestCase {
             exchange.getResponseHeaders().add(new HttpString(MATCHED), matched);
             exchange.getResponseHeaders().add(new HttpString(PATH), exchange.getRelativePath());
             for(Map.Entry<String, Deque<String>> param : exchange.getQueryParameters().entrySet()) {
-                exchange.getResponseHeaders().put(new HttpString(param.getKey()), param.getValue().getFirst());
+                exchange.setResponseHeader(new HttpString(param.getKey()), param.getValue().getFirst());
             }
             exchange.endExchange();
         }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.undertow.server;
+package io.undertow.server.protocol.http;
 
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
@@ -26,6 +26,7 @@ import java.util.Map;
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
 import io.undertow.annotationprocessor.HttpParserConfig;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
@@ -155,7 +156,7 @@ public abstract class HttpRequestParser {
     }
 
 
-    public void handle(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder) {
+    public void handle(ByteBuffer buffer, final ParseState currentState, final HttpServerExchangeImpl builder) {
         if (currentState.state == ParseState.VERB) {
             handleHttpVerb(buffer, currentState, builder);
             handlePath(buffer, currentState, builder);
@@ -205,11 +206,11 @@ public abstract class HttpRequestParser {
     }
 
 
-    abstract void handleHttpVerb(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder);
+    abstract void handleHttpVerb(ByteBuffer buffer, final ParseState currentState, final HttpServerExchangeImpl builder);
 
-    abstract void handleHttpVersion(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder);
+    abstract void handleHttpVersion(ByteBuffer buffer, final ParseState currentState, final HttpServerExchangeImpl builder);
 
-    abstract void handleHeader(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder);
+    abstract void handleHeader(ByteBuffer buffer, final ParseState currentState, final HttpServerExchangeImpl builder);
 
     /**
      * The parse states for parsing the path.
@@ -231,7 +232,7 @@ public abstract class HttpRequestParser {
      * @return The number of bytes remaining
      */
     @SuppressWarnings("unused")
-    final void handlePath(ByteBuffer buffer, ParseState state, HttpServerExchange exchange) {
+    final void handlePath(ByteBuffer buffer, ParseState state, HttpServerExchangeImpl exchange) {
         StringBuilder stringBuilder = state.stringBuilder;
         int parseState = state.parseState;
         int canonicalPathStart = state.pos;
@@ -348,7 +349,7 @@ public abstract class HttpRequestParser {
      * @return The number of bytes remaining
      */
     @SuppressWarnings("unused")
-    final void handleHeaderValue(ByteBuffer buffer, ParseState state, HttpServerExchange builder) {
+    final void handleHeaderValue(ByteBuffer buffer, ParseState state, HttpServerExchangeImpl builder) {
         StringBuilder stringBuilder = state.stringBuilder;
         if (stringBuilder == null) {
             stringBuilder = new StringBuilder();
@@ -446,7 +447,7 @@ public abstract class HttpRequestParser {
         return;
     }
 
-    protected void handleAfterVersion(ByteBuffer buffer, ParseState state, HttpServerExchange builder) {
+    protected void handleAfterVersion(ByteBuffer buffer, ParseState state, HttpServerExchangeImpl builder) {
         boolean newLine = state.leftOver == '\n';
         while (buffer.hasRemaining()) {
             final byte next = buffer.get();

@@ -59,7 +59,7 @@ public class ResumeWritesTestCase {
             @Override
             public void handleRequest(final HttpServerExchange exchange) throws Exception {
                 exchange.addResponseWrapper(new ReturnZeroWrapper());
-                exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, HELLO_WORLD.length());
+                exchange.setResponseHeader(Headers.CONTENT_LENGTH, HELLO_WORLD.length());
                 exchange.getResponseSender().send(HELLO_WORLD, IoCallback.END_EXCHANGE);
             }
         });

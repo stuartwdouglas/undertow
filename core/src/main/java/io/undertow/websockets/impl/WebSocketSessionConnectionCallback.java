@@ -15,11 +15,11 @@
  */
 package io.undertow.websockets.impl;
 
+import io.undertow.server.HttpServerExchange;
 import io.undertow.websockets.api.WebSocketSessionHandler;
 import io.undertow.websockets.api.WebSocketSessionIdGenerator;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.handler.WebSocketConnectionCallback;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 
 /**
  * {@link WebSocketConnectionCallback} which will create a {@link io.undertow.websockets.api.WebSocketSession} and operate on it.
@@ -47,7 +47,7 @@ public class WebSocketSessionConnectionCallback implements WebSocketConnectionCa
     }
 
     @Override
-    public void onConnect(WebSocketHttpExchange exchange, WebSocketChannel channel) {
+    public void onConnect(HttpServerExchange exchange, WebSocketChannel channel) {
         final WebSocketChannelSession session = new WebSocketChannelSession(channel, idGenerator.nextId(), executeInIoThread);
         sessionHandler.onSession(session, exchange);
         WebSocketRecieveListeners.startRecieving(session, channel, executeInIoThread);

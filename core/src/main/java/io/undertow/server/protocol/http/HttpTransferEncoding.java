@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.undertow.server;
+package io.undertow.server.protocol.http;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
@@ -31,6 +31,12 @@ import io.undertow.conduits.FixedLengthStreamSinkConduit;
 import io.undertow.conduits.FixedLengthStreamSourceConduit;
 import io.undertow.conduits.PipelingBufferingStreamSinkConduit;
 import io.undertow.conduits.ReadDataStreamSourceConduit;
+import io.undertow.server.ConduitWrapper;
+import io.undertow.server.HttpHandler;
+import io.undertow.server.HttpHandlers;
+import io.undertow.server.HttpServerConnection;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.ConduitFactory;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
@@ -59,7 +65,7 @@ public class HttpTransferEncoding {
     private HttpTransferEncoding() {
     }
 
-    public static void handleRequest(final HttpServerExchange exchange, final HttpHandler next) {
+    public static void handleRequest(final HttpServerExchangeImpl exchange, final HttpHandler next) {
         final HeaderMap requestHeaders = exchange.getRequestHeaders();
         final String connectionHeader = requestHeaders.getFirst(Headers.CONNECTION);
         final String transferEncodingHeader = requestHeaders.getLast(Headers.TRANSFER_ENCODING);
@@ -101,7 +107,7 @@ public class HttpTransferEncoding {
         HttpHandlers.executeRootHandler(next, exchange, Thread.currentThread() instanceof XnioExecutor);
     }
 
-    private static boolean handleRequestEncoding(HttpServerExchange exchange, String transferEncodingHeader, String contentLengthHeader, HttpServerConnection connection, PipelingBufferingStreamSinkConduit pipeliningBuffer, boolean persistentConnection) {
+    private static boolean handleRequestEncoding(HttpServerExchangeImpl exchange, String transferEncodingHeader, String contentLengthHeader, HttpServerConnection connection, PipelingBufferingStreamSinkConduit pipeliningBuffer, boolean persistentConnection) {
         HttpString transferEncoding = Headers.IDENTITY;
         if (transferEncodingHeader != null) {
             transferEncoding = new HttpString(transferEncodingHeader);
@@ -165,7 +171,8 @@ public class HttpTransferEncoding {
 
     private static ConduitWrapper<StreamSinkConduit> responseWrapper(final boolean requestLooksPersistent) {
         return new ConduitWrapper<StreamSinkConduit>() {
-            public StreamSinkConduit wrap(final ConduitFactory<StreamSinkConduit> factory, final HttpServerExchange exchange) {
+            public StreamSinkConduit wrap(final ConduitFactory<StreamSinkConduit> factory, final HttpServerExchange exc) {
+                HttpServerExchangeImpl exchange = (HttpServerExchangeImpl) exc;
                 final StreamSinkConduit channel = factory.create();
                 final HeaderMap responseHeaders = exchange.getResponseHeaders();
                 // test to see if we're still persistent
@@ -250,7 +257,7 @@ public class HttpTransferEncoding {
 
     private static final ConduitWrapper<StreamSourceConduit> CHUNKED_STREAM_SOURCE_CONDUIT_WRAPPER = new ConduitWrapper<StreamSourceConduit>() {
             public StreamSourceConduit wrap(final ConduitFactory<StreamSourceConduit> factory, final HttpServerExchange exchange) {
-                return new ChunkedStreamSourceConduit(factory.create(), exchange, chunkedDrainListener(exchange), maxEntitySize(exchange));
+                return new ChunkedStreamSourceConduit(factory.create(), (HttpServerExchangeImpl) exchange, chunkedDrainListener((HttpServerExchangeImpl) exchange), maxEntitySize(exchange));
             }
         };
 
@@ -262,7 +269,7 @@ public class HttpTransferEncoding {
                 if(max > 0 && contentLength > max) {
                     return new BrokenStreamSourceConduit(channel, UndertowMessages.MESSAGES.requestEntityWasTooLarge(exchange.getSourceAddress(), max));
                 }
-                return new FixedLengthStreamSourceConduit(channel, contentLength, fixedLengthDrainListener(exchange));
+                return new FixedLengthStreamSourceConduit(channel, contentLength, fixedLengthDrainListener((HttpServerExchangeImpl) exchange));
             }
         };
     }
@@ -274,7 +281,7 @@ public class HttpTransferEncoding {
             }
         };
 
-    private static ConduitListener<FixedLengthStreamSourceConduit> fixedLengthDrainListener(final HttpServerExchange exchange) {
+    private static ConduitListener<FixedLengthStreamSourceConduit> fixedLengthDrainListener(final HttpServerExchangeImpl exchange) {
         return new ConduitListener<FixedLengthStreamSourceConduit>() {
             public void handleEvent(final FixedLengthStreamSourceConduit fixedLengthConduit) {
                 long remaining = fixedLengthConduit.getRemaining();
@@ -287,7 +294,7 @@ public class HttpTransferEncoding {
         };
     }
 
-    private static ConduitListener<ChunkedStreamSourceConduit> chunkedDrainListener(final HttpServerExchange exchange) {
+    private static ConduitListener<ChunkedStreamSourceConduit> chunkedDrainListener(final HttpServerExchangeImpl exchange) {
         return new ConduitListener<ChunkedStreamSourceConduit>() {
             public void handleEvent(final ChunkedStreamSourceConduit chunkedStreamSourceConduit) {
                 if(!chunkedStreamSourceConduit.isFinished()) {
@@ -299,7 +306,7 @@ public class HttpTransferEncoding {
         };
     }
 
-    private static ConduitListener<StreamSinkConduit> terminateResponseListener(final HttpServerExchange exchange) {
+    private static ConduitListener<StreamSinkConduit> terminateResponseListener(final HttpServerExchangeImpl exchange) {
         return new ConduitListener<StreamSinkConduit>() {
             public void handleEvent(final StreamSinkConduit channel) {
                 exchange.terminateResponse();

@@ -34,8 +34,8 @@ public class DirectoryUtils {
         }
 
         if (buffer != null) {
-            exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, String.valueOf(buffer.limit()));
-            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, type);
+            exchange.setResponseHeader(Headers.CONTENT_LENGTH, String.valueOf(buffer.limit()));
+            exchange.setResponseHeader(Headers.CONTENT_TYPE, type);
             if (Methods.HEAD.equals(exchange.getRequestMethod())) {
                 exchange.endExchange();
                 return true;
@@ -52,7 +52,7 @@ public class DirectoryUtils {
         String requestPath = exchange.getRequestPath();
         if (! requestPath.endsWith("/")) {
             exchange.setResponseCode(302);
-            exchange.getResponseHeaders().put(Headers.LOCATION, requestPath + "/");
+            exchange.setResponseHeader(Headers.LOCATION, requestPath + "/");
             exchange.endExchange();
             return;
         }
@@ -114,8 +114,8 @@ public class DirectoryUtils {
 
         try {
             ByteBuffer output = ByteBuffer.wrap(builder.toString().getBytes("UTF-8"));
-            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/html");
-            exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, String.valueOf(output.limit()));
+            exchange.setResponseHeader(Headers.CONTENT_TYPE, "text/html");
+            exchange.setResponseHeader(Headers.CONTENT_LENGTH, String.valueOf(output.limit()));
             Channels.writeBlocking(exchange.getResponseChannel(), output);
         } catch (UnsupportedEncodingException e) {
             throw new IllegalStateException(e);

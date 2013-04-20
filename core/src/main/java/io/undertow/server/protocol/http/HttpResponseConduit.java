@@ -16,13 +16,17 @@
  * limitations under the License.
  */
 
-package io.undertow.server;
+package io.undertow.server.protocol.http;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 
+import io.undertow.server.ConduitWrapper;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
+import io.undertow.server.TruncatedResponseException;
 import io.undertow.util.ConduitFactory;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HeaderValues;
@@ -53,7 +57,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
     private int valueIdx;
     private int charIndex;
     private Pooled<ByteBuffer> pooledBuffer;
-    private final HttpServerExchange exchange;
+    private final HttpServerExchangeImpl exchange;
 
     private static final int STATE_BODY = 0; // Message body, normal pass-through operation
     private static final int STATE_START = 1; // No headers written yet
@@ -74,11 +78,11 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
         @Override
         public StreamSinkConduit wrap(ConduitFactory<StreamSinkConduit> factory, HttpServerExchange exchange) {
             final StreamSinkConduit channel = factory.create();
-            return new HttpResponseConduit(channel, exchange.getConnection().getBufferPool(), exchange);
+            return new HttpResponseConduit(channel, exchange.getConnection().getBufferPool(), (HttpServerExchangeImpl) exchange);
         }
     };
 
-    HttpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerExchange exchange) {
+    HttpResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerExchangeImpl exchange) {
         super(next);
         this.pool = pool;
         this.exchange = exchange;

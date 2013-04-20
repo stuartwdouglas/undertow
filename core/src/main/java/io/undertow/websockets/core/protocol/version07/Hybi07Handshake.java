@@ -23,13 +23,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.Set;
 
-import io.undertow.websockets.spi.WebSocketHttpExchange;
+import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketUtils;
 import io.undertow.websockets.core.WebSocketVersion;
 import io.undertow.websockets.core.protocol.Handshake;
-import org.xnio.IoUtils;
 import org.xnio.Pool;
 import org.xnio.channels.ConnectedStreamChannel;
 
@@ -58,34 +57,33 @@ public class Hybi07Handshake extends Handshake {
     }
 
     @Override
-    public boolean matches(final WebSocketHttpExchange exchange) {
-        if (exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY_STRING) != null &&
-                exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_VERSION_STRING) != null) {
-            return exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_VERSION_STRING)
+    public boolean matches(final HttpServerExchange exchange) {
+        if (exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY) != null &&
+                exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_VERSION) != null) {
+            return exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_VERSION)
                     .equals(getVersion().toHttpHeaderValue());
         }
         return false;
     }
 
-    protected void handshakeInternal(final WebSocketHttpExchange exchange) {
+    protected void handshakeInternal(final HttpServerExchange exchange) {
 
-        String origin = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_ORIGIN_STRING);
+        String origin = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_ORIGIN);
         if (origin != null) {
-            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_ORIGIN_STRING, origin);
+            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_ORIGIN, origin);
         }
-        String protocol = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_PROTOCOL_STRING);
+        String protocol = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_PROTOCOL);
         if (protocol != null) {
-            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_PROTOCOL_STRING, protocol);
+            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_PROTOCOL, protocol);
         }
-        exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_LOCATION_STRING, getWebSocketLocation(exchange));
+        exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_LOCATION, getWebSocketLocation(exchange));
 
-        final String key = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY_STRING);
+        final String key = exchange.getRequestHeader(Headers.SEC_WEB_SOCKET_KEY);
         try {
             final String solution = solve(key);
-            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_ACCEPT_STRING, solution);
+            exchange.setResponseHeader(Headers.SEC_WEB_SOCKET_ACCEPT, solution);
             performUpgrade(exchange);
         } catch (NoSuchAlgorithmException e) {
-            IoUtils.safeClose(exchange);
             exchange.endExchange();
             return;
         }
@@ -101,7 +99,7 @@ public class Hybi07Handshake extends Handshake {
     }
 
     @Override
-    public WebSocketChannel createChannel(WebSocketHttpExchange exchange, final ConnectedStreamChannel channel, final Pool<ByteBuffer> pool) {
+    public WebSocketChannel createChannel(HttpServerExchange exchange, final ConnectedStreamChannel channel, final Pool<ByteBuffer> pool) {
         return new WebSocket07Channel(channel, pool, getWebSocketLocation(exchange), subprotocols, false, allowExtensions);
     }
 }

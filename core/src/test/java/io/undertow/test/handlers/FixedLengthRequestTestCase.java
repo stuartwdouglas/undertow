@@ -78,7 +78,7 @@ public class FixedLengthRequestTestCase {
                     inputSream.close();
                     outputStream.close();
                 } catch (IOException e) {
-                    exchange.getResponseHeaders().put(Headers.CONNECTION, "close");
+                    exchange.setResponseHeader(Headers.CONNECTION, "close");
                     exchange.setResponseCode(500);
                     throw new RuntimeException(e);
                 }

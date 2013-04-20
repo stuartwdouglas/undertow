@@ -201,7 +201,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
     @Override
     public Enumeration<String> getHeaderNames() {
         final Set<String> headers = new HashSet<String>();
-        for (final HttpString i : exchange.getRequestHeaders().getHeaderNames()) {
+        for (final HttpString i : exchange.getRequestHeaderNames()) {
             headers.add(i.toString());
         }
         return new IteratorEnumeration<String>(headers.iterator());

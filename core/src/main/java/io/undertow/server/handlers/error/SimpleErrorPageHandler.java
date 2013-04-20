@@ -65,7 +65,7 @@ public class SimpleErrorPageHandler implements HttpHandler {
                 Set<Integer> codes = responseCodes;
                 if (codes == null ? exchange.getResponseCode() >= 400 : codes.contains(Integer.valueOf(exchange.getResponseCode()))) {
                     final String errorPage = "<html><head><title>Error</title></head><body>" + exchange.getResponseCode() + " - " + StatusCodes.getReason(exchange.getResponseCode()) + "</body></html>";
-                    exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, "" + errorPage.length());
+                    exchange.setResponseHeader(Headers.CONTENT_LENGTH, "" + errorPage.length());
                     Sender sender = exchange.getResponseSender();
                     sender.send(errorPage, IoCallback.END_EXCHANGE);
                     return true;

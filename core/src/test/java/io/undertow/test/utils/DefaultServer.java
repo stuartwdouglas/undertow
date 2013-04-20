@@ -36,9 +36,9 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
 import io.undertow.UndertowOptions;
-import io.undertow.ajp.AjpOpenListener;
+import io.undertow.server.protocol.ajp.AjpOpenListener;
 import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpOpenListener;
+import io.undertow.server.protocol.http.HttpOpenListener;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.OpenListener;
 import org.junit.runner.Description;

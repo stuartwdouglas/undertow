@@ -1,4 +1,4 @@
-package io.undertow.ajp;
+package io.undertow.server.protocol.ajp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -71,7 +71,7 @@ public class AjpParsingUnitTestCase {
     private void testResult(final HttpServerExchange exchange) {
         Assert.assertSame(Methods.GET, exchange.getRequestMethod());
         Assert.assertEquals(Protocols.HTTP_1_1, exchange.getProtocol());
-        Assert.assertEquals(3, exchange.getRequestHeaders().getHeaderNames().size());
+        Assert.assertEquals(3, exchange.getRequestHeaderNames().size());
         Assert.assertEquals("localhost:7777", exchange.getRequestHeaders().getFirst(Headers.HOST));
         Assert.assertEquals("Apache-HttpClient/4.1.3 (java 1.5)", exchange.getRequestHeaders().getFirst(Headers.USER_AGENT));
         Assert.assertEquals("Keep-Alive", exchange.getRequestHeaders().getFirst(Headers.CONNECTION));

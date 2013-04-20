@@ -83,7 +83,7 @@ public class HttpClientTestCase {
 
     static void sendMessage(final HttpServerExchange exchange) {
         exchange.setResponseCode(200);
-        exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, message.length() + "");
+        exchange.setResponseHeader(Headers.CONTENT_LENGTH, message.length() + "");
         final Sender sender = exchange.getResponseSender();
         sender.send(message, IoCallback.END_EXCHANGE);
     }

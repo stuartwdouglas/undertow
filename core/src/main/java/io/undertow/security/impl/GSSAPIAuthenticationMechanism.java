@@ -91,7 +91,7 @@ public class GSSAPIAuthenticationMechanism implements AuthenticationMechanism {
             }
         }
 
-        List<String> authHeaders = exchange.getRequestHeaders().get(AUTHORIZATION);
+        List<String> authHeaders = exchange.getRequestHeaders(AUTHORIZATION);
         if (authHeaders != null) {
             for (String current : authHeaders) {
                 if (current.startsWith(NEGOTIATE_PREFIX)) {
@@ -126,7 +126,7 @@ public class GSSAPIAuthenticationMechanism implements AuthenticationMechanism {
             }
         }
 
-        exchange.getResponseHeaders().add(WWW_AUTHENTICATE, header);
+        exchange.addResponseHeader(WWW_AUTHENTICATE, header);
 
         return new ChallengeResult(true, UNAUTHORIZED);
     }
@@ -148,7 +148,7 @@ public class GSSAPIAuthenticationMechanism implements AuthenticationMechanism {
     }
 
     private String getHostName(final HttpServerExchange exchange) {
-        String hostName = exchange.getRequestHeaders().getFirst(HOST);
+        String hostName = exchange.getRequestHeader(HOST);
         if (hostName != null) {
             if (hostName.contains(":")) {
                 hostName = hostName.substring(0, hostName.indexOf(":"));
@@ -197,7 +197,7 @@ public class GSSAPIAuthenticationMechanism implements AuthenticationMechanism {
 
                 if (respToken != null) {
                     // There will be no further challenge but we do have a token so set it here.
-                    exchange.getResponseHeaders().add(WWW_AUTHENTICATE,
+                    exchange.addResponseHeader(WWW_AUTHENTICATE,
                             NEGOTIATE_PREFIX + FlexBase64.encodeString(respToken, false));
                 }
                 IdentityManager identityManager = securityContext.getIdentityManager();

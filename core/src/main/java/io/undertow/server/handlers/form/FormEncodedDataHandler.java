@@ -62,11 +62,11 @@ public class FormEncodedDataHandler implements HttpHandler {
 
     @Override
     public void handleRequest(final HttpServerExchange exchange) throws Exception {
-        String mimeType = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
+        String mimeType = exchange.getRequestHeader(Headers.CONTENT_TYPE);
         if (mimeType != null && mimeType.startsWith(APPLICATION_X_WWW_FORM_URLENCODED)) {
 
             String charset = defaultEncoding;
-            String contentType = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
+            String contentType = exchange.getRequestHeader(Headers.CONTENT_TYPE);
             if (contentType != null) {
                 String cs = Headers.extractTokenFromHeader(contentType, "charset");
                 if (cs != null) {

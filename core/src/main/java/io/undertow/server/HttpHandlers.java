@@ -46,15 +46,16 @@ public final class HttpHandlers {
         handler.handleRequest(exchange);
     }
 
-    public static void executeRootHandler(final HttpHandler handler, final HttpServerExchange exchange, boolean inIoThread) {
+    public static void executeRootHandler(final HttpHandler handler, final HttpServerExchange httpServerExchange, boolean inIoThread) {
+        HttpServerExchangeImpl exchange = (HttpServerExchangeImpl) httpServerExchange;
         try {
             exchange.setInIoThread(inIoThread);
             exchange.setInCall(true);
             handler.handleRequest(exchange);
             exchange.setInCall(false);
             if (exchange.isDispatched()) {
-                final Runnable dispatchTask = exchange.getAttachment(HttpServerExchange.DISPATCH_TASK);
-                Executor executor = exchange.getAttachment(HttpServerExchange.DISPATCH_EXECUTOR);
+                final Runnable dispatchTask = exchange.getAttachment(HttpServerExchangeImpl.DISPATCH_TASK);
+                Executor executor = exchange.getAttachment(HttpServerExchangeImpl.DISPATCH_EXECUTOR);
                 exchange.unDispatch();
                 if (dispatchTask != null) {
                     executor = executor == null ? exchange.getConnection().getWorker() : executor;

@@ -1,6 +1,7 @@
-package io.undertow.ajp;
+package io.undertow.server.protocol.ajp;
 
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 
@@ -117,7 +118,7 @@ public class AjpParser {
     }
 
 
-    public void parse(final ByteBuffer buf, final AjpParseState state, final HttpServerExchange exchange) {
+    public void parse(final ByteBuffer buf, final AjpParseState state, final HttpServerExchangeImpl exchange) {
         if (!buf.hasRemaining()) {
             return;
         }

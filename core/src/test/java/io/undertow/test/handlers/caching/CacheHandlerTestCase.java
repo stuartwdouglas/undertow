@@ -42,7 +42,7 @@ public class CacheHandlerTestCase {
                 final ResponseCache cache = exchange.getAttachment(ResponseCache.ATTACHMENT_KEY);
                 if(!cache.tryServeResponse()) {
                     final String data = "Response " + responseCount.incrementAndGet();
-                    exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, data.length() + "");
+                    exchange.setResponseHeader(Headers.CONTENT_LENGTH, data.length() + "");
                     exchange.getResponseSender().send(data, IoCallback.END_EXCHANGE);
                 }
             }

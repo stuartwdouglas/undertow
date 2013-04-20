@@ -26,10 +26,10 @@ public class CachedHttpRequest {
     public CachedHttpRequest(final HttpServerExchange exchange) {
         this.path = exchange.getRequestPath();
         this.etag = ETagUtils.getETag(exchange);
-        this.contentLocation = exchange.getResponseHeaders().getFirst(Headers.CONTENT_LOCATION);
-        this.language = exchange.getResponseHeaders().getFirst(Headers.CONTENT_LANGUAGE);
-        this.contentType = exchange.getResponseHeaders().getFirst(Headers.CONTENT_TYPE);
-        String lmString = exchange.getResponseHeaders().getFirst(Headers.LAST_MODIFIED);
+        this.contentLocation = exchange.getResponseHeader(Headers.CONTENT_LOCATION);
+        this.language = exchange.getResponseHeader(Headers.CONTENT_LANGUAGE);
+        this.contentType = exchange.getResponseHeader(Headers.CONTENT_TYPE);
+        String lmString = exchange.getResponseHeader(Headers.LAST_MODIFIED);
         if (lmString == null) {
             this.lastModified = null;
         } else {
@@ -41,7 +41,7 @@ public class CachedHttpRequest {
         if(encoding != null) {
             this.contentEncoding = encoding.getCurrentContentEncoding();
         } else {
-            this.contentEncoding = exchange.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
+            this.contentEncoding = exchange.getResponseHeader(Headers.CONTENT_ENCODING);
         }
         this.responseCode = exchange.getResponseCode();
     }

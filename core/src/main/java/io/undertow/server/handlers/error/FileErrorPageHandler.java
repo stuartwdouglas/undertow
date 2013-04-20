@@ -109,7 +109,7 @@ public class FileErrorPageHandler implements HttpHandler {
                         IoUtils.safeClose(fileChannel);
                     }
                 });
-                exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, file.length());
+                exchange.setResponseHeader(Headers.CONTENT_LENGTH, Long.toString(file.length()));
 
                 try {
                     log.tracef("Serving file %s (blocking)", fileChannel);

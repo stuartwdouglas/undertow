@@ -39,7 +39,7 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.servlet.spec.HttpServletRequestImpl;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.ConcreteIoFuture;
-import io.undertow.websockets.spi.UpgradeCallback;
+import io.undertow.server.UpgradeCallback;
 import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.xnio.FinishedIoFuture;
 import org.xnio.IoFuture;

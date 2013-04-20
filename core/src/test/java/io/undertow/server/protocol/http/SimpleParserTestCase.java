@@ -16,10 +16,13 @@
  * limitations under the License.
  */
 
-package io.undertow.server;
+package io.undertow.server.protocol.http;
 
 import java.nio.ByteBuffer;
 
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.protocol.http.HttpRequestParser;
+import io.undertow.server.protocol.http.ParseState;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
@@ -120,9 +123,9 @@ public class SimpleParserTestCase {
         Assert.assertSame(result1.getProtocol(), result2.getProtocol());
         Assert.assertSame(result1.getRequestMethod(), result2.getRequestMethod());
 
-        for (final HttpString header : result1.getRequestHeaders().getHeaderNames()) {
+        for (final HttpString header : result1.getRequestHeaderNames()) {
             boolean found = false;
-            for (final HttpString header2 : result1.getRequestHeaders().getHeaderNames()) {
+            for (final HttpString header2 : result1.getRequestHeaderNames()) {
                 if (header == header2) {
                     found = true;
                     break;
@@ -143,7 +146,7 @@ public class SimpleParserTestCase {
         Assert.assertEquals("/somepath", result.getRequestURI());
         Assert.assertSame(Protocols.HTTP_1_1, result.getProtocol());
 
-        Assert.assertEquals(2, result.getRequestHeaders().getHeaderNames().size());
+        Assert.assertEquals(2, result.getRequestHeaderNames().size());
         Assert.assertEquals("www.somehost.net", result.getRequestHeaders().getFirst(new HttpString("Host")));
         Assert.assertEquals("some value", result.getRequestHeaders().getFirst(new HttpString("OtherHeader")));
 

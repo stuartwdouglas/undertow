@@ -66,7 +66,7 @@ public class EncodingHandler implements HttpHandler {
 
     @Override
     public void handleRequest(final HttpServerExchange exchange) throws Exception {
-        final List<String> res = exchange.getRequestHeaders().get(Headers.ACCEPT_ENCODING);
+        final List<String> res = exchange.getRequestHeaders(Headers.ACCEPT_ENCODING);
         HttpHandler nextHandler = this.next;
         if (res == null || res.isEmpty()) {
             if (nextHandler != null) {

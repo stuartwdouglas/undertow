@@ -63,7 +63,7 @@ public class FixedLengthResponseTestCase {
                     sender.send("Connection not persistent", IoCallback.END_EXCHANGE);
                     return;
                 }
-                exchange.getResponseHeaders().put(Headers.CONTENT_LENGTH, message.length() + "");
+                exchange.setResponseHeader(Headers.CONTENT_LENGTH, message.length() + "");
                 final Sender sender = exchange.getResponseSender();
                 sender.send(message, IoCallback.END_EXCHANGE);
             }
