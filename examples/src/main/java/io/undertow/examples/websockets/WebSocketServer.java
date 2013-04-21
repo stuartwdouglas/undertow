@@ -3,6 +3,7 @@ package io.undertow.examples.websockets;
 import io.undertow.Undertow;
 import io.undertow.examples.UndertowExample;
 import io.undertow.predicate.Predicates;
+import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.PredicateHandler;
 import io.undertow.server.handlers.RedirectHandler;
 import io.undertow.server.handlers.resource.ClassPathResourceManager;
@@ -11,7 +12,6 @@ import io.undertow.websockets.api.AbstractAssembledFrameHandler;
 import io.undertow.websockets.api.WebSocketFrameHeader;
 import io.undertow.websockets.api.WebSocketSession;
 import io.undertow.websockets.api.WebSocketSessionHandler;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 
 /**
  * @author Stuart Douglas
@@ -24,7 +24,7 @@ public class WebSocketServer {
                 .addListener(8080, "localhost")
                 .addWebSocketHandler("/myapp", new WebSocketSessionHandler() {
                     @Override
-                    public void onSession(final WebSocketSession session, WebSocketHttpExchange exchange) {
+                    public void onSession(final WebSocketSession session, HttpServerExchange exchange) {
                         session.setFrameHandler(new AbstractAssembledFrameHandler() {
                             @Override
                             public void onTextFrame(final WebSocketSession session, final WebSocketFrameHeader header, final CharSequence payload) {

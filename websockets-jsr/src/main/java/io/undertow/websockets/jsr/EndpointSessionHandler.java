@@ -23,6 +23,7 @@ import java.util.List;
 
 import javax.websocket.Endpoint;
 
+import io.undertow.server.HttpServerExchange;
 import io.undertow.servlet.api.InstanceFactory;
 import io.undertow.servlet.api.InstanceHandle;
 import io.undertow.servlet.util.ImmediateInstanceHandle;
@@ -30,7 +31,6 @@ import io.undertow.websockets.api.WebSocketSession;
 import io.undertow.websockets.api.WebSocketSessionHandler;
 import io.undertow.websockets.impl.WebSocketChannelSession;
 import io.undertow.websockets.jsr.handshake.HandshakeUtil;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.xnio.IoUtils;
 
 /**
@@ -54,7 +54,7 @@ public final class EndpointSessionHandler implements WebSocketSessionHandler {
     }
 
     @Override
-    public void onSession(WebSocketSession s, WebSocketHttpExchange exchange) {
+    public void onSession(WebSocketSession s, HttpServerExchange exchange) {
         WebSocketChannelSession channelSession = (WebSocketChannelSession) s;
         ConfiguredServerEndpoint config = HandshakeUtil.getConfig(channelSession.getChannel());
 

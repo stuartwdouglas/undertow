@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import io.undertow.UndertowLogger;
 import io.undertow.conduits.ConduitListener;
-import io.undertow.server.HttpServerExchange;
 import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;

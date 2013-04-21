@@ -22,11 +22,11 @@ import java.util.Map;
 
 import javax.websocket.server.ServerEndpointConfig;
 
+import io.undertow.server.HttpServerExchange;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.Headers;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.jsr.ConfiguredServerEndpoint;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 
 /**
  * Internal util class for handshaking
@@ -45,15 +45,15 @@ public final class HandshakeUtil {
     /**
      * Checks the orgin against the
      */
-    public static boolean checkOrigin(ServerEndpointConfig config, WebSocketHttpExchange exchange) {
+    public static boolean checkOrigin(ServerEndpointConfig config, HttpServerExchange exchange) {
         ServerEndpointConfig.Configurator c = config.getConfigurator();
-        return c.checkOrigin(exchange.getRequestHeader(Headers.ORIGIN_STRING));
+        return c.checkOrigin(exchange.getRequestHeader(Headers.ORIGIN));
     }
 
     /**
      * Prepare for upgrade
      */
-    public static void prepareUpgrade(final ServerEndpointConfig config, final WebSocketHttpExchange exchange) {
+    public static void prepareUpgrade(final ServerEndpointConfig config, final HttpServerExchange exchange) {
         ExchangeHandshakeRequest request = new ExchangeHandshakeRequest(exchange);
         ExchangeHandshakeResponse response = new ExchangeHandshakeResponse(exchange);
         ServerEndpointConfig.Configurator c = config.getConfigurator();

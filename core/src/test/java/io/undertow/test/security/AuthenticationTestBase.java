@@ -36,7 +36,6 @@ import io.undertow.security.idm.X509CertificateCredential;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.test.utils.DefaultServer;
-import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 import io.undertow.util.TestHttpClient;
 
@@ -233,11 +232,10 @@ public abstract class AuthenticationTestBase {
 
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
-            HeaderMap responseHeader = exchange.getResponseHeaders();
-            responseHeader.add(PROCESSED_BY, "ResponseHandler");
+            exchange.addResponseHeader(PROCESSED_BY, "ResponseHandler");
             String user = getAuthenticatedUser(exchange);
             if (user != null) {
-                responseHeader.add(AUTHENTICATED_USER, user);
+                exchange.addResponseHeader(AUTHENTICATED_USER, user);
             }
 
             exchange.endExchange();

@@ -68,7 +68,7 @@ public class SSLSessionTestCase {
                                 session.setAttribute(COUNT, 0);
                             }
                             Integer count = (Integer) session.getAttribute(COUNT);
-                            exchange.getResponseHeaders().add(new HttpString(COUNT), count.toString());
+                            exchange.addResponseHeader(new HttpString(COUNT), count.toString());
                             session.setAttribute(COUNT, ++count);
                             HttpHandlers.executeHandler(ResponseCodeHandler.HANDLE_200, exchange);
 

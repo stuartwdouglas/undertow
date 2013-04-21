@@ -37,7 +37,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.websocket.server.ServerContainer;
 
-import io.undertow.servlet.websockets.ServletWebSocketHttpExchange;
+import io.undertow.servlet.websockets.ServletHttpExchange;
 import io.undertow.websockets.core.handler.WebSocketConnectionCallback;
 import io.undertow.websockets.core.protocol.Handshake;
 import io.undertow.websockets.impl.WebSocketSessionConnectionCallback;
@@ -97,7 +97,7 @@ public class JsrWebSocketFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
         if (req.getHeader("Upgrade") != null) {
-            final ServletWebSocketHttpExchange facade = new ServletWebSocketHttpExchange(req, resp);
+            final ServletHttpExchange facade = new ServletHttpExchange(req, resp);
 
             String path;
             if (req.getPathInfo() == null) {

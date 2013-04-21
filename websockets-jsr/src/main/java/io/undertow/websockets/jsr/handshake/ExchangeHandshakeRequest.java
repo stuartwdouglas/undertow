@@ -19,13 +19,16 @@ package io.undertow.websockets.jsr.handshake;
 
 import java.net.URI;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.websocket.server.HandshakeRequest;
 
-import io.undertow.websockets.spi.WebSocketHttpExchange;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HttpString;
 
 /**
  * {@link HandshakeRequest} which wraps a {@link io.undertow.websockets.spi.WebSocketHttpExchange} to act on it.
@@ -35,24 +38,27 @@ import io.undertow.websockets.spi.WebSocketHttpExchange;
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
 public final class ExchangeHandshakeRequest implements HandshakeRequest {
-    private final WebSocketHttpExchange exchange;
+    private final HttpServerExchange exchange;
     private Map<String, List<String>> headers;
 
-    public ExchangeHandshakeRequest(final WebSocketHttpExchange exchange) {
+    public ExchangeHandshakeRequest(final HttpServerExchange exchange) {
         this.exchange = exchange;
     }
 
     @Override
     public Map<String, List<String>> getHeaders() {
         if (headers == null) {
-            headers = exchange.getRequestHeaders();
+            headers = new HashMap<>();
+            for(HttpString name : exchange.getRequestHeaderNames()) {
+                headers.put(name.toString(), new ArrayList<String>(exchange.getRequestHeaders(name)));
+            }
         }
         return headers;
     }
 
     @Override
     public Principal getUserPrincipal() {
-        return null;
+        return null; //TODO
     }
 
     @Override
@@ -67,7 +73,7 @@ public final class ExchangeHandshakeRequest implements HandshakeRequest {
 
     @Override
     public Object getHttpSession() {
-        return exchange.getSession();
+        return null; // TODO exchange.getSession();
     }
 
     @Override

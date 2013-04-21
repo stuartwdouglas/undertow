@@ -43,6 +43,7 @@ import javax.servlet.http.HttpServletResponse;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpHandlers;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.servlet.UndertowServletLogger;
 import io.undertow.servlet.UndertowServletMessages;
 import io.undertow.servlet.api.Deployment;
@@ -66,7 +67,7 @@ public class AsyncContextImpl implements AsyncContext {
 
     private final List<BoundAsyncListener> asyncListeners = new CopyOnWriteArrayList<BoundAsyncListener>();
 
-    private final HttpServerExchange exchange;
+    private final HttpServerExchangeImpl exchange;
     private final ServletRequest servletRequest;
     private final ServletResponse servletResponse;
     private final TimeoutTask timeoutTask = new TimeoutTask();
@@ -86,7 +87,7 @@ public class AsyncContextImpl implements AsyncContext {
     private final Deque<Runnable> asyncTaskQueue = new ArrayDeque<>();
     private boolean processingAsyncTask = false;
 
-    public AsyncContextImpl(final HttpServerExchange exchange, final ServletRequest servletRequest, final ServletResponse servletResponse, final AsyncContextImpl previousAsyncContext) {
+    public AsyncContextImpl(final HttpServerExchangeImpl exchange, final ServletRequest servletRequest, final ServletResponse servletResponse, final AsyncContextImpl previousAsyncContext) {
         this.exchange = exchange;
         this.servletRequest = servletRequest;
         this.servletResponse = servletResponse;

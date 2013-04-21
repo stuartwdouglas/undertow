@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.Servlet;
 
+import io.undertow.server.HttpServerExchange;
 import io.undertow.servlet.api.ServletContainer;
 import io.undertow.servlet.api.ServletInfo;
 import io.undertow.servlet.test.util.DeploymentUtils;
@@ -20,7 +21,6 @@ import io.undertow.websockets.core.StreamSourceFrameChannel;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketFrameType;
 import io.undertow.websockets.core.handler.WebSocketConnectionCallback;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 import io.undertow.websockets.utils.FrameChecker;
 import io.undertow.websockets.utils.WebSocketTestClient;
 import org.apache.james.mime4j.util.CharsetUtil;
@@ -49,7 +49,7 @@ public class WebSocketServletTest {
         DeploymentUtils.setupServlet(new ServletInfo("websocket", WebSocketServlet.class,
                 new ImmediateInstanceFactory<Servlet>(new WebSocketServlet(new WebSocketConnectionCallback() {
                     @Override
-                    public void onConnect(final WebSocketHttpExchange exchange, final WebSocketChannel channel) {
+                    public void onConnect(final HttpServerExchange exchange, final WebSocketChannel channel) {
                         connected.set(true);
                         channel.getReceiveSetter().set(new ChannelListener<WebSocketChannel>() {
                             @Override
@@ -59,7 +59,7 @@ public class WebSocketServletTest {
                                     if (ws == null) {
                                         return;
                                     }
-                                    new StringReadChannelListener(exchange.getBufferPool()) {
+                                    new StringReadChannelListener(exchange.getConnection().getBufferPool()) {
                                         @Override
                                         protected void stringDone(final String string) {
                                             try {

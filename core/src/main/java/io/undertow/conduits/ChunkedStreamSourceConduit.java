@@ -24,7 +24,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 
 import io.undertow.UndertowMessages;
-import io.undertow.server.HttpServerExchange;
 import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.Attachable;
 import io.undertow.util.AttachmentKey;

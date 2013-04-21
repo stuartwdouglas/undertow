@@ -60,6 +60,7 @@ import javax.servlet.http.Part;
 import io.undertow.security.api.SecurityContext;
 import io.undertow.security.idm.Account;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.server.handlers.CookieImpl;
 import io.undertow.server.handlers.form.FormData;
 import io.undertow.server.handlers.form.FormDataParser;
@@ -97,7 +98,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
 
     private static final Charset DEFAULT_CHARSET = Charset.forName("ISO-8859-1");
 
-    private final HttpServerExchange exchange;
+    private final HttpServerExchangeImpl exchange;
     private ServletContextImpl servletContext;
 
     private Map<String, Object> attributes = null;
@@ -115,7 +116,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
     private boolean readStarted;
 
     public HttpServletRequestImpl(final HttpServerExchange exchange, final ServletContextImpl servletContext) {
-        this.exchange = exchange;
+        this.exchange = (HttpServerExchangeImpl) exchange;
         this.servletContext = servletContext;
         this.queryParameters = exchange.getQueryParameters();
     }
@@ -164,7 +165,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public long getDateHeader(final String name) {
-        String header = exchange.getRequestHeaders().getFirst(new HttpString(name));
+        String header = exchange.getRequestHeader(new HttpString(name));
         if (header == null) {
             return -1;
         }
@@ -432,7 +433,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
         readStarted = true;
         if (parts == null) {
             final List<Part> parts = new ArrayList<Part>();
-            String mimeType = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
+            String mimeType = exchange.getRequestHeader(Headers.CONTENT_TYPE);
             if (mimeType != null && mimeType.startsWith(MultiPartHandler.MULTIPART_FORM_DATA)) {
                 final FormDataParser parser = exchange.getAttachment(FormDataParser.ATTACHMENT_KEY);
                 final FormData value = parser.parseBlocking();
@@ -470,7 +471,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
         if (characterEncoding != null) {
             return characterEncoding.name();
         }
-        String contentType = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
+        String contentType = exchange.getRequestHeader(Headers.CONTENT_TYPE);
         if (contentType == null) {
             return null;
         }
@@ -686,7 +687,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
             if (characterEncoding != null) {
                 charSet = characterEncoding;
             } else {
-                String contentType = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
+                String contentType = exchange.getRequestHeader(Headers.CONTENT_TYPE);
                 if (contentType != null) {
                     String c = Headers.extractTokenFromHeader(contentType, "charset");
                     if (c != null) {

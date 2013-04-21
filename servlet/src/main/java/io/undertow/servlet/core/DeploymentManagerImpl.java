@@ -33,7 +33,7 @@ import io.undertow.security.impl.CachedAuthenticatedSessionMechanism;
 import io.undertow.security.impl.ClientCertAuthenticationMechanism;
 import io.undertow.server.HandlerWrapper;
 import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.server.handlers.AttachmentHandler;
 import io.undertow.server.handlers.PredicateHandler;
 import io.undertow.servlet.UndertowServletMessages;
@@ -574,7 +574,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
             if (deployment.getDeploymentInfo().getExecutorFactory() != null) {
                 try {
                     executor = deployment.getDeploymentInfo().getExecutorFactory().createInstance();
-                    root = new AttachmentHandler<>(HttpServerExchange.DISPATCH_EXECUTOR, root, executor.getInstance());
+                    root = new AttachmentHandler<>(HttpServerExchangeImpl.DISPATCH_EXECUTOR, root, executor.getInstance());
                 } catch (InstantiationException e) {
                     throw new RuntimeException(e);
                 }

@@ -1,6 +1,5 @@
 package io.undertow.server.protocol.ajp;
 
-import io.undertow.server.HttpServerExchange;
 import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;

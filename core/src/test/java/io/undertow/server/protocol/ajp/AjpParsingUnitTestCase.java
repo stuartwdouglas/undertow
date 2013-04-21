@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.Headers;
 import io.undertow.util.Methods;
 import io.undertow.util.Protocols;
@@ -41,7 +42,7 @@ public class AjpParsingUnitTestCase {
     @Test
     public void testAjpParsing() {
         final ByteBuffer buffer = AjpParsingUnitTestCase.buffer.duplicate();
-        HttpServerExchange result = new HttpServerExchange(null);
+        HttpServerExchangeImpl result = new HttpServerExchangeImpl(null);
         final AjpParseState state = new AjpParseState();
         AjpParser.INSTANCE.parse(buffer, state, result);
         Assert.assertEquals(165, state.dataSize);
@@ -55,7 +56,7 @@ public class AjpParsingUnitTestCase {
     public void testByteByByteAjpParsing() {
         final ByteBuffer buffer = AjpParsingUnitTestCase.buffer.duplicate();
 
-        HttpServerExchange result = new HttpServerExchange(null);
+        HttpServerExchangeImpl result = new HttpServerExchangeImpl(null);
         final AjpParseState state = new AjpParseState();
         int limit = buffer.limit();
         for (int i = 1; i <= limit; ++i) {
@@ -72,8 +73,8 @@ public class AjpParsingUnitTestCase {
         Assert.assertSame(Methods.GET, exchange.getRequestMethod());
         Assert.assertEquals(Protocols.HTTP_1_1, exchange.getProtocol());
         Assert.assertEquals(3, exchange.getRequestHeaderNames().size());
-        Assert.assertEquals("localhost:7777", exchange.getRequestHeaders().getFirst(Headers.HOST));
-        Assert.assertEquals("Apache-HttpClient/4.1.3 (java 1.5)", exchange.getRequestHeaders().getFirst(Headers.USER_AGENT));
-        Assert.assertEquals("Keep-Alive", exchange.getRequestHeaders().getFirst(Headers.CONNECTION));
+        Assert.assertEquals("localhost:7777", exchange.getRequestHeader(Headers.HOST));
+        Assert.assertEquals("Apache-HttpClient/4.1.3 (java 1.5)", exchange.getRequestHeader(Headers.USER_AGENT));
+        Assert.assertEquals("Keep-Alive", exchange.getRequestHeader(Headers.CONNECTION));
     }
 }

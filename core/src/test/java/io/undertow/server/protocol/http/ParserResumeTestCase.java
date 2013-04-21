@@ -21,8 +21,7 @@ package io.undertow.server.protocol.http;
 import java.nio.ByteBuffer;
 
 import io.undertow.server.HttpServerExchange;
-import io.undertow.server.protocol.http.HttpRequestParser;
-import io.undertow.server.protocol.http.ParseState;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import io.undertow.util.Protocols;
@@ -54,7 +53,7 @@ public class ParserResumeTestCase {
     public void testOneCharacterAtATime() {
         byte[] in = DATA.getBytes();
         final ParseState context = new ParseState();
-        HttpServerExchange result = new HttpServerExchange(null);
+        HttpServerExchangeImpl result = new HttpServerExchangeImpl(null);
         ByteBuffer buffer = ByteBuffer.wrap(in);
         buffer.limit(1);
         while (context.state != ParseState.PARSE_COMPLETE) {
@@ -66,7 +65,7 @@ public class ParserResumeTestCase {
 
     private void testResume(final int split, byte[] in) {
         final ParseState context = new ParseState();
-        HttpServerExchange result = new HttpServerExchange(null);
+        HttpServerExchangeImpl result = new HttpServerExchangeImpl(null);
         ByteBuffer buffer = ByteBuffer.wrap(in);
         buffer.limit(split);
         HttpRequestParser.INSTANCE.handle(buffer, context, result);
@@ -82,10 +81,10 @@ public class ParserResumeTestCase {
         Assert.assertEquals("http://www.somehost.net/apath", result.getRequestURI());
         Assert.assertSame(Protocols.HTTP_1_1, result.getProtocol());
 
-        Assert.assertEquals("www.somehost.net", result.getRequestHeaders().getFirst(new HttpString("Host")));
-        Assert.assertEquals("some value", result.getRequestHeaders().getFirst(new HttpString("OtherHeader")));
-        Assert.assertEquals("another", result.getRequestHeaders().getFirst(new HttpString("Hostee")));
-        Assert.assertEquals("a", result.getRequestHeaders().getFirst(new HttpString("Accept-garbage")));
+        Assert.assertEquals("www.somehost.net", result.getRequestHeader(new HttpString("Host")));
+        Assert.assertEquals("some value", result.getRequestHeader(new HttpString("OtherHeader")));
+        Assert.assertEquals("another", result.getRequestHeader(new HttpString("Hostee")));
+        Assert.assertEquals("a", result.getRequestHeader(new HttpString("Accept-garbage")));
         Assert.assertEquals(4, result.getRequestHeaderNames().size());
 
         Assert.assertEquals(ParseState.PARSE_COMPLETE, context.state);

@@ -89,7 +89,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
 
     @Override
     public boolean containsHeader(final String name) {
-        return exchange.getResponseHeaders().contains(new HttpString(name));
+        return exchange.isResponseHeaderPresent(new HttpString(name));
     }
 
     @Override
@@ -161,7 +161,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
             }
             realPath = servletContext.getContextPath() + CanonicalPathUtils.canonicalize(current + location);
         }
-        String host = exchange.getRequestHeaders().getFirst(Headers.HOST);
+        String host = exchange.getRequestHeader(Headers.HOST);
         if (host == null) {
             host = exchange.getDestinationAddress().getAddress().getHostAddress();
         }
@@ -202,7 +202,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
         if (insideInclude) {
             return;
         }
-        exchange.getResponseHeaders().add(name, value);
+        exchange.addResponseHeader(name, value);
     }
 
     @Override
@@ -238,18 +238,18 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
 
     @Override
     public String getHeader(final String name) {
-        return exchange.getResponseHeaders().getFirst(new HttpString(name));
+        return exchange.getResponseHeader(new HttpString(name));
     }
 
     @Override
     public Collection<String> getHeaders(final String name) {
-        return new ArrayList<String>(exchange.getResponseHeaders().get(new HttpString(name)));
+        return new ArrayList<String>(exchange.getResponseHeaders(new HttpString(name)));
     }
 
     @Override
     public Collection<String> getHeaderNames() {
         final Set<String> headers = new HashSet<String>();
-        for (final HttpString i : exchange.getResponseHeaders().getHeaderNames()) {
+        for (final HttpString i : exchange.getResponseHeaderNames()) {
             headers.add(i.toString());
         }
         return headers;
@@ -449,7 +449,7 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
         }
         writer = null;
         responseState = ResponseState.NONE;
-        exchange.getResponseHeaders().clear();
+        exchange.clearResponseHeaders();
         exchange.setResponseCode(200);
     }
 

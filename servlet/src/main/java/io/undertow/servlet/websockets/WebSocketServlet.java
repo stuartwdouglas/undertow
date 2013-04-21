@@ -73,7 +73,7 @@ public class WebSocketServlet extends HttpServlet {
     @Override
     protected void doGet(final HttpServletRequest req, final HttpServletResponse resp) throws ServletException, IOException {
 
-        final ServletWebSocketHttpExchange facade = new ServletWebSocketHttpExchange(req, resp);
+        final ServletHttpExchange facade = new ServletHttpExchange(req, resp);
         Handshake handshaker = null;
         for (Handshake method : handshakes) {
             if (method.matches(facade)) {

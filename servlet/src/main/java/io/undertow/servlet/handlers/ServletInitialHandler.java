@@ -24,6 +24,7 @@ import javax.servlet.ServletException;
 import io.undertow.UndertowLogger;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.HttpServerExchangeImpl;
 import io.undertow.server.handlers.form.FormDataParser;
 import io.undertow.servlet.api.ServletDispatcher;
 import io.undertow.servlet.api.ThreadSetupAction;
@@ -128,12 +129,12 @@ public class ServletInitialHandler implements HttpHandler, ServletDispatcher {
             //
         } catch (Throwable t) {
             if(request.isAsyncStarted() || request.getDispatcherType() == DispatcherType.ASYNC) {
-                exchange.unDispatch();
+                ((HttpServerExchangeImpl)exchange).unDispatch();
                 request.getAsyncContextInternal().handleError(t);
             } else {
                 if (!exchange.isResponseStarted()) {
                     exchange.setResponseCode(500);
-                    exchange.getResponseHeaders().clear();
+                    exchange.clearResponseHeaders();
                     String location = servletContext.getDeployment().getErrorPages().getErrorLocation(t);
                     if (location == null && t instanceof ServletException) {
                         location = servletContext.getDeployment().getErrorPages().getErrorLocation(t.getCause());

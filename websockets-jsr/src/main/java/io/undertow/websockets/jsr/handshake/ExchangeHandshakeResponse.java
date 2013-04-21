@@ -17,33 +17,38 @@
  */
 package io.undertow.websockets.jsr.handshake;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.websocket.HandshakeResponse;
 
-import io.undertow.websockets.spi.WebSocketHttpExchange;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HttpString;
 
 /**
- * {@link HandshakeResponse} which wraps a {@link io.undertow.websockets.spi.WebSocketHttpExchange} to act on it.
+ * {@link HandshakeResponse} which wraps a {@link HttpServerExchange to act on it.
  * Once the processing of it is done {@link #update()} must be called to persist any changes
  * made.
  *
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
 public final class ExchangeHandshakeResponse implements HandshakeResponse {
-    private final WebSocketHttpExchange exchange;
+    private final HttpServerExchange exchange;
     private Map<String, List<String>> headers;
 
-    public ExchangeHandshakeResponse(final WebSocketHttpExchange exchange) {
+    public ExchangeHandshakeResponse(final HttpServerExchange exchange) {
         this.exchange = exchange;
     }
 
     @Override
     public Map<String, List<String>> getHeaders() {
         if (headers == null) {
-            headers = new HashMap<>(exchange.getResponseHeaders());
+            headers = new HashMap<>();
+            for(HttpString header : exchange.getResponseHeaderNames()) {
+                headers.put(header.toString(), new ArrayList<String>(exchange.getResponseHeaders(header)));
+            }
         }
         return headers;
     }
@@ -53,7 +58,12 @@ public final class ExchangeHandshakeResponse implements HandshakeResponse {
      */
     void update() {
         if (headers != null) {
-            exchange.setResponseHeaders(headers);
+            exchange.clearResponseHeaders();
+            for(Map.Entry<String, List<String>> entry : headers.entrySet()) {
+                for(String val : entry.getValue()) {
+                    exchange.addResponseHeader(HttpString.tryFromString(entry.getKey()), val);
+                }
+            }
         }
     }
 }

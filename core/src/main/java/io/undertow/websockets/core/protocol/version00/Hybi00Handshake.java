@@ -16,7 +16,6 @@
 
 package io.undertow.websockets.core.protocol.version00;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.MessageDigest;
@@ -30,7 +29,6 @@ import io.undertow.util.Headers;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketVersion;
 import io.undertow.websockets.core.protocol.Handshake;
-import org.xnio.IoFuture;
 import org.xnio.Pool;
 import org.xnio.channels.ConnectedStreamChannel;
 

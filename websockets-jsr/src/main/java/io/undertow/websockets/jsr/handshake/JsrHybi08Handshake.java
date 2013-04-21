@@ -20,10 +20,10 @@ package io.undertow.websockets.jsr.handshake;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 
+import io.undertow.server.HttpServerExchange;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.protocol.version08.Hybi08Handshake;
 import io.undertow.websockets.jsr.ConfiguredServerEndpoint;
-import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.xnio.Pool;
 import org.xnio.channels.ConnectedStreamChannel;
 
@@ -42,20 +42,20 @@ public final class JsrHybi08Handshake extends Hybi08Handshake {
     }
 
     @Override
-    protected void upgradeChannel(final WebSocketHttpExchange exchange, byte[] data) {
+    protected void upgradeChannel(final HttpServerExchange exchange, byte[] data) {
         HandshakeUtil.prepareUpgrade(config.getEndpointConfiguration(), exchange);
         super.upgradeChannel(exchange, data);
     }
 
     @Override
-    public WebSocketChannel createChannel(WebSocketHttpExchange exchange, final ConnectedStreamChannel c, final Pool<ByteBuffer> buffers) {
+    public WebSocketChannel createChannel(HttpServerExchange exchange, final ConnectedStreamChannel c, final Pool<ByteBuffer> buffers) {
         WebSocketChannel channel = super.createChannel(exchange, c, buffers);
         HandshakeUtil.setConfig(channel, config);
         return channel;
     }
 
     @Override
-    public boolean matches(WebSocketHttpExchange exchange) {
+    public boolean matches(HttpServerExchange exchange) {
         return super.matches(exchange) && HandshakeUtil.checkOrigin(config.getEndpointConfiguration(), exchange);
     }
 
