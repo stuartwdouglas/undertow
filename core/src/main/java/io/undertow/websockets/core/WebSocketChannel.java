@@ -70,6 +70,12 @@ public abstract class WebSocketChannel implements ConnectedChannel {
     private final Pool<ByteBuffer> bufferPool;
 
     private volatile StreamSourceFrameChannel receiver;
+
+    /**
+     * the current fragmented reciever channel. May not be the same as {@link #receiver} if we recieve control
+     * frames in the middle
+     */
+    private volatile StreamSourceFrameChannel continuationReceiver;
     /**
      * an incoming frame that has not been created yet
      */
@@ -301,7 +307,7 @@ public abstract class WebSocketChannel implements ConnectedChannel {
             }
             PartialFrame partialFrame = this.partialFrame;
             if (partialFrame == null) {
-                partialFrame = this.partialFrame = receiveFrame(new StreamSourceChannelControl());
+                partialFrame = this.partialFrame = receiveFrame(new StreamSourceChannelControl(), continuationReceiver);
             }
 
             int res;
@@ -355,6 +361,9 @@ public abstract class WebSocketChannel implements ConnectedChannel {
             channel.getSourceChannel().suspendReads();
             this.partialFrame = null;
             receiver = partialFrame.getChannel();
+            if(continuationReceiver == null && !receiver.isFinalFragment()) {
+                this.continuationReceiver = receiver;
+            }
             if (receiver.getType() == WebSocketFrameType.CLOSE) {
                 closeFrameReceived = true;
             }
@@ -501,12 +510,13 @@ public abstract class WebSocketChannel implements ConnectedChannel {
     /**
      * Create a new {@link StreamSourceFrameChannel}  which can be used to read the data of the received WebSocket Frame
      *
-     * @param streamSourceChannelControl@return
-     *         channel                  A {@link StreamSourceFrameChannel} will be used to read a Frame from.
-     *         This will return {@code null} if the right {@link StreamSourceFrameChannel} could not be detected with the given
+     * @param streamSourceChannelControl @return
+     *         channel                  A {@link io.undertow.websockets.core.StreamSourceFrameChannel} will be used to read a Frame from.
+     *         This will return {@code null} if the right {@link io.undertow.websockets.core.StreamSourceFrameChannel} could not be detected with the given
      *         buffer and so more data is needed.
+     * @param continuationReceiver
      */
-    protected abstract PartialFrame receiveFrame(StreamSourceChannelControl streamSourceChannelControl);
+    protected abstract PartialFrame receiveFrame(StreamSourceChannelControl streamSourceChannelControl, StreamSourceFrameChannel continuationReceiver);
 
     /**
      * Create a new StreamSinkFrameChannel which can be used to send a WebSocket Frame of the type {@link WebSocketFrameType}.
@@ -726,6 +736,9 @@ public abstract class WebSocketChannel implements ConnectedChannel {
             synchronized (WebSocketChannel.this) {
                 if (channel == receiver) {
                     receiver = null;
+                    if(channel.isFinalFragment()) {
+                        continuationReceiver = null;
+                    }
                     if (receivesSuspended) {
                         channel.suspendReads();
                     } else {

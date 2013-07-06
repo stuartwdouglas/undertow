@@ -18,6 +18,7 @@
 
 package io.undertow.websockets.core;
 
+import io.undertow.websockets.core.function.ChannelFunction;
 import org.xnio.ChannelExceptionHandler;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListener.Setter;
@@ -50,12 +51,15 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
 
     private final SimpleSetter<? extends StreamSourceFrameChannel> readSetter = new SimpleSetter<StreamSourceFrameChannel>();
     private final SimpleSetter<? extends StreamSourceFrameChannel> closeSetter = new SimpleSetter<StreamSourceFrameChannel>();
-    private final boolean finalFragment;
-    private final int rsv;
-    private final long payloadSize;
+    private volatile boolean finalFragment;
+    private volatile int rsv;
+    private volatile long payloadSize;
 
     private volatile boolean readsResumed;
-    private volatile boolean complete;
+    private volatile boolean frameComplete;
+    private volatile boolean messageComplete;
+    private volatile int frameCount = 1;
+
     private volatile boolean closed;
 
     protected StreamSourceFrameChannel(final WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocketChannel wsChannel, WebSocketFrameType type, long payloadSize) {
@@ -70,6 +74,16 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
         this.finalFragment = finalFragment;
         this.rsv = rsv;
         this.payloadSize = payloadSize;
+    }
+
+    public void continuation(final boolean finalFragment, final int rsv, final long payloadSize, ChannelFunction[] functions) {
+        this.finalFragment = finalFragment;
+        this.rsv = rsv;
+        this.payloadSize = payloadSize;
+        this.frameCount++;
+        if(isReadResumed()) {
+            wakeupReads();
+        }
     }
 
     /**
@@ -87,8 +101,11 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
 
     @Override
     public final long read(ByteBuffer[] dsts, int offset, int length) throws IOException {
-        if (complete) {
+        if (messageComplete) {
             return -1;
+        }
+        if(frameComplete) {
+            return 0;
         }
         try {
             return read0(dsts, offset, length);
@@ -106,8 +123,11 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
 
     @Override
     public final long read(ByteBuffer[] dsts) throws IOException {
-        if (complete) {
+        if (messageComplete) {
             return -1;
+        }
+        if(frameComplete) {
+            return 0;
         }
         try {
             return read0(dsts);
@@ -125,8 +145,11 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
 
     @Override
     public final int read(ByteBuffer dst) throws IOException {
-        if (complete) {
+        if (messageComplete) {
             return -1;
+        }
+        if(frameComplete) {
+            return 0;
         }
         try {
             int i = read0(dst);
@@ -146,8 +169,11 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
 
     @Override
     public final long transferTo(long position, long count, FileChannel target) throws IOException {
-        if (complete) {
+        if (messageComplete) {
             return -1;
+        }
+        if(frameComplete) {
+            return 0;
         }
         try {
             return transferTo0(position, count, target);
@@ -165,9 +191,12 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
 
     @Override
     public final long transferTo(long count, ByteBuffer throughBuffer, StreamSinkChannel target) throws IOException {
-        if (complete) {
+        if (messageComplete) {
             throughBuffer.clear();
             return -1;
+        }
+        if(frameComplete) {
+            return 0;
         }
         try {
             return transferTo0(count, throughBuffer, target);
@@ -187,7 +216,10 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
      * Is called once the whole frame was read.
      */
     protected void complete() throws IOException {
-        complete = true;
+        if(finalFragment) {
+            messageComplete = true;
+        }
+        frameComplete = true;
         streamSourceChannelControl.readFrameDone(this);
     }
 
@@ -246,7 +278,7 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
             public void run() {
                 WebSocketLogger.REQUEST_LOGGER.debugf("Invoking directly queued read listener");
                 ChannelListeners.invokeChannelListener(StreamSourceFrameChannel.this, listener);
-                if (!complete) {
+                if (!frameComplete) {
                     channel.resumeReads();
                 }
             }
@@ -254,12 +286,12 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
     }
 
     /**
-     * Discard the frame, which means all data that would be part of the frame will be discarded.
+     * Discard the frame, which means all data that would be part of the message will be discarded.
      *
      * Once all is discarded it will call {@link #close()}
      */
     public void discard() throws IOException {
-        if (!complete) {
+        if (!messageComplete) {
             ChannelListener<StreamSourceChannel> drainListener = ChannelListeners.drainListener(Long.MAX_VALUE,
                     new ChannelListener<StreamSourceChannel>() {
                         @Override
@@ -283,7 +315,7 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
     @Override
     public void suspendReads() {
         readsResumed = false;
-        if(!complete) {
+        if(!frameComplete) {
             channel.suspendReads();
         }
     }
@@ -291,7 +323,7 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
     @Override
     public void resumeReads() {
         readsResumed = true;
-        if(complete) {
+        if(frameComplete) {
             queueListener((ChannelListener<StreamSourceFrameChannel>) readSetter.get());
         } else {
             channel.resumeReads();
@@ -352,5 +384,9 @@ public abstract class StreamSourceFrameChannel implements StreamSourceChannel {
     @Override
     public Setter<? extends StreamSourceChannel> getCloseSetter() {
         return closeSetter;
+    }
+
+    public int getFrameCount() {
+        return frameCount;
     }
 }

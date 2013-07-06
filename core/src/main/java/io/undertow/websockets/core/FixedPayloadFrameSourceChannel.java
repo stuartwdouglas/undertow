@@ -34,7 +34,7 @@ import java.nio.channels.FileChannel;
 public abstract class FixedPayloadFrameSourceChannel extends StreamSourceFrameChannel {
 
     private long readBytes;
-    private final ChannelFunction[] functions;
+    private volatile ChannelFunction[] functions;
 
     protected FixedPayloadFrameSourceChannel(WebSocketChannel.StreamSourceChannelControl streamSourceChannelControl, StreamSourceChannel channel, WebSocketChannel wsChannel, WebSocketFrameType type, long payloadSize, int rsv, boolean finalFragment, ChannelFunction... functions) {
         super(streamSourceChannelControl, channel, wsChannel, type, payloadSize, rsv, finalFragment);
@@ -42,10 +42,16 @@ public abstract class FixedPayloadFrameSourceChannel extends StreamSourceFrameCh
     }
 
     @Override
+    public void continuation(boolean finalFragment, int rsv, long payloadSize, ChannelFunction[] functions) {
+        this.functions = functions;
+        super.continuation(finalFragment, rsv, payloadSize, functions);
+    }
+
+    @Override
     protected final long transferTo0(long position, long count, FileChannel target) throws IOException {
         long toRead = bytesToRead();
         if (toRead < 1) {
-            return -1;
+            return isFinalFragment() ? -1 : 0;
         }
 
         if (toRead < count) {
@@ -68,7 +74,7 @@ public abstract class FixedPayloadFrameSourceChannel extends StreamSourceFrameCh
     protected final long transferTo0(long count, ByteBuffer throughBuffer, StreamSinkChannel target) throws IOException {
         long toRead = bytesToRead();
         if (toRead < 1) {
-            return -1;
+            return isFinalFragment() ? -1 : 0;
         }
 
         if (toRead < count) {
@@ -84,7 +90,7 @@ public abstract class FixedPayloadFrameSourceChannel extends StreamSourceFrameCh
     protected int read0(ByteBuffer dst) throws IOException {
         long toRead = bytesToRead();
         if (toRead < 1) {
-            return -1;
+            return isFinalFragment() ? -1 : 0;
         }
         int r;
         int position = dst.position();

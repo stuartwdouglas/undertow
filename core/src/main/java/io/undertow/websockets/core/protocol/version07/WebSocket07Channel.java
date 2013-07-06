@@ -62,7 +62,6 @@ public class WebSocket07Channel extends WebSocketChannel {
         DONE,
     }
 
-    private int fragmentedFramesCount;
     private final ByteBuffer lengthBuffer = ByteBuffer.allocate(8);
 
     private UTF8Checker checker;
@@ -89,7 +88,7 @@ public class WebSocket07Channel extends WebSocketChannel {
     }
 
     @Override
-    protected PartialFrame receiveFrame(final StreamSourceChannelControl streamSourceChannelControl) {
+    protected PartialFrame receiveFrame(final StreamSourceChannelControl streamSourceChannelControl, final StreamSourceFrameChannel continuationReceiver) {
         return new PartialFrame() {
 
             private boolean frameFinalFlag;
@@ -296,17 +295,6 @@ public class WebSocket07Channel extends WebSocketChannel {
                     }
                     return;
                 }
-
-                if (frameFinalFlag) {
-                    // check if the frame is a ping frame as these are allowed in the middle
-                    if (frameOpcode != OPCODE_PING) {
-                        fragmentedFramesCount = 0;
-                    }
-                } else {
-                    // Increment counter
-                    fragmentedFramesCount++;
-                }
-
                 if (frameOpcode == OPCODE_TEXT) {
                     // try to grab the checker which was used before
                     UTF8Checker checker = WebSocket07Channel.this.checker;
@@ -350,11 +338,7 @@ public class WebSocket07Channel extends WebSocketChannel {
                     } else {
                         functions = EMPTY_FUNCTIONS;
                     }
-                    if (frameMasked) {
-                        this.channel = new WebSocket07ContinuationFrameSourceChannel(streamSourceChannelControl, channel.getSourceChannel(), WebSocket07Channel.this, framePayloadLength, frameRsv, frameFinalFlag, functions);
-                    } else {
-                        this.channel = new WebSocket07ContinuationFrameSourceChannel(streamSourceChannelControl, channel.getSourceChannel(), WebSocket07Channel.this, framePayloadLength, frameRsv, frameFinalFlag, functions);
-                    }
+                    continuationReceiver.continuation(frameFinalFlag, frameRsv, framePayloadLength, functions);
                 } else {
                     throw WebSocketMessages.MESSAGES.unsupportedOpCode(frameOpcode);
                 }
@@ -372,12 +356,12 @@ public class WebSocket07Channel extends WebSocketChannel {
                 }
 
                 // check opcode vs message fragmentation state 1/2
-                if (fragmentedFramesCount == 0 && frameOpcode == OPCODE_CONT) {
+                if (continuationReceiver == null && frameOpcode == OPCODE_CONT) {
                     throw WebSocketMessages.MESSAGES.continuationFrameOutsideFragmented();
                 }
 
                 // check opcode vs message fragmentation state 2/2
-                if (fragmentedFramesCount != 0 && frameOpcode != OPCODE_CONT && frameOpcode != OPCODE_PING) {
+                if (continuationReceiver != null && frameOpcode != OPCODE_CONT && frameOpcode != OPCODE_PING) {
                     throw WebSocketMessages.MESSAGES.nonContinuationFrameInsideFragmented();
                 }
             }
