@@ -26,9 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
-import io.undertow.UndertowLogger;
 import io.undertow.conduits.ConduitListener;
 import io.undertow.server.ExchangeCookieUtils;
 import io.undertow.server.HttpServerExchange;
@@ -69,10 +67,7 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
     /**
      * State flags
      */
-    @SuppressWarnings("unused")
-    private volatile int state = FLAG_START;
-
-    private static final AtomicIntegerFieldUpdater<AjpServerResponseConduit> stateUpdater = AtomicIntegerFieldUpdater.newUpdater(AjpServerResponseConduit.class, "state");
+    private int state = FLAG_START;
 
     /**
      * The current data buffer. This will be released once it has been written out.
@@ -88,9 +83,10 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
 
     private final ConduitListener<? super AjpServerResponseConduit> finishListener;
 
+    /**
+     * If this is a head request. In this case no data will be written.
+     */
     private final boolean headRequest;
-
-
 
     /**
      * An AJP request channel that wants access to the underlying sink channel.
@@ -100,13 +96,13 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
      * <p/>
      * While this field is set attempts to write will always return 0.
      */
-    private volatile ByteBuffer readBodyChunkBuffer;
+    private ByteBuffer readBodyChunkBuffer;
 
     private static final int FLAG_START = 1; //indicates that the header has not been generated yet.
     private static final int FLAG_SHUTDOWN = 1 << 2;
     private static final int FLAG_DELEGATE_SHUTDOWN = 1 << 3;
     private static final int FLAG_CLOSE_QUEUED = 1 << 4;
-    private static final int FLAG_WRITE_ENTERED = 1 << 5;
+    private static final int FLAG_ = 1 << 5;
 
     static {
         final Map<HttpString, Integer> headers = new HashMap<HttpString, Integer>();
@@ -155,22 +151,12 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
      * @throws java.io.IOException
      */
     private boolean processWrite() throws IOException {
-        int oldState;
-        int writeEnteredState;
-        do {
-            oldState = this.state;
-            if ((oldState & FLAG_WRITE_ENTERED) != 0) {
-                return false;
-            }
-            if (anyAreSet(state, FLAG_DELEGATE_SHUTDOWN)) {
-                return true;
-            }
-            writeEnteredState = oldState | FLAG_WRITE_ENTERED;
-        } while (!stateUpdater.compareAndSet(this, state, writeEnteredState));
-        int newState = writeEnteredState;
+        if (anyAreSet(state, FLAG_DELEGATE_SHUTDOWN)) {
+            return true;
+        }
 
         //if currentDataBuffer is set then we just
-        if (anyAreSet(oldState, FLAG_START)) {
+        if (anyAreSet(state, FLAG_START)) {
             if (readBodyChunkBuffer == null) {
 
                 //merge the cookies into the header map
@@ -214,26 +200,23 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
                 buffer.put(2, (byte) ((dataLength >> 8) & 0xFF));
                 buffer.put(3, (byte) (dataLength & 0xFF));
                 buffer.flip();
-                newState = (newState & ~FLAG_START);
+                this.state &= ~FLAG_START;
             } else {
                 //otherwise we just write out the get request body chunk and return
                 ByteBuffer readBuffer = readBodyChunkBuffer;
                 do {
                     int res = next.write(readBuffer);
                     if (res == 0) {
-                        stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
                         return false;
                     }
                 } while (readBodyChunkBuffer.hasRemaining());
                 readBodyChunkBuffer = null;
-                stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
                 return true;
             }
         }
 
         if (currentDataBuffer != null) {
             if (!writeCurrentBuffer()) {
-                stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
                 return false;
             }
         }
@@ -245,7 +228,6 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
             do {
                 int res = next.write(readBuffer);
                 if (res == 0) {
-                    stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
                     return false;
                 }
             } while (readBodyChunkBuffer.hasRemaining());
@@ -253,7 +235,7 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
         }
 
         if (anyAreSet(state, FLAG_SHUTDOWN) && allAreClear(state, FLAG_CLOSE_QUEUED)) {
-            newState = newState | FLAG_CLOSE_QUEUED;
+            this.state |= FLAG_CLOSE_QUEUED;
             currentDataBuffer = pool.allocate();
             final ByteBuffer buffer = currentDataBuffer.getResource();
             packetHeaderAndDataBuffer = new ByteBuffer[1];
@@ -266,12 +248,8 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
             buffer.put((byte) (exchange.isPersistent() ? 1 : 0)); //reuse
             buffer.flip();
             if (!writeCurrentBuffer()) {
-                stateUpdater.set(this, newState & ~FLAG_WRITE_ENTERED); //clear the write entered flag
                 return false;
             }
-        }
-        if (newState != writeEnteredState) {
-            stateUpdater.set(this, newState);
         }
         return true;
     }
@@ -301,57 +279,52 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
         if (!processWrite()) {
             return 0;
         }
-        try {
-            if(headRequest) {
-                int remaining = src.remaining();
-                src.position(src.position() + remaining);
-                return remaining;
-            }
-            int limit = src.limit();
-            try {
-                if (src.remaining() > MAX_DATA_SIZE) {
-                    src.limit(src.position() + MAX_DATA_SIZE);
-                }
-                final int writeSize = src.remaining();
-                final ByteBuffer[] buffers = createHeader(src);
-                int toWrite = 0;
-                for (ByteBuffer buffer : buffers) {
-                    toWrite += buffer.remaining();
-                }
-                final int originalPayloadSize = writeSize;
-                int total = 0;
-                long r = 0;
-                do {
-                    r = next.write(buffers, 0, buffers.length);
-                    total += r;
-                    toWrite -= r;
-                    if (r == -1) {
-                        throw new ClosedChannelException();
-                    } else if (r == 0) {
-                        //we need to copy all the remaining bytes
-                        Pooled<ByteBuffer> newPooledBuffer = pool.allocate();
-                        while (src.hasRemaining()) {
-                            newPooledBuffer.getResource().put(src);
-                        }
-                        newPooledBuffer.getResource().flip();
-                        ByteBuffer[] savedBuffers = new ByteBuffer[3];
-                        savedBuffers[0] = buffers[0];
-                        savedBuffers[1] = newPooledBuffer.getResource();
-                        savedBuffers[2] = buffers[2];
-                        this.packetHeaderAndDataBuffer = savedBuffers;
-                        this.currentDataBuffer = newPooledBuffer;
-
-                        return originalPayloadSize;
-                    }
-                } while (toWrite > 0);
-                return originalPayloadSize;
-            } finally {
-                src.limit(limit);
-            }
-        } finally {
-            exitWrite();
+        if (headRequest) {
+            int remaining = src.remaining();
+            src.position(src.position() + remaining);
+            return remaining;
         }
+        int limit = src.limit();
+        try {
+            if (src.remaining() > MAX_DATA_SIZE) {
+                src.limit(src.position() + MAX_DATA_SIZE);
+            }
+            final int writeSize = src.remaining();
+            final ByteBuffer[] buffers = createHeader(src);
+            int toWrite = 0;
+            for (ByteBuffer buffer : buffers) {
+                toWrite += buffer.remaining();
+            }
+            final int originalPayloadSize = writeSize;
+            int total = 0;
+            long r = 0;
+            do {
+                r = next.write(buffers, 0, buffers.length);
+                total += r;
+                toWrite -= r;
+                if (r == -1) {
+                    throw new ClosedChannelException();
+                } else if (r == 0) {
+                    //we need to copy all the remaining bytes
+                    Pooled<ByteBuffer> newPooledBuffer = pool.allocate();
+                    while (src.hasRemaining()) {
+                        newPooledBuffer.getResource().put(src);
+                    }
+                    newPooledBuffer.getResource().flip();
+                    ByteBuffer[] savedBuffers = new ByteBuffer[3];
+                    savedBuffers[0] = buffers[0];
+                    savedBuffers[1] = newPooledBuffer.getResource();
+                    savedBuffers[2] = buffers[2];
+                    this.packetHeaderAndDataBuffer = savedBuffers;
+                    this.currentDataBuffer = newPooledBuffer;
 
+                    return originalPayloadSize;
+                }
+            } while (toWrite > 0);
+            return originalPayloadSize;
+        } finally {
+            src.limit(limit);
+        }
     }
 
     private ByteBuffer[] createHeader(final ByteBuffer src) {
@@ -374,10 +347,6 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
         buffers[1] = src;
         buffers[2] = ByteBuffer.wrap(footer);
         return buffers;
-    }
-
-    private void exitWrite() {
-        stateUpdater.set(this, state & ~FLAG_WRITE_ENTERED);
     }
 
     public long write(final ByteBuffer[] srcs) throws IOException {
@@ -412,21 +381,17 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
         if (!processWrite()) {
             return false;
         }
-        try {
-            int state = this.state;
-            if (allAreSet(state, FLAG_SHUTDOWN) && allAreClear(state, FLAG_DELEGATE_SHUTDOWN)) {
-                if(!exchange.isPersistent()) {
-                    next.terminateWrites();
-                }
-                if(finishListener != null) {
-                    finishListener.handleEvent(this);
-                }
-                stateUpdater.set(this, state | FLAG_DELEGATE_SHUTDOWN);
+        int state = this.state;
+        if (allAreSet(state, FLAG_SHUTDOWN) && allAreClear(state, FLAG_DELEGATE_SHUTDOWN)) {
+            if (!exchange.isPersistent()) {
+                next.terminateWrites();
             }
-            return next.flush();
-        } finally {
-            exitWrite();
+            if (finishListener != null) {
+                finishListener.handleEvent(this);
+            }
+            state |= FLAG_DELEGATE_SHUTDOWN;
         }
+        return next.flush();
     }
 
     public void suspendWrites() {
@@ -449,28 +414,20 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
     }
 
     public void terminateWrites() throws IOException {
-        int oldState = 0, newState = 0;
-        do {
-            oldState = this.state;
-            if (anyAreSet(oldState, FLAG_SHUTDOWN)) {
-                return;
-            }
-            newState = oldState | FLAG_SHUTDOWN;
-        } while (!stateUpdater.compareAndSet(this, oldState, newState));
-        if (allAreClear(oldState, FLAG_START) &&
+        if (anyAreSet(state, FLAG_SHUTDOWN)) {
+            return;
+        }
+        this.state |= FLAG_SHUTDOWN;
+        if (allAreClear(state, FLAG_START) &&
                 readBodyChunkBuffer == null &&
                 packetHeaderAndDataBuffer == null) {
-            if(!exchange.isPersistent()) {
+            if (!exchange.isPersistent()) {
                 next.terminateWrites();
             }
-            if(finishListener != null) {
+            if (finishListener != null) {
                 finishListener.handleEvent(this);
             }
-            newState |= FLAG_DELEGATE_SHUTDOWN;
-            while (stateUpdater.compareAndSet(this, oldState, newState)) {
-                oldState = state;
-                newState = oldState | FLAG_DELEGATE_SHUTDOWN;
-            }
+            state |= FLAG_DELEGATE_SHUTDOWN;
         }
     }
 
@@ -485,34 +442,11 @@ final class AjpServerResponseConduit extends AbstractStreamSinkConduit<StreamSin
     public boolean doGetRequestBodyChunk(ByteBuffer buffer, final AjpServerRequestConduit requestChannel) throws IOException {
         this.readBodyChunkBuffer = buffer;
         boolean result = processWrite();
-        if (result) {
-            exitWrite();
-        } else {
+        if (!result) {
             //if this write does not work we spawn a thread to force it out.
             //this is not great, but there is not really a great deal we can do here
             //there is probably a better way to deal with this, but I am not really sure what it is
-            this.exchange.getConnection().getWorker().submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        while (AjpServerResponseConduit.this.readBodyChunkBuffer != null) {
-                            next.awaitWritable();
-                            boolean result = processWrite();
-                            if (result) {
-                                exitWrite();
-                            }
-                        }
-                    } catch (IOException e) {
-                        if (requestChannel.isReadResumed()) {
-                            requestChannel.wakeupReads();
-                        }
-                        if (isWriteResumed()) {
-                            next.wakeupWrites();
-                        }
-                        UndertowLogger.REQUEST_IO_LOGGER.ioException(e);
-                    }
-                }
-            });
+            throw new IOException("Could not complete write in 1 go");
         }
 
         return result;
