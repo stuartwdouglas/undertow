@@ -22,6 +22,8 @@ package io.undertow.util;
  * @author Stuart Douglas
  */
 
+import java.util.List;
+
 /**
  * An immutable, type-safe object attachment key.  Such a key has no value outside of its object identity.
  *
@@ -61,6 +63,15 @@ public abstract class AttachmentKey<T> {
     @SuppressWarnings("unchecked")
     public static <T> AttachmentKey<AttachmentList<T>> createList(final Class<? super T> valueClass) {
         return new ListAttachmentKey(valueClass);
+    }
+
+    /**
+     *
+     * @param key The list attachment key
+     * @return The element type of the list
+     */
+    public static <T> Class<T> listValueClass(final AttachmentKey<AttachmentList<T>> key) {
+        return ((ListAttachmentKey)key).getValueClass();
     }
 }
 
