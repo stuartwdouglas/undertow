@@ -9,6 +9,7 @@ import io.undertow.server.protocol.framed.AbstractFramedStreamSourceChannel;
 import io.undertow.server.protocol.framed.FrameHeaderData;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.AttachmentList;
+import org.xnio.IoUtils;
 import org.xnio.OptionMap;
 import org.xnio.Pool;
 import org.xnio.Pooled;
@@ -34,7 +35,7 @@ public class AjpChannel extends AbstractFramedChannel<AjpChannel, AjpStreamSourc
     private final int bufferSize;
     private AjpRequestParseState parseState;
     private HttpServerExchange exchange;
-    private AjpStreamSourceChannel existing;
+    private AjpStreamSourceChannel sourceChannel;
     private AjpStreamSinkChannel sinkChannel;
     private ConduitStreamSinkChannel conduitStreamSinkChannel;
     private ConduitStreamSourceChannel conduitStreamSourceChannel;
@@ -59,16 +60,21 @@ public class AjpChannel extends AbstractFramedChannel<AjpChannel, AjpStreamSourc
     @Override
     protected AjpStreamSourceChannel createChannel(FrameHeaderData frameHeaderData, Pooled<ByteBuffer> frameData) {
         AjpStreamSourceChannel channel = new AjpStreamSourceChannel(this, frameData, frameHeaderData.getFrameLength());
-        existing = channel;
+        sourceChannel = channel;
         return channel;
     }
 
     @Override
     protected FrameHeaderData parseFrame(ByteBuffer data) throws IOException {
+        if(sourceChannel != null) {
+            
+        }
+        if()
+
         if(parseState == null) {
             parseState = new AjpRequestParseState();
         }
-        if(existing == null) {
+        if(sourceChannel == null) {
             exchange = new HttpServerExchange(null); //todo: connection impl
         }
         parser.parse(data, parseState, exchange);
@@ -83,7 +89,7 @@ public class AjpChannel extends AbstractFramedChannel<AjpChannel, AjpStreamSourc
 
             AjpStreamSourceChannel existing;
             if(parseState.prefix == AjpRequestParser.) {
-                existing = this.existing;
+                existing = this.sourceChannel;
             } else {
                 existing = null;
             }
@@ -102,7 +108,15 @@ public class AjpChannel extends AbstractFramedChannel<AjpChannel, AjpStreamSourc
     }
 
     @Override
-    protected void handleBrokenChannel() {
+    protected void handleBrokenSourceChannel(Throwable e) {
+        IoUtils.safeClose(sourceChannel);
+    }
+
+    @Override
+    protected void handleBrokenSinkChannel(Throwable e) {
+        if(sinkChannel != null) {
+            sinkChannel.markBroken();
+        }
     }
 
     @Override
