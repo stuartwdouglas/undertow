@@ -255,7 +255,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
         final SecurityPathMatches securityPathMatches = buildSecurityConstraints();
         current = new AuthenticationCallHandler(current);
         if (!securityPathMatches.isEmpty()) {
-            current = new ServletAuthenticationConstraintHandler(current);
+            current = new ServletAuthenticationConstraintHandler(current, deploymentInfo.getAuthorizationManager(), deployment);
         }
         current = new ServletConfidentialityConstraintHandler(deploymentInfo.getConfidentialPortManager(), current);
         if (!securityPathMatches.isEmpty()) {

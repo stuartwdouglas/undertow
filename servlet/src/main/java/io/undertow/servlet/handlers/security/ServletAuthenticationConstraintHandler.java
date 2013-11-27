@@ -22,11 +22,13 @@ import java.util.List;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.security.handlers.AuthenticationConstraintHandler;
-import io.undertow.servlet.api.SecurityInfo.EmptyRoleSemantic;
+import io.undertow.servlet.api.AuthorizationManager;
+import io.undertow.servlet.api.Deployment;
+import io.undertow.servlet.api.SingleConstraintMatch;
 import io.undertow.servlet.handlers.ServletRequestContext;
 
 /**
- * A simple handler that just sets the auth type to REQUIRED after iterating each of the {@link SingleConstraintMatch} instances
+ * A simple handler that just sets the auth type to REQUIRED after iterating each of the {@link io.undertow.servlet.api.SingleConstraintMatch} instances
  * and identifying if any require authentication.
  *
  * @author Stuart Douglas
@@ -34,35 +36,22 @@ import io.undertow.servlet.handlers.ServletRequestContext;
  */
 public class ServletAuthenticationConstraintHandler extends AuthenticationConstraintHandler {
 
-    public ServletAuthenticationConstraintHandler(final HttpHandler next) {
+    private final AuthorizationManager authorizationManager;
+    private final Deployment deployment;
+
+
+    public ServletAuthenticationConstraintHandler(final HttpHandler next, AuthorizationManager authorizationManager, Deployment deployment) {
         super(next);
+        this.authorizationManager = authorizationManager;
+        this.deployment = deployment;
     }
 
     @Override
     protected boolean isAuthenticationRequired(final HttpServerExchange exchange) {
-        List<SingleConstraintMatch> constraints = exchange.getAttachment(ServletRequestContext.ATTACHMENT_KEY).getRequiredConstrains();
+        final ServletRequestContext servletRequestContext = exchange.getAttachment(ServletRequestContext.ATTACHMENT_KEY);
+        List<SingleConstraintMatch> constraints = servletRequestContext.getRequiredConstrains();
+        return authorizationManager.isAuthenticationRequired(constraints, servletRequestContext.getCurrentServlet().getManagedServlet().getServletInfo(), servletRequestContext.getOriginalRequest(), deployment);
 
-        /*
-         * Even once this is set to true the reason we allow the loop to continue is in case an empty role with a semantic of
-         * deny is found as that will override everything.
-         */
-        boolean authenticationRequired = false;
-        for (SingleConstraintMatch constraint : constraints) {
-            if (constraint.getRequiredRoles().isEmpty()) {
-                if (constraint.getEmptyRoleSemantic() == EmptyRoleSemantic.DENY) {
-                    /*
-                     * For this case we return false as we know it can never be satisfied.
-                     */
-                    return false;
-                } else if (constraint.getEmptyRoleSemantic() == EmptyRoleSemantic.AUTHENTICATE) {
-                    authenticationRequired = true;
-                }
-            } else {
-                authenticationRequired = true;
-            }
-        }
-
-        return authenticationRequired;
     }
 
 }
