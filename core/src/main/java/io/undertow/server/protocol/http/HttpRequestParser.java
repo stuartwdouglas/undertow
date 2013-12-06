@@ -21,6 +21,7 @@ package io.undertow.server.protocol.http;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -75,13 +76,21 @@ import static io.undertow.util.Headers.UPGRADE_STRING;
 import static io.undertow.util.Headers.USER_AGENT_STRING;
 import static io.undertow.util.Headers.VIA_STRING;
 import static io.undertow.util.Headers.WARNING_STRING;
+import static io.undertow.util.Methods.CONNECT;
 import static io.undertow.util.Methods.CONNECT_STRING;
+import static io.undertow.util.Methods.DELETE;
 import static io.undertow.util.Methods.DELETE_STRING;
+import static io.undertow.util.Methods.GET;
 import static io.undertow.util.Methods.GET_STRING;
+import static io.undertow.util.Methods.HEAD;
 import static io.undertow.util.Methods.HEAD_STRING;
+import static io.undertow.util.Methods.OPTIONS;
 import static io.undertow.util.Methods.OPTIONS_STRING;
+import static io.undertow.util.Methods.POST;
 import static io.undertow.util.Methods.POST_STRING;
+import static io.undertow.util.Methods.PUT;
 import static io.undertow.util.Methods.PUT_STRING;
+import static io.undertow.util.Methods.TRACE;
 import static io.undertow.util.Methods.TRACE_STRING;
 import static io.undertow.util.Protocols.HTTP_0_9_STRING;
 import static io.undertow.util.Protocols.HTTP_1_0_STRING;
@@ -97,7 +106,7 @@ import static io.undertow.util.Protocols.HTTP_1_1_STRING;
  *
  * @author Stuart Douglas
  */
-@HttpParserConfig(methods = {
+@HttpParserConfig(methods ={
         OPTIONS_STRING,
         GET_STRING,
         HEAD_STRING,
@@ -153,11 +162,24 @@ import static io.undertow.util.Protocols.HTTP_1_1_STRING;
         })
 public abstract class HttpRequestParser {
 
+
+    private static final HttpString[] METHODS = {
+            OPTIONS,
+            GET,
+            HEAD,
+            POST,
+            PUT,
+            DELETE,
+            TRACE,
+            CONNECT};
+
     private final int maxParameters;
     private final int maxHeaders;
     private final boolean allowEncodedSlash;
     private final boolean decode;
     private final String charset;
+
+    private final HttpMethodStateMachine methodParser;
 
     public HttpRequestParser(OptionMap options) {
         maxParameters = options.get(UndertowOptions.MAX_PARAMETERS, 1000);
@@ -165,6 +187,8 @@ public abstract class HttpRequestParser {
         allowEncodedSlash = options.get(UndertowOptions.ALLOW_ENCODED_SLASH, false);
         decode = options.get(UndertowOptions.DECODE_URL, true);
         charset = options.get(UndertowOptions.URL_CHARSET, "UTF-8");
+        methodParser = new HttpMethodStateMachine();
+        methodParser.generate(Arrays.asList(METHODS));
     }
 
     public static final HttpRequestParser instance(final OptionMap options) {
@@ -244,7 +268,9 @@ public abstract class HttpRequestParser {
     }
 
 
-    abstract void handleHttpVerb(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder);
+    private void handleHttpVerb(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder) {
+        methodParser.parse(buffer, currentState, builder);
+    }
 
     abstract void handleHttpVersion(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder);
 
