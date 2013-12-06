@@ -23,7 +23,7 @@ public abstract class AbstractParsingStateMachine {
 
     private volatile StateMachine stateMachine;
 
-    private static final int TERMINAL_STATE_MASK = 1 << 23;
+    private static final int TERMINAL_STATE_MASK = 1 << 22;
     private static final int INVERSE_TERMINAL_STATE_MASK = ~TERMINAL_STATE_MASK;
 
     public AbstractParsingStateMachine generate(final Collection<HttpString> strings) {
@@ -33,13 +33,15 @@ public abstract class AbstractParsingStateMachine {
         for (HttpString value : strings) {
             addStates(initial, value, allStates);
         }
-        for(State state : allStates) {
+        for (State state : allStates) {
             setupPrefixMatch(state);
         }
 
         int stateLength = 0;
         for (State state : allStates) {
-            stateLength = stateLength + 1 + state.next.size();
+            if (!state.invalid) {
+                stateLength = stateLength + 1 + state.next.size();
+            }
         }
 
         final int[] states = new int[stateLength];
@@ -66,12 +68,23 @@ public abstract class AbstractParsingStateMachine {
         }
         HttpString string = currentState.current;
         int pos = currentState.pos;
+        byte leftOver = currentState.leftOver;
 
         StateMachine stateMachine = this.stateMachine;
         int[] states = stateMachine.states;
 
         while (string == null && buffer.hasRemaining()) {
-            byte c = buffer.get();
+            byte c;
+            if (leftOver == 0) {
+                c = buffer.get();
+            } else {
+                c = leftOver;
+                leftOver = 0;
+                currentState.leftOver = 0;
+            }
+            if (pos == 0 && (c == ' ' || c == '\t' || c == '\r' || c == '\n')) {
+                continue; //skip leading whitespace
+            }
             pos++;
             int head = states[parseState];
             int length = head & 0xFF;
@@ -92,6 +105,7 @@ public abstract class AbstractParsingStateMachine {
                 HttpString soFar = stateMachine.terminalStates[head >> 8];
                 currentState.pos = -1;
                 currentState.stringBuilder.append(soFar.toString());
+                currentState.stringBuilder.append((char) c);
                 handleNoMatch(buffer, currentState, builder);
                 return;
             }
@@ -100,7 +114,7 @@ public abstract class AbstractParsingStateMachine {
             while (buffer.hasRemaining()) {
                 byte c = buffer.get();
                 if (isEnd(c)) {
-                    if (parseState == string.length()) {
+                    if (pos == string.length()) {
                         handleResult(string, currentState, builder);
                     } else {
                         handleResult(new HttpString(string.toString().substring(0, pos)), currentState, builder);
@@ -109,7 +123,7 @@ public abstract class AbstractParsingStateMachine {
                 }
                 if (string.length() == pos || c != string.byteAt(pos)) {
                     currentState.pos = -1;
-                    currentState.stringBuilder.append(string.toString().substring(0, parseState));
+                    currentState.stringBuilder.append(string.toString().substring(0, pos));
                     currentState.stringBuilder.append((char) c);
                     handleNoMatch(buffer, currentState, builder);
                     return;
@@ -126,7 +140,6 @@ public abstract class AbstractParsingStateMachine {
         while (buffer.hasRemaining()) {
             byte c = buffer.get();
             if (isEnd(c)) {
-                currentState.state++;
                 handleResult(new HttpString(stringBuilder.toString()), currentState, builder);
                 stringBuilder.setLength(0);
                 return;
@@ -144,7 +157,7 @@ public abstract class AbstractParsingStateMachine {
         int i = 0;
 
         for (State state : allStates) {
-            if(state.invalid) {
+            if (state.invalid) {
                 continue;
             }
             state.location = i;
@@ -156,14 +169,14 @@ public abstract class AbstractParsingStateMachine {
                 next.getValue().branchEnds.add(i);
                 int nextKey = next.getKey() & 0xFF;
                 if (next.getValue().terminalState != null) {
-                    int terminal = terminalStates.size();
-                    terminalStates.add(next.getValue().terminalState);
-
+                    int terminal = terminalStates.indexOf(next.getValue().terminalState);
+                    if (terminal == -1) {
+                        terminal = terminalStates.size();
+                        terminalStates.add(next.getValue().terminalState);
+                    }
                     nextKey |= (terminal | TERMINAL_STATE_MASK) << 8;
                 }
                 states[i++] = nextKey;
-
-
             }
         }
 
@@ -190,7 +203,7 @@ public abstract class AbstractParsingStateMachine {
                 state.prefixMatch = true;
                 s = state.next.values().iterator().next();
                 while (true) {
-                    if(s.next.isEmpty()) {
+                    if (s.next.isEmpty()) {
                         break;
                     }
                     s.invalid = true;
@@ -252,7 +265,7 @@ public abstract class AbstractParsingStateMachine {
         }
 
         void mark(final int[] states) {
-            if (next.isEmpty()) {
+            if (terminalState != null) {
                 return;
             }
             for (Integer br : branchEnds) {

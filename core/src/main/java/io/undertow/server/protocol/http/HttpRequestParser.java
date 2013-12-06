@@ -18,16 +18,8 @@
 
 package io.undertow.server.protocol.http;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-
 import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
-import io.undertow.annotationprocessor.HttpParserConfig;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
@@ -36,65 +28,64 @@ import io.undertow.util.Protocols;
 import io.undertow.util.URLUtils;
 import org.xnio.OptionMap;
 
-import static io.undertow.util.Headers.ACCEPT_CHARSET_STRING;
-import static io.undertow.util.Headers.ACCEPT_ENCODING_STRING;
-import static io.undertow.util.Headers.ACCEPT_LANGUAGE_STRING;
-import static io.undertow.util.Headers.ACCEPT_RANGES_STRING;
-import static io.undertow.util.Headers.ACCEPT_STRING;
-import static io.undertow.util.Headers.AUTHORIZATION_STRING;
-import static io.undertow.util.Headers.CACHE_CONTROL_STRING;
-import static io.undertow.util.Headers.CONNECTION_STRING;
-import static io.undertow.util.Headers.CONTENT_LENGTH_STRING;
-import static io.undertow.util.Headers.CONTENT_TYPE_STRING;
-import static io.undertow.util.Headers.COOKIE_STRING;
-import static io.undertow.util.Headers.EXPECT_STRING;
-import static io.undertow.util.Headers.FROM_STRING;
-import static io.undertow.util.Headers.HOST_STRING;
-import static io.undertow.util.Headers.IF_MATCH_STRING;
-import static io.undertow.util.Headers.IF_MODIFIED_SINCE_STRING;
-import static io.undertow.util.Headers.IF_NONE_MATCH_STRING;
-import static io.undertow.util.Headers.IF_RANGE_STRING;
-import static io.undertow.util.Headers.IF_UNMODIFIED_SINCE_STRING;
-import static io.undertow.util.Headers.MAX_FORWARDS_STRING;
-import static io.undertow.util.Headers.ORIGIN_STRING;
-import static io.undertow.util.Headers.PRAGMA_STRING;
-import static io.undertow.util.Headers.PROXY_AUTHORIZATION_STRING;
-import static io.undertow.util.Headers.RANGE_STRING;
-import static io.undertow.util.Headers.REFERER_STRING;
-import static io.undertow.util.Headers.REFRESH_STRING;
-import static io.undertow.util.Headers.SEC_WEB_SOCKET_KEY_STRING;
-import static io.undertow.util.Headers.SEC_WEB_SOCKET_VERSION_STRING;
-import static io.undertow.util.Headers.SERVER_STRING;
-import static io.undertow.util.Headers.SSL_CIPHER_STRING;
-import static io.undertow.util.Headers.SSL_CIPHER_USEKEYSIZE_STRING;
-import static io.undertow.util.Headers.SSL_CLIENT_CERT_STRING;
-import static io.undertow.util.Headers.SSL_SESSION_ID_STRING;
-import static io.undertow.util.Headers.STRICT_TRANSPORT_SECURITY_STRING;
-import static io.undertow.util.Headers.TRAILER_STRING;
-import static io.undertow.util.Headers.TRANSFER_ENCODING_STRING;
-import static io.undertow.util.Headers.UPGRADE_STRING;
-import static io.undertow.util.Headers.USER_AGENT_STRING;
-import static io.undertow.util.Headers.VIA_STRING;
-import static io.undertow.util.Headers.WARNING_STRING;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import static io.undertow.util.Headers.ACCEPT;
+import static io.undertow.util.Headers.ACCEPT_CHARSET;
+import static io.undertow.util.Headers.ACCEPT_ENCODING;
+import static io.undertow.util.Headers.ACCEPT_LANGUAGE;
+import static io.undertow.util.Headers.ACCEPT_RANGES;
+import static io.undertow.util.Headers.AUTHORIZATION;
+import static io.undertow.util.Headers.CACHE_CONTROL;
+import static io.undertow.util.Headers.CONNECTION;
+import static io.undertow.util.Headers.CONTENT_LENGTH;
+import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.Headers.COOKIE;
+import static io.undertow.util.Headers.EXPECT;
+import static io.undertow.util.Headers.FROM;
+import static io.undertow.util.Headers.HOST;
+import static io.undertow.util.Headers.IF_MATCH;
+import static io.undertow.util.Headers.IF_MODIFIED_SINCE;
+import static io.undertow.util.Headers.IF_NONE_MATCH;
+import static io.undertow.util.Headers.IF_RANGE;
+import static io.undertow.util.Headers.IF_UNMODIFIED_SINCE;
+import static io.undertow.util.Headers.MAX_FORWARDS;
+import static io.undertow.util.Headers.ORIGIN;
+import static io.undertow.util.Headers.PRAGMA;
+import static io.undertow.util.Headers.PROXY_AUTHORIZATION;
+import static io.undertow.util.Headers.RANGE;
+import static io.undertow.util.Headers.REFERER;
+import static io.undertow.util.Headers.REFRESH;
+import static io.undertow.util.Headers.SEC_WEB_SOCKET_KEY;
+import static io.undertow.util.Headers.SEC_WEB_SOCKET_VERSION;
+import static io.undertow.util.Headers.SERVER;
+import static io.undertow.util.Headers.SSL_CIPHER;
+import static io.undertow.util.Headers.SSL_CIPHER_USEKEYSIZE;
+import static io.undertow.util.Headers.SSL_CLIENT_CERT;
+import static io.undertow.util.Headers.SSL_SESSION_ID;
+import static io.undertow.util.Headers.STRICT_TRANSPORT_SECURITY;
+import static io.undertow.util.Headers.TRAILER;
+import static io.undertow.util.Headers.TRANSFER_ENCODING;
+import static io.undertow.util.Headers.UPGRADE;
+import static io.undertow.util.Headers.USER_AGENT;
+import static io.undertow.util.Headers.VIA;
+import static io.undertow.util.Headers.WARNING;
 import static io.undertow.util.Methods.CONNECT;
-import static io.undertow.util.Methods.CONNECT_STRING;
 import static io.undertow.util.Methods.DELETE;
-import static io.undertow.util.Methods.DELETE_STRING;
 import static io.undertow.util.Methods.GET;
-import static io.undertow.util.Methods.GET_STRING;
 import static io.undertow.util.Methods.HEAD;
-import static io.undertow.util.Methods.HEAD_STRING;
 import static io.undertow.util.Methods.OPTIONS;
-import static io.undertow.util.Methods.OPTIONS_STRING;
 import static io.undertow.util.Methods.POST;
-import static io.undertow.util.Methods.POST_STRING;
 import static io.undertow.util.Methods.PUT;
-import static io.undertow.util.Methods.PUT_STRING;
 import static io.undertow.util.Methods.TRACE;
-import static io.undertow.util.Methods.TRACE_STRING;
-import static io.undertow.util.Protocols.HTTP_0_9_STRING;
-import static io.undertow.util.Protocols.HTTP_1_0_STRING;
-import static io.undertow.util.Protocols.HTTP_1_1_STRING;
+import static io.undertow.util.Protocols.HTTP_0_9;
+import static io.undertow.util.Protocols.HTTP_1_0;
+import static io.undertow.util.Protocols.HTTP_1_1;
 
 /**
  * The basic HTTP parser. The actual parser is a sub class of this class that is generated as part of
@@ -106,61 +97,7 @@ import static io.undertow.util.Protocols.HTTP_1_1_STRING;
  *
  * @author Stuart Douglas
  */
-@HttpParserConfig(methods ={
-        OPTIONS_STRING,
-        GET_STRING,
-        HEAD_STRING,
-        POST_STRING,
-        PUT_STRING,
-        DELETE_STRING,
-        TRACE_STRING,
-        CONNECT_STRING},
-        protocols = {
-                HTTP_0_9_STRING, HTTP_1_0_STRING, HTTP_1_1_STRING
-        },
-        headers = {
-                ACCEPT_STRING,
-                ACCEPT_CHARSET_STRING,
-                ACCEPT_ENCODING_STRING,
-                ACCEPT_LANGUAGE_STRING,
-                ACCEPT_RANGES_STRING,
-                AUTHORIZATION_STRING,
-                CACHE_CONTROL_STRING,
-                COOKIE_STRING,
-                CONNECTION_STRING,
-                CONTENT_LENGTH_STRING,
-                CONTENT_TYPE_STRING,
-                EXPECT_STRING,
-                FROM_STRING,
-                HOST_STRING,
-                IF_MATCH_STRING,
-                IF_MODIFIED_SINCE_STRING,
-                IF_NONE_MATCH_STRING,
-                IF_RANGE_STRING,
-                IF_UNMODIFIED_SINCE_STRING,
-                MAX_FORWARDS_STRING,
-                ORIGIN_STRING,
-                PRAGMA_STRING,
-                PROXY_AUTHORIZATION_STRING,
-                RANGE_STRING,
-                REFERER_STRING,
-                REFRESH_STRING,
-                SEC_WEB_SOCKET_KEY_STRING,
-                SEC_WEB_SOCKET_VERSION_STRING,
-                SERVER_STRING,
-                SSL_CLIENT_CERT_STRING,
-                SSL_CIPHER_STRING,
-                SSL_SESSION_ID_STRING,
-                SSL_CIPHER_USEKEYSIZE_STRING,
-                STRICT_TRANSPORT_SECURITY_STRING,
-                TRAILER_STRING,
-                TRANSFER_ENCODING_STRING,
-                UPGRADE_STRING,
-                USER_AGENT_STRING,
-                VIA_STRING,
-                WARNING_STRING
-        })
-public abstract class HttpRequestParser {
+public class HttpRequestParser {
 
 
     private static final HttpString[] METHODS = {
@@ -173,6 +110,54 @@ public abstract class HttpRequestParser {
             TRACE,
             CONNECT};
 
+    private static final HttpString[] VERSIONS = {
+            HTTP_0_9, HTTP_1_0, HTTP_1_1
+    };
+    
+    private static final HttpString[] HEADERS = {
+            ACCEPT,
+            ACCEPT_CHARSET,
+            ACCEPT_ENCODING,
+            ACCEPT_LANGUAGE,
+            ACCEPT_RANGES,
+            AUTHORIZATION,
+            CACHE_CONTROL,
+            COOKIE,
+            CONNECTION,
+            CONTENT_LENGTH,
+            CONTENT_TYPE,
+            EXPECT,
+            FROM,
+            HOST,
+            IF_MATCH,
+            IF_MODIFIED_SINCE,
+            IF_NONE_MATCH,
+            IF_RANGE,
+            IF_UNMODIFIED_SINCE,
+            MAX_FORWARDS,
+            ORIGIN,
+            PRAGMA,
+            PROXY_AUTHORIZATION,
+            RANGE,
+            REFERER,
+            REFRESH,
+            SEC_WEB_SOCKET_KEY,
+            SEC_WEB_SOCKET_VERSION,
+            SERVER,
+            SSL_CLIENT_CERT,
+            SSL_CIPHER,
+            SSL_SESSION_ID,
+            SSL_CIPHER_USEKEYSIZE,
+            STRICT_TRANSPORT_SECURITY,
+            TRAILER,
+            TRANSFER_ENCODING,
+            UPGRADE,
+            USER_AGENT,
+            VIA,
+            WARNING   
+            
+    };
+
     private final int maxParameters;
     private final int maxHeaders;
     private final boolean allowEncodedSlash;
@@ -180,6 +165,8 @@ public abstract class HttpRequestParser {
     private final String charset;
 
     private final HttpMethodStateMachine methodParser;
+    private final HttpVersionStateMachine versionParser;
+    private final HttpHeaderStateMachine headerStateMachine;
 
     public HttpRequestParser(OptionMap options) {
         maxParameters = options.get(UndertowOptions.MAX_PARAMETERS, 1000);
@@ -189,6 +176,10 @@ public abstract class HttpRequestParser {
         charset = options.get(UndertowOptions.URL_CHARSET, "UTF-8");
         methodParser = new HttpMethodStateMachine();
         methodParser.generate(Arrays.asList(METHODS));
+        versionParser = new HttpVersionStateMachine();
+        versionParser.generate(Arrays.asList(VERSIONS));
+        headerStateMachine = new HttpHeaderStateMachine();
+        headerStateMachine.generate(Arrays.asList(HEADERS));
     }
 
     public static final HttpRequestParser instance(final OptionMap options) {
@@ -272,9 +263,13 @@ public abstract class HttpRequestParser {
         methodParser.parse(buffer, currentState, builder);
     }
 
-    abstract void handleHttpVersion(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder);
+   private void handleHttpVersion(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder) {
+       versionParser.parse(buffer, currentState, builder);
+   }
 
-    abstract void handleHeader(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder);
+    private void handleHeader(ByteBuffer buffer, final ParseState currentState, final HttpServerExchange builder) {
+        headerStateMachine.parse(buffer, currentState, builder);
+    }
 
     /**
      * The parse states for parsing the path.

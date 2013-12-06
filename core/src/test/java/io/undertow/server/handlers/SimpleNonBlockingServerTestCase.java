@@ -45,8 +45,8 @@ public class SimpleNonBlockingServerTestCase {
     }
 
     @Test
-    public void sendHttpRequest() throws IOException {
-        
+    public void sendHttpRequest() throws IOException, InterruptedException {
+        Thread.sleep(10000000);
         TestHttpClient client = new TestHttpClient();
         try {
             HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/path");
