@@ -8,15 +8,14 @@ import io.undertow.util.HttpString;
  */
 public class HttpVersionStateMachine extends AbstractParsingStateMachine {
 
+    public HttpVersionStateMachine() {
+        super('\n', '\r');
+    }
+
     @Override
     protected void handleResult(HttpString httpString, ParseState currentState, HttpServerExchange builder) {
         builder.setProtocol(httpString);
         currentState.state++;
         currentState.parseState = 0;
-    }
-
-    @Override
-    protected boolean isEnd(byte c) {
-        return c == '\n' || c == '\r';
     }
 }

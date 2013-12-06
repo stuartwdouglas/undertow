@@ -101,20 +101,21 @@ public class HttpRequestParser {
 
 
     private static final HttpString[] METHODS = {
-            OPTIONS,
             GET,
-            HEAD,
             POST,
+            HEAD,
             PUT,
             DELETE,
             TRACE,
-            CONNECT};
+            CONNECT,
+            OPTIONS,};
 
     private static final HttpString[] VERSIONS = {
-            HTTP_0_9, HTTP_1_0, HTTP_1_1
+            HTTP_1_1, HTTP_0_9, HTTP_1_0
     };
     
     private static final HttpString[] HEADERS = {
+            HOST,
             ACCEPT,
             ACCEPT_CHARSET,
             ACCEPT_ENCODING,
@@ -128,7 +129,6 @@ public class HttpRequestParser {
             CONTENT_TYPE,
             EXPECT,
             FROM,
-            HOST,
             IF_MATCH,
             IF_MODIFIED_SINCE,
             IF_NONE_MATCH,

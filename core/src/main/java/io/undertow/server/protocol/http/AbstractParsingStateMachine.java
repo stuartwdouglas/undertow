@@ -8,9 +8,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -25,6 +27,14 @@ public abstract class AbstractParsingStateMachine {
 
     private static final int TERMINAL_STATE_MASK = 1 << 22;
     private static final int INVERSE_TERMINAL_STATE_MASK = ~TERMINAL_STATE_MASK;
+
+    private final char endChar1;
+    private final char endChar2;
+
+    protected AbstractParsingStateMachine(char endChar1, char endChar2) {
+        this.endChar1 = endChar1;
+        this.endChar2 = endChar2;
+    }
 
     public AbstractParsingStateMachine generate(final Collection<HttpString> strings) {
         final List<State> allStates = new ArrayList<State>();
@@ -113,7 +123,7 @@ public abstract class AbstractParsingStateMachine {
         if (string != null) {
             while (buffer.hasRemaining()) {
                 byte c = buffer.get();
-                if (isEnd(c)) {
+                if (c == endChar1 || c == endChar2) {
                     if (pos == string.length()) {
                         handleResult(string, currentState, builder);
                     } else {
@@ -139,7 +149,7 @@ public abstract class AbstractParsingStateMachine {
         StringBuilder stringBuilder = currentState.stringBuilder;
         while (buffer.hasRemaining()) {
             byte c = buffer.get();
-            if (isEnd(c)) {
+            if (c == endChar1 || c == endChar2) {
                 handleResult(new HttpString(stringBuilder.toString()), currentState, builder);
                 stringBuilder.setLength(0);
                 return;
@@ -150,8 +160,6 @@ public abstract class AbstractParsingStateMachine {
     }
 
     protected abstract void handleResult(HttpString httpString, ParseState currentState, HttpServerExchange builder);
-
-    protected abstract boolean isEnd(byte c);
 
     private void generateStateList(List<State> allStates, int[] states, List<HttpString> terminalStates) {
         int i = 0;
@@ -255,7 +263,7 @@ public abstract class AbstractParsingStateMachine {
         boolean invalid;
         final byte value;
         final HttpString soFar;
-        final Map<Byte, State> next = new HashMap<Byte, State>();
+        final Map<Byte, State> next = new LinkedHashMap<Byte, State>();
         private final Set<Integer> branchEnds = new HashSet<Integer>();
         private int location;
 
