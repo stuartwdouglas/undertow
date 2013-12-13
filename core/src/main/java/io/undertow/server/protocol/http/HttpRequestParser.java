@@ -271,6 +271,7 @@ public abstract class HttpRequestParser {
     final void handlePath(ByteBuffer buffer, ParseState state, HttpServerExchange exchange) {
         StringBuilder stringBuilder = state.stringBuilder;
         int parseState = state.parseState;
+        int hashCode = state.hashCode;
         int canonicalPathStart = state.pos;
         boolean urlDecodeRequired = state.urlDecodeRequired;
 
@@ -278,7 +279,7 @@ public abstract class HttpRequestParser {
             char next = (char) buffer.get();
             if (next == ' ' || next == '\t') {
                 if (stringBuilder.length() != 0) {
-                    final String path = stringBuilder.toString();
+                    final String path = state.stringCache.toString(stringBuilder, hashCode);
                     if (parseState < HOST_DONE) {
                         String decodedPath = decode(path, urlDecodeRequired, state, allowEncodedSlash);
                         exchange.setRequestPath(decodedPath);
@@ -295,13 +296,14 @@ public abstract class HttpRequestParser {
                     state.stringBuilder.setLength(0);
                     state.parseState = 0;
                     state.pos = 0;
+                    state.hashCode = ParseState.HASH_CODE_START;
                     state.urlDecodeRequired = false;
                     return;
                 }
             } else if (next == '\r' || next == '\n') {
                 throw UndertowMessages.MESSAGES.failedToParsePath();
             } else if (next == '?' && (parseState == START || parseState == HOST_DONE)) {
-                final String path = stringBuilder.toString();
+                final String path = state.stringCache.toString(stringBuilder, hashCode);
                 if (parseState < HOST_DONE) {
                     String decodedPath = decode(path, urlDecodeRequired, state, allowEncodedSlash);
                     exchange.setRequestPath(decodedPath);
@@ -317,11 +319,12 @@ public abstract class HttpRequestParser {
                 state.stringBuilder.setLength(0);
                 state.parseState = 0;
                 state.pos = 0;
+                state.hashCode = ParseState.HASH_CODE_START;
                 state.urlDecodeRequired = false;
                 handleQueryParameters(buffer, state, exchange);
                 return;
             } else if (next == ';' && (parseState == START || parseState == HOST_DONE)) {
-                final String path = stringBuilder.toString();
+                final String path = state.stringCache.toString(stringBuilder, hashCode);
                 if (parseState < HOST_DONE) {
                     String decodedPath = decode(path, urlDecodeRequired, state, allowEncodedSlash);
                     exchange.setRequestPath(decodedPath);
@@ -335,6 +338,7 @@ public abstract class HttpRequestParser {
                 }
                 state.state = ParseState.PATH_PARAMETERS;
                 state.stringBuilder.setLength(0);
+                state.hashCode = ParseState.HASH_CODE_START;
                 state.parseState = 0;
                 state.pos = 0;
                 state.urlDecodeRequired = false;
@@ -357,6 +361,7 @@ public abstract class HttpRequestParser {
                     parseState = START;
                 }
                 stringBuilder.append(next);
+                hashCode = (hashCode << 4) + hashCode + next;
             }
 
         }
@@ -549,7 +554,7 @@ public abstract class HttpRequestParser {
     @SuppressWarnings("unused")
     final void handleHeaderValue(ByteBuffer buffer, ParseState state, HttpServerExchange builder) {
         StringBuilder stringBuilder = state.stringBuilder;
-
+        int hashCode = state.hashCode;
         int parseState = state.parseState;
         while (buffer.hasRemaining() && parseState == NORMAL) {
             final byte next = buffer.get();
@@ -561,6 +566,7 @@ public abstract class HttpRequestParser {
                 parseState = WHITESPACE;
             } else {
                 stringBuilder.append((char) next);
+                hashCode = (hashCode << 4) + hashCode + next;
             }
         }
 
@@ -576,6 +582,7 @@ public abstract class HttpRequestParser {
                         parseState = WHITESPACE;
                     } else {
                         stringBuilder.append((char) next);
+                        hashCode = (hashCode << 4) + hashCode + next;
                     }
                     break;
                 }
@@ -590,6 +597,7 @@ public abstract class HttpRequestParser {
                             stringBuilder.append(' ');
                         }
                         stringBuilder.append((char) next);
+                        hashCode = (hashCode << 4) + hashCode + next;
                         parseState = NORMAL;
                     }
                     break;
@@ -605,7 +613,7 @@ public abstract class HttpRequestParser {
                     } else {
                         //we have a header
                         HttpString nextStandardHeader = state.nextHeader;
-                        String headerValue = stringBuilder.toString();
+                        String headerValue = state.stringCache.toString(stringBuilder, hashCode);
 
 
                         if (state.mapCount++ > maxHeaders) {
@@ -618,6 +626,7 @@ public abstract class HttpRequestParser {
 
                         state.leftOver = next;
                         state.stringBuilder.setLength(0);
+                        state.hashCode = ParseState.HASH_CODE_START;
                         if (next == '\r') {
                             parseState = AWAIT_DATA_END;
                         } else {
@@ -636,7 +645,7 @@ public abstract class HttpRequestParser {
         }
         //we only write to the state if we did not finish parsing
         state.parseState = parseState;
-        return;
+        state.hashCode = hashCode;
     }
 
     protected void handleAfterVersion(ByteBuffer buffer, ParseState state, HttpServerExchange builder) {

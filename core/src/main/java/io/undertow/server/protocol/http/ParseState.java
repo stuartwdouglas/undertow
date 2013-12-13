@@ -19,6 +19,7 @@
 package io.undertow.server.protocol.http;
 
 import io.undertow.util.HttpString;
+import io.undertow.util.StringCache;
 
 /**
  * The current state of the tokenizer state machine. This class is mutable and not thread safe.
@@ -46,6 +47,7 @@ class ParseState {
     public static final int HEADER = 6;
     public static final int HEADER_VALUE = 7;
     public static final int PARSE_COMPLETE = 8;
+    public static final int HASH_CODE_START = 17;
 
     /**
      * The actual state of request parsing
@@ -81,6 +83,8 @@ class ParseState {
      */
     final StringBuilder stringBuilder = new StringBuilder();
 
+    final StringCache stringCache = new StringCache();
+
     /**
      * This has different meanings depending on the current state.
      *
@@ -101,6 +105,8 @@ class ParseState {
     String nextQueryParam;
 
     int mapCount;
+
+    int hashCode = 17;
 
     final StringBuilder decodeBuffer = new StringBuilder();
 
@@ -129,5 +135,6 @@ class ParseState {
         this.nextHeader = null;
         this.nextQueryParam = null;
         this.mapCount = 0;
+        this.hashCode = HASH_CODE_START;
     }
 }
