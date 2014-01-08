@@ -18,6 +18,7 @@
 
 package io.undertow.server.protocol.http;
 
+import io.undertow.util.HeaderPair;
 import io.undertow.util.HttpString;
 
 import java.util.HashMap;
@@ -110,7 +111,7 @@ class ParseState {
      * In general browsers will often send the same header with every request. This cache allows us to re-use the resulting
      * strings.
      */
-    final HashMap<HttpString, String> headerValuesCache = new HashMap<HttpString, String>();
+    final HashMap<HttpString, HeaderPair> headerValuesCache = new HashMap<HttpString, HeaderPair>();
 
     public ParseState() {
         this.parseState = 0;

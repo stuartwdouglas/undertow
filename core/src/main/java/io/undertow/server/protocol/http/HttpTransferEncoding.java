@@ -29,6 +29,7 @@ import io.undertow.conduits.HeadStreamSinkConduit;
 import io.undertow.server.Connectors;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
+import io.undertow.util.HeaderPair;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
@@ -48,6 +49,10 @@ import org.xnio.conduits.StreamSourceConduit;
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public class HttpTransferEncoding {
+
+    private static final HeaderPair CONNECTION_KEEP_ALIVE = new HeaderPair(Headers.CONNECTION, Headers.KEEP_ALIVE.toString());
+    private static final HeaderPair CONNECTION_CLOSE = new HeaderPair(Headers.CONNECTION, Headers.CLOSE.toString());
+    private static final HeaderPair TRANSFER_ENCODING_CHUNKED = new HeaderPair(Headers.TRANSFER_ENCODING, Headers.CHUNKED.toString());
 
     private static final Logger log = Logger.getLogger("io.undertow.server.handler.transfer-encoding");
 
@@ -217,13 +222,13 @@ public class HttpTransferEncoding {
         // test to see if we're still persistent
         String connection = responseHeaders.getFirst(Headers.CONNECTION);
         if (!exchange.isPersistent()) {
-            responseHeaders.put(Headers.CONNECTION, Headers.CLOSE.toString());
+            responseHeaders.put(CONNECTION_CLOSE);
         } else if (exchange.isPersistent() && connection != null) {
             if (HttpString.tryFromString(connection).equals(Headers.CLOSE)) {
                 exchange.setPersistent(false);
             }
         } else if (exchange.getConnection().getUndertowOptions().get(UndertowOptions.ALWAYS_SET_KEEP_ALIVE, true)) {
-            responseHeaders.put(Headers.CONNECTION, Headers.KEEP_ALIVE.toString());
+            responseHeaders.put(CONNECTION_KEEP_ALIVE);
         }
         final String contentLengthHeader = responseHeaders.getFirst(Headers.CONTENT_LENGTH);
         if (contentLengthHeader != null) {
@@ -258,7 +263,7 @@ public class HttpTransferEncoding {
         if (transferEncodingHeader == null) {
             if (exchange.isHttp11()) {
                 if (exchange.isPersistent()) {
-                    responseHeaders.put(Headers.TRANSFER_ENCODING, Headers.CHUNKED.toString());
+                    responseHeaders.put(TRANSFER_ENCODING_CHUNKED);
 
                     if (headRequest) {
                         return channel;

@@ -37,11 +37,20 @@ public final class HeaderValues extends AbstractCollection<String> implements De
 
     private static final String[] NO_STRINGS = new String[0];
     final HttpString key;
+    final boolean immutable;
     byte head, size;
     Object value;
 
     HeaderValues(final HttpString key) {
         this.key = key;
+        this.immutable = false;
+    }
+
+    HeaderValues(final HttpString key, String value, boolean immutable) {
+        this.key = key;
+        this.value = value;
+        this.size = 1;
+        this.immutable = immutable;
     }
 
     public HttpString getHeaderName() {
@@ -178,6 +187,7 @@ public final class HeaderValues extends AbstractCollection<String> implements De
             }
 
             public void set(final String headerValue) {
+
                 if (returned == -1) {
                     throw new IllegalStateException();
                 }
@@ -669,5 +679,19 @@ public final class HeaderValues extends AbstractCollection<String> implements De
 
     public boolean addAll(final Collection<? extends String> c) {
         return addAll(0, c);
+    }
+
+    HeaderValues copy() {
+        HeaderValues ret = new HeaderValues(key);
+        ret.size = size;
+        ret.head = head;
+        if(value instanceof String[]) {
+            int length = ((String[]) value).length;
+            ret.value = new String[length];
+            System.arraycopy(value, 0, ret.value, 0, length);
+        } else {
+            ret.value = value;
+        }
+        return ret;
     }
 }

@@ -35,6 +35,7 @@ import io.undertow.util.AttachmentKey;
 import io.undertow.util.ConduitFactory;
 import io.undertow.util.Cookies;
 import io.undertow.util.HeaderMap;
+import io.undertow.util.HeaderPair;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.NetworkUtils;
@@ -85,6 +86,8 @@ import static org.xnio.Bits.intBitMask;
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public final class HttpServerExchange extends AbstractAttachable {
+
+    private static final HeaderPair ZERO_CONTENT_LENGTH = new HeaderPair(Headers.CONTENT_LENGTH, "0");
 
     // immutable state
 
@@ -1425,7 +1428,7 @@ public final class HttpServerExchange extends AbstractAttachable {
     private void closeAndFlushResponse() {
         try {
             if (isResponseChannelAvailable()) {
-                getResponseHeaders().put(Headers.CONTENT_LENGTH, "0");
+                getResponseHeaders().put(ZERO_CONTENT_LENGTH);
                 getResponseChannel();
             }
             responseChannel.shutdownWrites();

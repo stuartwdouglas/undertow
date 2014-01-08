@@ -239,6 +239,10 @@ public final class HeaderMap implements Iterable<HeaderValues> {
                 table[idx] = row;
                 return row[1];
             }
+            if(headerValues.immutable) {
+                headerValues = headerValues.copy();
+                table[idx] = headerValues;
+            }
             return headerValues;
         } else {
             final HeaderValues[] row = (HeaderValues[]) o;
@@ -246,7 +250,13 @@ public final class HeaderMap implements Iterable<HeaderValues> {
             for (int i = 0; i < row.length; i++) {
                 headerValues = row[i];
                 if (headerValues != null) {
-                    if (headerName.equals(headerValues.key)) { return headerValues; }
+                    if (headerName.equals(headerValues.key)) {
+                        if(headerValues.immutable) {
+                            headerValues = headerValues.copy();
+                            row[i] = headerValues;
+                        }
+                        return headerValues;
+                    }
                 } else if (empty == -1) {
                     empty = i;
                 }
@@ -680,6 +690,148 @@ public final class HeaderMap implements Iterable<HeaderValues> {
     public HeaderMap add(HttpString headerName, String headerValue) {
         addLast(headerName, headerValue);
         return this;
+    }
+
+    public HeaderMap add(HeaderPair pair) {
+        HttpString headerName = pair.getName();
+        final int hc = headerName.hashCode();
+        final Object[] table = this.table;
+        final int length = table.length;
+        final int idx = hc & (length - 1);
+        final Object o = table[idx];
+        if (o == null) {
+            if (size >= length >> 1) {
+                resize();
+                add(pair);
+                return this;
+            }
+            table[idx] = pair.getHeaderValues();
+            size++;
+        } else {
+            addNonEmpty(pair, table, length, idx, o);
+        }
+        return this;
+    }
+
+    private void addNonEmpty(HeaderPair pair, Object[] table, int length, int idx, Object o) {
+        HttpString headerName = pair.getName();
+        if (o instanceof HeaderValues) {
+            HeaderValues headerValues = (HeaderValues) o;
+            if (! headerName.equals(headerValues.key)) {
+                if (size >= length >> 1) {
+                    resize();
+                    add(pair);
+                }
+                size++;
+                final HeaderValues[] row = { headerValues, pair.getHeaderValues(), null, null };
+                table[idx] = row;
+                        return;
+            } else {
+                add(pair.getName(), pair.getValue());
+                        return;
+            }
+        } else {
+            final HeaderValues[] row = (HeaderValues[]) o;
+            int empty = -1;
+            for (int i = 0; i < row.length; i++) {
+                HeaderValues headerValues = row[i];
+                if (headerValues != null) {
+                    if (headerName.equals(headerValues.key)) {
+                        add(pair.getName(), pair.getValue());
+                        return;
+                    }
+                } else if (empty == -1) {
+                    empty = i;
+                }
+            }
+            if (size >= length >> 1) {
+                resize();
+                add(pair);
+                return;
+            }
+            size++;
+            if (empty != -1) {
+                row[empty] = pair.getHeaderValues();
+            } else {
+                if (row.length >= 16) {
+                    throw new SecurityException("Excessive collisions");
+                }
+                final HeaderValues[] newRow = Arrays.copyOf(row, row.length + 3);
+                newRow[row.length] = pair.getHeaderValues();
+                table[idx] = newRow;
+            }
+        }
+    }
+
+    public HeaderMap put(HeaderPair pair) {
+        HttpString headerName = pair.getName();
+        final int hc = headerName.hashCode();
+        final Object[] table = this.table;
+        final int length = table.length;
+        final int idx = hc & (length - 1);
+        final Object o = table[idx];
+        if (o == null) {
+            if (size >= length >> 1) {
+                resize();
+                add(pair);
+                return this;
+            }
+            table[idx] = pair.getHeaderValues();
+            size++;
+        } else {
+            putNonEmpty(pair, table, length, idx, o);
+        }
+        return this;
+    }
+
+    private void putNonEmpty(HeaderPair pair, Object[] table, int length, int idx, Object o) {
+        HttpString headerName = pair.getName();
+        if (o instanceof HeaderValues) {
+            HeaderValues headerValues = (HeaderValues) o;
+            if (! headerName.equals(headerValues.key)) {
+                if (size >= length >> 1) {
+                    resize();
+                    put(pair);
+                }
+                size++;
+                final HeaderValues[] row = { headerValues, pair.getHeaderValues(), null, null };
+                table[idx] = row;
+                return;
+            } else {
+                put(pair.getName(), pair.getValue());
+                return;
+            }
+        } else {
+            final HeaderValues[] row = (HeaderValues[]) o;
+            int empty = -1;
+            for (int i = 0; i < row.length; i++) {
+                HeaderValues headerValues = row[i];
+                if (headerValues != null) {
+                    if (headerName.equals(headerValues.key)) {
+                        put(pair.getName(), pair.getValue());
+                        return;
+                    }
+                } else if (empty == -1) {
+                    empty = i;
+                }
+            }
+            if (size >= length >> 1) {
+                resize();
+                put(pair);
+                return;
+            }
+            size++;
+            if (empty != -1) {
+                row[empty] = pair.getHeaderValues();
+            } else {
+                if (row.length >= 16) {
+                    throw new SecurityException("Excessive collisions");
+                }
+                final HeaderValues[] newRow = Arrays.copyOf(row, row.length + 3);
+                newRow[row.length] = pair.getHeaderValues();
+                table[idx] = newRow;
+            }
+        }
     }
 
     public HeaderMap addFirst(final HttpString headerName, final String headerValue) {

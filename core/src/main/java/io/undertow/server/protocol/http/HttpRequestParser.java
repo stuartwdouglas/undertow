@@ -29,6 +29,7 @@ import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.annotationprocessor.HttpParserConfig;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HeaderPair;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
@@ -627,9 +628,9 @@ public abstract class HttpRequestParser {
     final void handleHeaderValue(ByteBuffer buffer, ParseState state, HttpServerExchange builder) {
         HttpString headerName = state.nextHeader;
         StringBuilder stringBuilder = state.stringBuilder;
-        HashMap<HttpString, String> headerValuesCache = state.headerValuesCache;
+        HashMap<HttpString,HeaderPair> headerValuesCache = state.headerValuesCache;
         if (stringBuilder.length() == 0) {
-            String existing = headerValuesCache.get(headerName);
+            HeaderPair existing = headerValuesCache.get(headerName);
             if (existing != null) {
                 if (handleCachedHeader(existing, buffer, state, builder)) {
                     return;
@@ -640,7 +641,7 @@ public abstract class HttpRequestParser {
         handleHeaderValueCacheMiss(buffer, state, builder, headerName, headerValuesCache, stringBuilder);
     }
 
-    private void handleHeaderValueCacheMiss(ByteBuffer buffer, ParseState state, HttpServerExchange builder, HttpString headerName, HashMap<HttpString, String> headerValuesCache, StringBuilder stringBuilder) {
+    private void handleHeaderValueCacheMiss(ByteBuffer buffer, ParseState state, HttpServerExchange builder, HttpString headerName, HashMap<HttpString, HeaderPair> headerValuesCache, StringBuilder stringBuilder) {
 
         int parseState = state.parseState;
         while (buffer.hasRemaining() && parseState == NORMAL) {
@@ -703,11 +704,13 @@ public abstract class HttpRequestParser {
                             throw UndertowMessages.MESSAGES.tooManyHeaders(maxHeaders);
                         }
                         //TODO: we need to decode this according to RFC-2047 if we have seen a =? symbol
-                        builder.getRequestHeaders().add(headerName, headerValue);
+
+                        HeaderPair hv = new HeaderPair(headerName, headerValue);
+                        builder.getRequestHeaders().add(hv);
                         if(headerValuesCache.size() < maxHeaders) {
                             //we have a limit on how many we can cache
                             //to prevent memory filling and hash collision attacks
-                            headerValuesCache.put(headerName, headerValue);
+                            headerValuesCache.put(headerName, hv);
                         }
 
                         state.nextHeader = null;
@@ -734,7 +737,8 @@ public abstract class HttpRequestParser {
         state.parseState = parseState;
     }
 
-    protected boolean handleCachedHeader(String existing, ByteBuffer buffer, ParseState state, HttpServerExchange builder) {
+    protected boolean handleCachedHeader(HeaderPair hv, ByteBuffer buffer, ParseState state, HttpServerExchange builder) {
+        String existing = hv.getValue();
         if (existing.length() + 3 > buffer.remaining()) {
             return false;
         }
@@ -766,7 +770,7 @@ public abstract class HttpRequestParser {
             throw UndertowMessages.MESSAGES.tooManyHeaders(maxHeaders);
         }
         //TODO: we need to decode this according to RFC-2047 if we have seen a =? symbol
-        builder.getRequestHeaders().add(state.nextHeader, existing);
+        builder.getRequestHeaders().add(hv);
 
         state.nextHeader = null;
 
