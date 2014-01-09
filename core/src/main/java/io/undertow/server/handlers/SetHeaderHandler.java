@@ -20,6 +20,7 @@ package io.undertow.server.handlers;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HeaderPair;
 import io.undertow.util.HttpString;
 
 /**
@@ -27,25 +28,22 @@ import io.undertow.util.HttpString;
  */
 public class SetHeaderHandler implements HttpHandler {
 
-    private final HttpString header;
-    private final String value;
+    private final HeaderPair header;
 
     private volatile HttpHandler next = ResponseCodeHandler.HANDLE_404;
 
     public SetHeaderHandler(final String header, final String value) {
-        this.header = new HttpString(header);
-        this.value = value;
+        this.header = new HeaderPair(new HttpString(header), value);
     }
 
     public SetHeaderHandler(final HttpHandler next, final String header, final String value) {
         this.next = next;
-        this.value = value;
-        this.header = new HttpString(header);
+        this.header = new HeaderPair(new HttpString(header), value);
     }
 
     @Override
     public void handleRequest(final HttpServerExchange exchange) throws Exception {
-        exchange.getResponseHeaders().put(header, value);
+        exchange.getResponseHeaders().put(header);
         next.handleRequest(exchange);
     }
 }
