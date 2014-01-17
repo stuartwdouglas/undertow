@@ -12,6 +12,7 @@ import io.undertow.proxy.container.NodeService;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.Cookie;
+import io.undertow.util.AttachmentKey;
 import io.undertow.util.HttpString;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ import org.xnio.channels.StreamSinkChannel;
 public class ProxyHandler implements HttpHandler {
 
     private NodeService nodeservice = null;
+    public static final AttachmentKey<Node> NODE = AttachmentKey.create(Node.class);
 
     /* Initialise the node provider to the xml one if there was none set before */
     public void init() throws Exception {
@@ -64,9 +66,10 @@ public class ProxyHandler implements HttpHandler {
                 return;
             } else {
                 /* TODO that is a bit hacky */
-                System.out.println("WORKER: " + getWorker());
+                System.out.println("WORKER: " + getWorker() + " : " + node);
                 HttpClient client = HttpClient.create(getWorker(), options);
                 SocketAddress addr = new InetSocketAddress(node.getHostname(), node.getPort());
+                exchange.putAttachment(NODE, node);
                 HttpClientCallback<HttpClientConnection> connectioncallback = createConnectionCallback(exchange);
                 client.connect(addr, OptionMap.EMPTY, connectioncallback);
                 return;
@@ -95,7 +98,8 @@ public class ProxyHandler implements HttpHandler {
 
             @Override
             public void completed(HttpClientConnection connection) {
-                System.out.println("ConnectionCallback done");
+                System.out.println("ConnectionCallback done on " + exchange.getAttachment(NODE));
+                // TODO add the connection to the node connections.
                 HttpClientRequest request = null;
                 try {
                     request = connection.createRequest(exchange.getRequestMethod().toString(), new URI(exchange.getRequestURI()));
