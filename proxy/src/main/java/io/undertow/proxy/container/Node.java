@@ -10,11 +10,7 @@
  */
 package io.undertow.proxy.container;
 
-import io.undertow.client.HttpClientConnection;
-
 import java.io.Serializable;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -111,11 +107,6 @@ public class Node implements Serializable {
      * Load factor received via the STATUS messages
      */
     private int load;
-
-    /*
-     * Client connections used by the node
-     */
-    Deque<HttpClientConnection> connections = new ArrayDeque<HttpClientConnection>();
 
     /**
      * Create a new instance of {@code Node}

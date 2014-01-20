@@ -35,6 +35,8 @@ import io.undertow.proxy.mcmp.Constants;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.form.FormData;
+import io.undertow.server.handlers.proxy.LoadBalancingProxyClient;
+import io.undertow.server.handlers.proxy.ProxyHandler;
 import io.undertow.util.HttpString;
 
 public class MCMPHandler implements HttpHandler {
@@ -45,11 +47,18 @@ public class MCMPHandler implements HttpHandler {
 
     private MCMConfig conf = null;
 
+    private final HttpHandler next;
+    private final LoadBalancingProxyClient loadBalancer;
+
+    public MCMPHandler(HttpHandler next, LoadBalancingProxyClient loadBalancer) {
+        this.next = next;
+        this.loadBalancer = loadBalancer;
+    }
+
     public void init() throws Exception {
         if (conf == null) {
             conf = new MCMConfig();
             conf.init();
-            proxy.setNodeservice(conf);
         }
         if (md == null)
             md = MessageDigest.getInstance("MD5");
@@ -63,14 +72,14 @@ public class MCMPHandler implements HttpHandler {
     }
 
     @Override
-    public void handleRequest(HttpServerExchange exchange) {
+    public void handleRequest(HttpServerExchange exchange) throws Exception {
 
         /*
          * Proxy the request that needs to be proxied and process others
          */
         InetSocketAddress addr = exchange.getDestinationAddress();
         if (addr.getPort() != cport || !addr.getHostName().equals(chost)) {
-            proxy.handleRequest(exchange);
+            next.handleRequest(exchange);
             return;
         }
 
@@ -707,14 +716,14 @@ public class MCMPHandler implements HttpHandler {
     /* more code adapted from FormEncodedDataHandler (handleEvent) */
         public FormData handleEvent(HttpServerExchange exchange) {
             StreamSourceChannel channel = exchange.getRequestChannel();
-            int c = 0;
-            FormData data = new FormData();
+            FormData data = new FormData(0);
             final Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
             try {
                 final ByteBuffer buffer = pooled.getResource();
                 int state = 0;
                 String name = null;
                 StringBuilder builder = new StringBuilder();
+                int c;
                 do {
                     c = channel.read(buffer);
                     if (c > 0) {

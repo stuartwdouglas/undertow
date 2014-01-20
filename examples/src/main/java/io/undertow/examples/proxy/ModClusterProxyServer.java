@@ -8,14 +8,16 @@ import org.xnio.XnioWorker;
 import io.undertow.Undertow;
 import io.undertow.examples.UndertowExample;
 import io.undertow.proxy.MCMPHandler;
-import io.undertow.proxy.ProxyHandler;
+import io.undertow.server.handlers.ResponseCodeHandler;
+import io.undertow.server.handlers.proxy.LoadBalancingProxyClient;
+import io.undertow.server.handlers.proxy.ProxyHandler;
 
 /**
  * @author Jean-Frederic Clere
  */
 
 @UndertowExample("Proxy Server")
-public class ProxyServer {
+public class ModClusterProxyServer {
 
     /* the address and port to receive the MCMP elements */
     static String chost = System.getProperty("io.undertow.examples.proxy.CADDRESS");
@@ -53,17 +55,16 @@ public class ProxyServer {
                 chost = java.net.InetAddress.getLocalHost().getHostName();
                 System.out.println("Using: " + chost);
             }
-            MCMPHandler mcmp = new MCMPHandler();
-            ProxyHandler proxy = new ProxyHandler();
-            ProxyHandler.setWorker(worker);
-            ProxyHandler.setOptions(DEFAULT_OPTIONS);
+            LoadBalancingProxyClient loadBalancer = new LoadBalancingProxyClient();
+            ProxyHandler proxy = new ProxyHandler(loadBalancer, 30000, ResponseCodeHandler.HANDLE_404);
+            MCMPHandler mcmp = new MCMPHandler(proxy, loadBalancer);
             mcmp.setChost(chost);
             mcmp.setCport(cport);
             mcmp.setProxy(proxy);
             server = Undertow.builder()
                     .addListener(cport, chost)
                     .addListener(pport, phost)
-                    .addPathHandler("/", mcmp)
+                    .setHandler(mcmp)
                     .build();
             server.start();
             mcmp.init();
