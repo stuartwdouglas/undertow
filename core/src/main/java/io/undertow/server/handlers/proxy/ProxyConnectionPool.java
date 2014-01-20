@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author Stuart Douglas
  */
-class ProxyConnectionPool implements Closeable {
+public class ProxyConnectionPool implements Closeable {
 
     private final URI uri;
 

@@ -12,6 +12,7 @@ package io.undertow.proxy.container;
 
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
+import io.undertow.server.handlers.proxy.ProxyConnectionPool;
 
 /**
  * {@code Node} Created on Jun 11, 2012 at 11:10:06 AM
@@ -107,6 +108,10 @@ public class Node implements Serializable {
      * Load factor received via the STATUS messages
      */
     private int load;
+    /*
+     * like in the Host of LoadBalancingProxyClient, it is needed by the health check logic.
+     */
+    private ProxyConnectionPool connectionPool;
 
     /**
      * Create a new instance of {@code Node}

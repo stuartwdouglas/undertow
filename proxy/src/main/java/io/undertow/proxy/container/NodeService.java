@@ -262,6 +262,7 @@ public class NodeService extends LifeCycleServiceAdapter {
                 return false;
             }
             boolean ok = false;
+            // TODO we should use the connectionPool instead.
             java.net.Socket s = null;
             try {
                 s = new java.net.Socket(node.getHostname(), node.getPort());
