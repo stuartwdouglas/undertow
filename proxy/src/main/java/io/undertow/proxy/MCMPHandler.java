@@ -35,7 +35,6 @@ import io.undertow.proxy.mcmp.Constants;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.form.FormData;
-import io.undertow.server.handlers.proxy.LoadBalancingProxyClient;
 import io.undertow.server.handlers.proxy.ProxyHandler;
 import io.undertow.util.HttpString;
 
@@ -46,11 +45,10 @@ public class MCMPHandler implements HttpHandler {
     private ProxyHandler proxy;
 
     private MCMConfig conf = null;
+    private final ModClusterLoadBalancingProxyClient loadBalancer;
 
     private final HttpHandler next;
-    private final LoadBalancingProxyClient loadBalancer;
-
-    public MCMPHandler(HttpHandler next, LoadBalancingProxyClient loadBalancer) {
+    public MCMPHandler(HttpHandler next, ModClusterLoadBalancingProxyClient loadBalancer) {
         this.next = next;
         this.loadBalancer = loadBalancer;
     }
@@ -59,6 +57,7 @@ public class MCMPHandler implements HttpHandler {
         if (conf == null) {
             conf = new MCMConfig();
             conf.init();
+            loadBalancer.setNodeservice(conf);
         }
         if (md == null)
             md = MessageDigest.getInstance("MD5");

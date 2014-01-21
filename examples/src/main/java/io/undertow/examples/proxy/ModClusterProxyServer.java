@@ -8,8 +8,8 @@ import org.xnio.XnioWorker;
 import io.undertow.Undertow;
 import io.undertow.examples.UndertowExample;
 import io.undertow.proxy.MCMPHandler;
+import io.undertow.proxy.ModClusterLoadBalancingProxyClient;
 import io.undertow.server.handlers.ResponseCodeHandler;
-import io.undertow.server.handlers.proxy.LoadBalancingProxyClient;
 import io.undertow.server.handlers.proxy.ProxyHandler;
 
 /**
@@ -55,7 +55,7 @@ public class ModClusterProxyServer {
                 chost = java.net.InetAddress.getLocalHost().getHostName();
                 System.out.println("Using: " + chost + ":" + cport);
             }
-            LoadBalancingProxyClient loadBalancer = new LoadBalancingProxyClient();
+            ModClusterLoadBalancingProxyClient loadBalancer = new ModClusterLoadBalancingProxyClient();
             ProxyHandler proxy = new ProxyHandler(loadBalancer, 30000, ResponseCodeHandler.HANDLE_404);
             MCMPHandler mcmp = new MCMPHandler(proxy, loadBalancer);
             mcmp.setChost(chost);

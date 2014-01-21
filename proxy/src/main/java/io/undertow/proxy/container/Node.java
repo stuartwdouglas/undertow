@@ -546,4 +546,12 @@ public class Node implements Serializable {
     public void setFlushPackets(boolean flushPackets) {
         this.flushPackets = flushPackets;
     }
+
+    public ProxyConnectionPool getConnectionPool() {
+        return connectionPool;
+    }
+
+    public void setConnectionPool(ProxyConnectionPool connectionPool) {
+        this.connectionPool = connectionPool;
+    }
 }

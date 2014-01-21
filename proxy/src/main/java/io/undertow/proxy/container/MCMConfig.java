@@ -41,7 +41,6 @@ public class MCMConfig extends NodeService {
         super();
     }
 
-
     @Override
     public void init() throws Exception {
         // Create the thread to keep the configure up to date.
@@ -74,6 +73,7 @@ public class MCMConfig extends NodeService {
     public void insertupdate(Node node) {
         if (getNodes().isEmpty()) {
             node.setId(1);
+            // TODO add the connection manager.
             getNodes().add(node);
         } else {
             int i = 1;
@@ -94,6 +94,7 @@ public class MCMConfig extends NodeService {
                 getNodes().add(node);
             } else {
                 node.setId(i);
+                // TODO add the connection manager.
                 getNodes().add(node);
             }
         }
