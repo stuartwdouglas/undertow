@@ -156,7 +156,7 @@ public class MCMPHandler implements HttpHandler {
         }
     }
 
-    static String MOD_CLUSTER_EXPOSED_VERSION = "mod_cluster/1.2.2.Final";
+    static String MOD_CLUSTER_EXPOSED_VERSION = "mod_cluster_undertow/0.0.0.Beta";
     /*
      * build the mod_cluster_manager page
      * It builds the html like mod_manager.c
@@ -395,9 +395,8 @@ public class MCMPHandler implements HttpHandler {
                     contextCommandString(buf, uri, context.getStatus(), context.getPath(), alias, jvmRoute);
                 buf.append("\n");
             }
-            buf.append("</pre>");
-
         }
+        buf.append("</pre>");
     }
 
     /* generate a command URL for the context */
@@ -716,7 +715,7 @@ public class MCMPHandler implements HttpHandler {
     /* more code adapted from FormEncodedDataHandler (handleEvent) */
         public FormData handleEvent(HttpServerExchange exchange) {
             StreamSourceChannel channel = exchange.getRequestChannel();
-            FormData data = new FormData(0);
+            FormData data = new FormData(10);
             final Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
             try {
                 final ByteBuffer buffer = pooled.getResource();

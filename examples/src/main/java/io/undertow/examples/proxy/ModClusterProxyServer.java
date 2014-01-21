@@ -16,7 +16,7 @@ import io.undertow.server.handlers.proxy.ProxyHandler;
  * @author Jean-Frederic Clere
  */
 
-@UndertowExample("Proxy Server")
+@UndertowExample("ModCluster Proxy Server")
 public class ModClusterProxyServer {
 
     /* the address and port to receive the MCMP elements */
@@ -53,7 +53,7 @@ public class ModClusterProxyServer {
             if (chost == null) {
                 // We are going to guess it.
                 chost = java.net.InetAddress.getLocalHost().getHostName();
-                System.out.println("Using: " + chost);
+                System.out.println("Using: " + chost + ":" + cport);
             }
             LoadBalancingProxyClient loadBalancer = new LoadBalancingProxyClient();
             ProxyHandler proxy = new ProxyHandler(loadBalancer, 30000, ResponseCodeHandler.HANDLE_404);
