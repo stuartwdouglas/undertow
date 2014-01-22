@@ -275,4 +275,7 @@ public interface UndertowMessages {
 
     @Message(id = 83, value = "Host %s has not been registered")
     RuntimeException hostHasNotBeenRegistered(Object host);
+
+    @Message(id = 84, value = "Key %s does not match parameter name %s")
+    IllegalArgumentException keyDoesNotMatchParameterName(String key, String parameterName);
 }
