@@ -42,11 +42,11 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
     private Collection<String> headerNames;
 
     public ParameterMap() {
-        table = new Object[16];
+        table = null;
     }
 
     private ParameterValues getEntry(final String headerName) {
-        if (headerName == null) {
+        if (headerName == null || table == null) {
             return null;
         }
         final int hc = headerName.hashCode();
@@ -75,7 +75,7 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
     }
 
     private ParameterValues removeEntry(final String headerName) {
-        if (headerName == null) {
+        if (headerName == null || table == null) {
             return null;
         }
         final int hc = headerName.hashCode();
@@ -149,6 +149,9 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
     private ParameterValues getOrCreateEntry(final String headerName) {
         if (headerName == null) {
             return null;
+        }
+        if(table == null) {
+            table = new Object[16];
         }
         final int hc = headerName.hashCode();
         final Object[] table = this.table;
@@ -281,6 +284,9 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
 
     @Override
     public boolean containsValue(Object value) {
+        if(table == null) {
+            return false;
+        }
         if (value instanceof HeaderValues) {
             for (int i = 0; i < table.length; ++i) {
                 Object o = table[i];
@@ -314,6 +320,9 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
         }
         if (value.getParameterName() != key) {
             throw UndertowMessages.MESSAGES.keyDoesNotMatchParameterName(key, value.getParameterName());
+        }
+        if(this.table == null) {
+            this.table = new Object[16];
         }
         final int hc = key.hashCode();
         int length = table.length;
@@ -395,6 +404,9 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
      * @see #fiCurrent(long)
      */
     public long fastIterate() {
+        if(table == null) {
+            return -1;
+        }
         final Object[] table = this.table;
         final int len = table.length;
         int ri = 0;
@@ -428,6 +440,9 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
      */
     public long fastIterateNonEmpty() {
         final Object[] table = this.table;
+        if(table == null) {
+            return -1;
+        }
         final int len = table.length;
         int ri = 0;
         int ci;
@@ -591,6 +606,9 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
                     ci;
 
             private ParameterValues _next() {
+                if(table == null) {
+                    return null;
+                }
                 for (; ; ) {
                     if (ri >= table.length) {
                         return null;
@@ -653,7 +671,7 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
         };
     }
 
-    public Collection<String> getHeaderNames() {
+    public Collection<String> getParameterNames() {
         if (headerNames != null) {
             return headerNames;
         }
@@ -793,6 +811,9 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
     // clear
 
     public void clear() {
+        if(table == null) {
+            return;
+        }
         Arrays.fill(table, null);
         size = 0;
     }
@@ -946,7 +967,7 @@ public final class ParameterMap implements Iterable<ParameterValues>, Map<String
     public String toString() {
         StringBuilder sb = new StringBuilder("{");
         boolean first = true;
-        for (String name : getHeaderNames()) {
+        for (String name : getParameterNames()) {
             if (first) {
                 first = false;
             } else {
