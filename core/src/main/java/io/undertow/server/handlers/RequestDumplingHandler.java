@@ -1,6 +1,5 @@
 package io.undertow.server.handlers;
 
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -12,6 +11,8 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
 import io.undertow.util.LocaleUtils;
+import io.undertow.util.ParameterMap;
+import io.undertow.util.ParameterValues;
 
 /**
  * Handler that dumps a exchange to a log.
@@ -61,8 +62,8 @@ public class RequestDumplingHandler implements HttpHandler {
         }
         sb.append("            locale=" + LocaleUtils.getLocalesFromHeader(exchange.getRequestHeaders().get(Headers.ACCEPT_LANGUAGE)) + "\n");
         sb.append("            method=" + exchange.getRequestMethod() + "\n");
-        Map<String, Deque<String>> pnames = exchange.getQueryParameters();
-        for (Map.Entry<String, Deque<String>> entry : pnames.entrySet()) {
+        ParameterMap pnames = exchange.getQueryParameters();
+        for (Map.Entry<String, ParameterValues> entry : pnames.entrySet()) {
             String pname = entry.getKey();
             Iterator<String> pvalues = entry.getValue().iterator();
             sb.append("         parameter=");

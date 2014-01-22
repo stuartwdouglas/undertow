@@ -24,6 +24,7 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpClientUtils;
 import io.undertow.testutils.TestHttpClient;
+import io.undertow.util.ParameterValues;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.junit.Assert;
@@ -31,7 +32,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.IOException;
-import java.util.Deque;
 import java.util.Map;
 
 import static io.undertow.Handlers.path;
@@ -92,7 +92,7 @@ public class SetAttributeTestCase {
             HttpResponse result = client.execute(get);
             Assert.assertEquals(200, result.getStatusLine().getStatusCode());
             String response = HttpClientUtils.readResponse(result);
-            Assert.assertEquals("URI: /relative/foo?bar=a&woz=b relative: /foo QS:?bar=a&woz=b bar: a woz: b", response);
+            Assert.assertEquals("URI: /relative/foo?bar=a&woz=b relative: /foo QS:?bar=a&woz=b woz: b bar: a", response);
 
             get = new HttpGet(DefaultServer.getDefaultServerURL() + "/somePath/foo/a/b");
             result = client.execute(get);
@@ -118,7 +118,7 @@ public class SetAttributeTestCase {
             final StringBuilder sb = new StringBuilder("URI: " + exchange.getRequestURI()
                     + " relative: " + exchange.getRelativePath()
                     + " QS:" + exchange.getQueryString());
-            for (Map.Entry<String, Deque<String>> param : exchange.getQueryParameters().entrySet()) {
+            for (Map.Entry<String, ParameterValues> param : exchange.getQueryParameters().entrySet()) {
                 sb.append(" " + param.getKey() + ": " + param.getValue().getFirst());
             }
             exchange.getResponseSender().send(sb.toString());

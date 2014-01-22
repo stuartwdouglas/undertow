@@ -20,7 +20,6 @@ package io.undertow.server.handlers.path;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.Map;
 
 import io.undertow.server.HttpHandler;
@@ -29,6 +28,7 @@ import io.undertow.server.handlers.PathHandler;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpClientUtils;
 import io.undertow.util.HttpString;
+import io.undertow.util.ParameterValues;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -134,7 +134,7 @@ public class PathTestCase {
         public void handleRequest(HttpServerExchange exchange) throws Exception {
             exchange.getResponseHeaders().add(new HttpString(MATCHED), matched);
             exchange.getResponseHeaders().add(new HttpString(PATH), exchange.getRelativePath());
-            for(Map.Entry<String, Deque<String>> param : exchange.getQueryParameters().entrySet()) {
+            for(Map.Entry<String, ParameterValues> param : exchange.getQueryParameters().entrySet()) {
                 exchange.getResponseHeaders().put(new HttpString(param.getKey()), param.getValue().getFirst());
             }
             exchange.endExchange();

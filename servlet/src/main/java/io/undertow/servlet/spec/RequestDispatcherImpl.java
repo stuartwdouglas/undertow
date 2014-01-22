@@ -20,10 +20,6 @@ package io.undertow.servlet.spec;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.RequestDispatcher;
@@ -41,6 +37,7 @@ import io.undertow.servlet.api.ThreadSetupAction;
 import io.undertow.servlet.handlers.ServletRequestContext;
 import io.undertow.servlet.handlers.ServletChain;
 import io.undertow.servlet.handlers.ServletPathMatch;
+import io.undertow.util.ParameterMap;
 import io.undertow.util.QueryParameterUtils;
 
 /**
@@ -113,7 +110,7 @@ public class RequestDispatcherImpl implements RequestDispatcher {
             final ServletRequest oldRequest = servletRequestContext.getServletRequest();
             final ServletResponse oldResponse = servletRequestContext.getServletResponse();
 
-            Map<String, Deque<String>> queryParameters = requestImpl.getQueryParameters();
+            ParameterMap queryParameters = requestImpl.getQueryParameters();
 
             if (!named) {
 
@@ -132,7 +129,7 @@ public class RequestDispatcherImpl implements RequestDispatcher {
                     String newQueryString = newServletPath.substring(qsPos + 1);
                     newServletPath = newServletPath.substring(0, qsPos);
 
-                    Map<String, Deque<String>> newQueryParameters = QueryParameterUtils.mergeQueryParametersWithNewQueryString(queryParameters, newQueryString);
+                    ParameterMap newQueryParameters = QueryParameterUtils.mergeQueryParametersWithNewQueryString(queryParameters, newQueryString);
                     requestImpl.getExchange().setQueryString(newQueryString);
                     requestImpl.setQueryParameters(newQueryParameters);
                 }
@@ -233,7 +230,7 @@ public class RequestDispatcherImpl implements RequestDispatcher {
             Object servletPath = null;
             Object pathInfo = null;
             Object queryString = null;
-            Map<String, Deque<String>> queryParameters = requestImpl.getQueryParameters();
+            ParameterMap queryParameters = requestImpl.getQueryParameters();
 
             if (!named) {
                 requestUri = request.getAttribute(INCLUDE_REQUEST_URI);
@@ -248,7 +245,7 @@ public class RequestDispatcherImpl implements RequestDispatcher {
                     String newQueryString = newServletPath.substring(qsPos + 1);
                     newServletPath = newServletPath.substring(0, qsPos);
 
-                    Map<String, Deque<String>> newQueryParameters = QueryParameterUtils.mergeQueryParametersWithNewQueryString(queryParameters, newQueryString);
+                    ParameterMap newQueryParameters = QueryParameterUtils.mergeQueryParametersWithNewQueryString(queryParameters, newQueryString);
                     requestImpl.setQueryParameters(newQueryParameters);
                     requestImpl.setAttribute(INCLUDE_QUERY_STRING, newQueryString);
                 } else {
@@ -359,7 +356,7 @@ public class RequestDispatcherImpl implements RequestDispatcher {
         String newRequestUri = servletContext.getContextPath() + newServletPath;
 
         //todo: a more efficent impl
-        Map<String, Deque<String>> newQueryParameters = new HashMap<String, Deque<String>>();
+        ParameterMap newQueryParameters = new ParameterMap();
         for (String part : newQueryString.split("&")) {
             String name = part;
             String value = "";
@@ -368,11 +365,7 @@ public class RequestDispatcherImpl implements RequestDispatcher {
                 name = part.substring(0, equals);
                 value = part.substring(equals + 1);
             }
-            Deque<String> queue = newQueryParameters.get(name);
-            if (queue == null) {
-                newQueryParameters.put(name, queue = new ArrayDeque<String>(1));
-            }
-            queue.add(value);
+            newQueryParameters.add(name, value);
         }
         requestImpl.setQueryParameters(newQueryParameters);
 

@@ -47,6 +47,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
+import io.undertow.util.ParameterValues;
 import io.undertow.util.SameThreadExecutor;
 import org.xnio.ChannelExceptionHandler;
 import org.xnio.ChannelListener;
@@ -65,7 +66,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URLEncoder;
 import java.nio.channels.Channel;
-import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -254,7 +254,7 @@ public final class ProxyHandler implements HttpHandler {
                 boolean first = true;
                 if (!exchange.getPathParameters().isEmpty()) {
                     requestURI.append(';');
-                    for (Map.Entry<String, Deque<String>> entry : exchange.getPathParameters().entrySet()) {
+                    for (Map.Entry<String, ParameterValues> entry : exchange.getPathParameters().entrySet()) {
                         if (first) {
                             first = false;
                         } else {

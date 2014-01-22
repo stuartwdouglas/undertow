@@ -1,13 +1,12 @@
 package io.undertow.server.handlers;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Map;
-import java.util.TreeMap;
 
 import io.undertow.UndertowOptions;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.util.ParameterMap;
+import io.undertow.util.ParameterValues;
 import io.undertow.util.URLUtils;
 
 /**
@@ -40,13 +39,12 @@ public class URLDecodingHandler implements HttpHandler {
             exchange.setRelativePath(URLUtils.decode(exchange.getRelativePath(), charset, decodeSlash, sb));
             exchange.setResolvedPath(URLUtils.decode(exchange.getResolvedPath(), charset, decodeSlash, sb));
             if (!exchange.getQueryString().isEmpty()) {
-                final TreeMap<String, Deque<String>> newParams = new TreeMap<String, Deque<String>>();
-                for (Map.Entry<String, Deque<String>> param : exchange.getQueryParameters().entrySet()) {
-                    final Deque<String> newVales = new ArrayDeque<String>(param.getValue().size());
+                final ParameterMap newParams = new ParameterMap();
+                for (Map.Entry<String, ParameterValues> param : exchange.getQueryParameters().entrySet()) {
+                    String key = URLUtils.decode(param.getKey(), charset, true, sb);
                     for (String val : param.getValue()) {
-                        newVales.add(URLUtils.decode(val, charset, true, sb));
+                        newParams.add(key, URLUtils.decode(val, charset, true, sb));
                     }
-                    newParams.put(URLUtils.decode(param.getKey(), charset, true, sb), newVales);
                 }
                 exchange.getQueryParameters().clear();
                 exchange.getQueryParameters().putAll(newParams);

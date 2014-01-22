@@ -8,6 +8,7 @@ import io.undertow.server.HttpUpgradeListener;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
+import io.undertow.util.ParameterValues;
 import org.xnio.ChannelListener;
 import org.xnio.FinishedIoFuture;
 import org.xnio.FutureResult;
@@ -22,7 +23,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -221,7 +221,7 @@ public class AsyncWebSocketHttpServerExchange implements WebSocketHttpExchange {
     @Override
     public Map<String, List<String>> getRequestParameters() {
         Map<String, List<String>> params = new HashMap<String, List<String>>();
-        for (Map.Entry<String, Deque<String>> param : exchange.getQueryParameters().entrySet()) {
+        for (Map.Entry<String, ParameterValues> param : exchange.getQueryParameters().entrySet()) {
             params.put(param.getKey(), new ArrayList<String>(param.getValue()));
         }
         return params;

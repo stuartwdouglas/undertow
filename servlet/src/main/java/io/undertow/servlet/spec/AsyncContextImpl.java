@@ -21,9 +21,7 @@ package io.undertow.servlet.spec;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -59,6 +57,7 @@ import io.undertow.servlet.handlers.ServletPathMatch;
 import io.undertow.servlet.handlers.ServletRequestContext;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.CanonicalPathUtils;
+import io.undertow.util.ParameterMap;
 import io.undertow.util.SameThreadExecutor;
 import org.xnio.IoUtils;
 import org.xnio.XnioExecutor;
@@ -226,7 +225,7 @@ public class AsyncContextImpl implements AsyncContext {
         String newRequestUri = context.getContextPath() + newServletPath;
 
         //todo: a more efficient impl
-        Map<String, Deque<String>> newQueryParameters = new HashMap<String, Deque<String>>();
+        ParameterMap newQueryParameters = new ParameterMap();
         for (String part : newQueryString.split("&")) {
             String name = part;
             String value = "";
@@ -235,11 +234,7 @@ public class AsyncContextImpl implements AsyncContext {
                 name = part.substring(0, equals);
                 value = part.substring(equals + 1);
             }
-            Deque<String> queue = newQueryParameters.get(name);
-            if (queue == null) {
-                newQueryParameters.put(name, queue = new ArrayDeque<String>(1));
-            }
-            queue.add(value);
+            newQueryParameters.add(name, value);
         }
         requestImpl.setQueryParameters(newQueryParameters);
 

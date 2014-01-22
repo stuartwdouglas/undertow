@@ -1,8 +1,6 @@
 package io.undertow.util;
 
-import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -49,8 +47,8 @@ public class QueryParameterUtils {
      * @param newQueryString The query string
      * @return The map of key value parameters
      */
-    public static Map<String, Deque<String>> parseQueryString(final String newQueryString) {
-        Map<String, Deque<String>> newQueryParameters = new LinkedHashMap<String, Deque<String>>();
+    public static ParameterMap parseQueryString(final String newQueryString) {
+        ParameterMap newQueryParameters = new ParameterMap();
         int startPos = 0;
         int equalPos = -1;
         for(int i = 0; i < newQueryString.length(); ++i) {
@@ -69,7 +67,7 @@ public class QueryParameterUtils {
         return newQueryParameters;
     }
 
-    private static void handleQueryParameter(String newQueryString, Map<String, Deque<String>> newQueryParameters, int startPos, int equalPos, int i) {
+    private static void handleQueryParameter(String newQueryString, ParameterMap newQueryParameters, int startPos, int equalPos, int i) {
         String key;
         String value = "";
         if(equalPos == -1) {
@@ -78,27 +76,16 @@ public class QueryParameterUtils {
             key = newQueryString.substring(startPos, equalPos);
             value = newQueryString.substring(equalPos + 1, i);
         }
-
-        Deque<String> queue = newQueryParameters.get(key);
-        if (queue == null) {
-            newQueryParameters.put(key, queue = new ArrayDeque<String>(1));
-        }
-        if(value != null) {
-            queue.add(value);
-        }
+        newQueryParameters.add(key, value);
     }
 
 
-    public static Map<String, Deque<String>> mergeQueryParametersWithNewQueryString(final Map<String, Deque<String>> queryParameters, final String newQueryString) {
+    public static ParameterMap mergeQueryParametersWithNewQueryString(final ParameterMap queryParameters, final String newQueryString) {
 
-        Map<String, Deque<String>> newQueryParameters = parseQueryString(newQueryString);
+        ParameterMap newQueryParameters = parseQueryString(newQueryString);
         //according to the spec the new query parameters have to 'take precedence'
-        for (Map.Entry<String, Deque<String>> entry : queryParameters.entrySet()) {
-            if (!newQueryParameters.containsKey(entry.getKey())) {
-                newQueryParameters.put(entry.getKey(), new ArrayDeque<String>(entry.getValue()));
-            } else {
-                newQueryParameters.get(entry.getKey()).addAll(entry.getValue());
-            }
+        for (Map.Entry<String, ParameterValues> entry : queryParameters.entrySet()) {
+            newQueryParameters.addAll(entry.getKey(), entry.getValue());
         }
         return newQueryParameters;
     }

@@ -19,7 +19,6 @@
 package io.undertow.server.handlers;
 
 import java.io.IOException;
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -28,6 +27,7 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpClientUtils;
 import io.undertow.testutils.TestHttpClient;
+import io.undertow.util.ParameterValues;
 import org.apache.http.client.methods.HttpGet;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -50,9 +50,9 @@ public class QueryParametersTestCase {
             public void handleRequest(final HttpServerExchange exchange) throws Exception {
                 StringBuilder sb = new StringBuilder();
                 sb.append("{");
-                Iterator<Map.Entry<String,Deque<String>>> iterator = exchange.getQueryParameters().entrySet().iterator();
+                Iterator<Map.Entry<String,ParameterValues>> iterator = exchange.getQueryParameters().entrySet().iterator();
                 while (iterator.hasNext()) {
-                    Map.Entry<String, Deque<String>> qp = iterator.next();
+                    Map.Entry<String, ParameterValues> qp = iterator.next();
                     sb.append(qp.getKey());
                     sb.append("=>");
                     if(qp.getValue().size() == 1) {
@@ -87,9 +87,9 @@ public class QueryParametersTestCase {
             runTest(client, "{unicode=>Iñtërnâtiônàližætiøn}", "/path?unicode=Iñtërnâtiônàližætiøn");
             runTest(client, "{a=>b,value=>bb bb}", "/path?a=b&value=bb%20bb");
             runTest(client, "{a=>b,value=>[bb,cc]}", "/path?a=b&value=bb&value=cc");
-            runTest(client, "{a=>b,s =>,t =>,value=>[bb,cc]}", "/path?a=b&value=bb&value=cc&s%20&t%20");
-            runTest(client, "{a=>b,s =>,t =>,value=>[bb,cc]}", "/path?a=b&value=bb&value=cc&s%20&t%20&");
-            runTest(client, "{a=>b,s =>,t =>,u=>,value=>[bb,cc]}", "/path?a=b&value=bb&value=cc&s%20&t%20&u");
+            runTest(client, "{a=>b,value=>[bb,cc],t =>,s =>}", "/path?a=b&value=bb&value=cc&s%20&t%20");
+            runTest(client, "{a=>b,value=>[bb,cc],t =>,s =>}", "/path?a=b&value=bb&value=cc&s%20&t%20&");
+            runTest(client, "{a=>b,value=>[bb,cc],u=>,t =>,s =>}", "/path?a=b&value=bb&value=cc&s%20&t%20&u");
 
 
         } finally {

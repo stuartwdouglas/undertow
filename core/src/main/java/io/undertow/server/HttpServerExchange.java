@@ -38,6 +38,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.NetworkUtils;
+import io.undertow.util.ParameterMap;
 import io.undertow.util.Protocols;
 import io.undertow.util.SameThreadExecutor;
 import org.jboss.logging.Logger;
@@ -66,8 +67,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.security.AccessController;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
@@ -105,8 +104,8 @@ public final class HttpServerExchange extends AbstractAttachable {
     private ExchangeCompletionListener[] exchangeCompleteListeners;
     private DefaultResponseListener[] defaultResponseListeners;
 
-    private Map<String, Deque<String>> queryParameters;
-    private Map<String, Deque<String>> pathParameters;
+    private ParameterMap queryParameters;
+    private ParameterMap pathParameters;
 
     private Map<String, Cookie> requestCookies;
     private Map<String, Cookie> responseCookies;
@@ -909,22 +908,18 @@ public final class HttpServerExchange extends AbstractAttachable {
      *
      * @return The query parameters
      */
-    public Map<String, Deque<String>> getQueryParameters() {
+    public ParameterMap getQueryParameters() {
         if (queryParameters == null) {
-            queryParameters = new TreeMap<String, Deque<String>>();
+            queryParameters = new ParameterMap();
         }
         return queryParameters;
     }
 
     public HttpServerExchange addQueryParam(final String name, final String param) {
         if (queryParameters == null) {
-            queryParameters = new TreeMap<String, Deque<String>>();
+            queryParameters = new ParameterMap();
         }
-        Deque<String> list = queryParameters.get(name);
-        if (list == null) {
-            queryParameters.put(name, list = new ArrayDeque<String>(2));
-        }
-        list.add(param);
+        queryParameters.add(name, param);
         return this;
     }
 
@@ -934,22 +929,18 @@ public final class HttpServerExchange extends AbstractAttachable {
      *
      * @return The path parameters
      */
-    public Map<String, Deque<String>> getPathParameters() {
+    public ParameterMap getPathParameters() {
         if (pathParameters == null) {
-            pathParameters = new TreeMap<String, Deque<String>>();
+            pathParameters = new ParameterMap();
         }
         return pathParameters;
     }
 
     public HttpServerExchange addPathParam(final String name, final String param) {
         if (pathParameters == null) {
-            pathParameters = new TreeMap<String, Deque<String>>();
+            pathParameters = new ParameterMap();
         }
-        Deque<String> list = pathParameters.get(name);
-        if (list == null) {
-            pathParameters.put(name, list = new ArrayDeque<String>(2));
-        }
-        list.add(param);
+        pathParameters.add(name, param);
         return this;
     }
 

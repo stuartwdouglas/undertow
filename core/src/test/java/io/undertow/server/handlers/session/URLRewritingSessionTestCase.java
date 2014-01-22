@@ -19,7 +19,6 @@
 package io.undertow.server.handlers.session;
 
 import java.io.IOException;
-import java.util.Deque;
 import java.util.Map;
 
 import io.undertow.server.HttpHandler;
@@ -33,6 +32,7 @@ import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpClientUtils;
 import io.undertow.testutils.TestHttpClient;
 import io.undertow.util.HttpString;
+import io.undertow.util.ParameterValues;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -69,7 +69,7 @@ public class URLRewritingSessionTestCase {
                 exchange.getResponseHeaders().add(new HttpString(COUNT), count.toString());
                 session.setAttribute(COUNT, ++count);
 
-                for (Map.Entry<String, Deque<String>> qp : exchange.getQueryParameters().entrySet()) {
+                for (Map.Entry<String, ParameterValues> qp : exchange.getQueryParameters().entrySet()) {
                     exchange.getResponseHeaders().add(new HttpString(qp.getKey()), qp.getValue().getFirst());
                 }
                 if (exchange.getQueryString().isEmpty()) {

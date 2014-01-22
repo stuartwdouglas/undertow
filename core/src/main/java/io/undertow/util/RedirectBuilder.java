@@ -4,7 +4,6 @@ import io.undertow.server.HttpServerExchange;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.Deque;
 import java.util.Map;
 
 /**
@@ -57,7 +56,7 @@ public class RedirectBuilder {
                 if (!exchange.getPathParameters().isEmpty()) {
                     boolean first = true;
                     uri.append(';');
-                    for (Map.Entry<String, Deque<String>> param : exchange.getPathParameters().entrySet()) {
+                    for (Map.Entry<String, ParameterValues> param : exchange.getPathParameters().entrySet()) {
                         for (String value : param.getValue()) {
                             if (first) {
                                 first = false;

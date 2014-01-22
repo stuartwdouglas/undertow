@@ -44,6 +44,8 @@ import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.LocaleUtils;
 import io.undertow.util.Methods;
+import io.undertow.util.ParameterMap;
+import io.undertow.util.ParameterValues;
 import org.xnio.LocalSocketAddress;
 
 import javax.servlet.AsyncContext;
@@ -104,7 +106,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
     private List<Part> parts = null;
     private volatile boolean asyncStarted = false;
     private volatile AsyncContextImpl asyncContext = null;
-    private Map<String, Deque<String>> queryParameters;
+    private ParameterMap queryParameters;
     private FormData parsedFormData;
     private Charset characterEncoding;
     private boolean readStarted;
@@ -639,7 +641,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
             queryParameters = exchange.getQueryParameters();
         }
         final Map<String, ArrayList<String>> arrayMap = new HashMap<String, ArrayList<String>>();
-        for (Map.Entry<String, Deque<String>> entry : queryParameters.entrySet()) {
+        for (Map.Entry<String, ParameterValues> entry : queryParameters.entrySet()) {
             arrayMap.put(entry.getKey(), new ArrayList<String>(entry.getValue()));
         }
         if (exchange.getRequestMethod().equals(Methods.POST)) {
@@ -931,14 +933,14 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
     }
 
 
-    public Map<String, Deque<String>> getQueryParameters() {
+    public ParameterMap getQueryParameters() {
         if (queryParameters == null) {
             queryParameters = exchange.getQueryParameters();
         }
         return queryParameters;
     }
 
-    public void setQueryParameters(final Map<String, Deque<String>> queryParameters) {
+    public void setQueryParameters(final ParameterMap queryParameters) {
         this.queryParameters = queryParameters;
     }
 
