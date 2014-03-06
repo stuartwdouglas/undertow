@@ -15,7 +15,7 @@
  * the License.
  */
 
-package io.undertow.proxy.container;
+package io.undertow.server.handlers.proxy.mod_proxy.container;
 
 import java.util.ArrayList;
 import java.util.List;

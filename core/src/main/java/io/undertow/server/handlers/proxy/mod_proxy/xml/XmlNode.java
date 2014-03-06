@@ -11,68 +11,79 @@
  * You should have received a copy of the GNU Lesser General Public License along with this software; if not, write to the Free
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-package io.undertow.proxy.xml;
+package io.undertow.server.handlers.proxy.mod_proxy.xml;
 
 import java.io.Serializable;
-import java.util.List;
 
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * {@code Nodes}
+ * {@code Node}
  * <p/>
- * Created on Jul 5, 2012 at 2:42:31 PM
+ * Created on Jul 5, 2012 at 2:24:42 PM
  *
  * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>
  */
-@XmlRootElement(name = "nodes")
-public class XmlNodes implements Serializable {
+@XmlRootElement(name = "node")
+public class XmlNode implements Serializable {
 
-    private List<XmlNode> nodes;
+    private String hostname;
+    private int port;
 
     /**
      *
      */
-    private static final long serialVersionUID = 982132341234234234L;
+    private static final long serialVersionUID = 533330892734892364L;
 
     /**
-     * Create a new instance of {@code Nodes}
+     * Create a new instance of {@code Node}
      */
-    public XmlNodes() {
+    public XmlNode() {
         super();
     }
 
     /**
-     * Getter for nodes
+     * Getter for hostname.
      *
-     * @return the nodes
+     * @return the hostname
      */
-    @XmlElement(name = "node")
-    public List<XmlNode> getNodes() {
-        return this.nodes;
+    @XmlElement
+    public String getHostname() {
+        return this.hostname;
     }
 
     /**
-     * Setter for the nodes
+     * Setter for the hostname
      *
-     * @param nodes the nodes to set
+     * @param hostname the hostname to set
      */
-    public void setNodes(List<XmlNode> nodes) {
-        this.nodes = nodes;
+    public void setHostname(String hostname) {
+        this.hostname = hostname;
+    }
+
+    /**
+     * Getter for port
+     *
+     * @return the port
+     */
+    @XmlElement
+    public int getPort() {
+        return this.port;
+    }
+
+    /**
+     * Setter for the port
+     *
+     * @param port the port to set
+     */
+    public void setPort(int port) {
+        this.port = port;
     }
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("[");
-        int i = 0;
-        for (XmlNode n : this.nodes) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append(n);
-            i++;
-        }
-        return sb.append(']').toString();
+        return this.hostname + ":" + this.port;
     }
+
 }

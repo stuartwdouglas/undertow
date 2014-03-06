@@ -15,7 +15,7 @@
  * the License.
  */
 
-package io.undertow.proxy.mcmp;
+package io.undertow.server.handlers.proxy.mod_proxy.mcmp;
 
 import io.undertow.util.HttpString;
 

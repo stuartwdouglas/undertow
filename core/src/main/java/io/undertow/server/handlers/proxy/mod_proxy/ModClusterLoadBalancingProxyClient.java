@@ -1,4 +1,4 @@
-package io.undertow.proxy;
+package io.undertow.server.handlers.proxy.mod_proxy;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -7,8 +7,8 @@ import java.util.concurrent.TimeUnit;
 
 import io.undertow.client.ClientConnection;
 import io.undertow.client.UndertowClient;
-import io.undertow.proxy.container.Node;
-import io.undertow.proxy.container.NodeService;
+import io.undertow.server.handlers.proxy.mod_proxy.container.Node;
+import io.undertow.server.handlers.proxy.mod_proxy.container.NodeService;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.ServerConnection;
 import io.undertow.server.handlers.Cookie;

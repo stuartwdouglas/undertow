@@ -7,8 +7,8 @@ import org.xnio.XnioWorker;
 
 import io.undertow.Undertow;
 import io.undertow.examples.UndertowExample;
-import io.undertow.proxy.MCMPHandler;
-import io.undertow.proxy.ModClusterLoadBalancingProxyClient;
+import io.undertow.server.handlers.proxy.mod_proxy.MCMPHandler;
+import io.undertow.server.handlers.proxy.mod_proxy.ModClusterLoadBalancingProxyClient;
 import io.undertow.server.handlers.ResponseCodeHandler;
 import io.undertow.server.handlers.proxy.ProxyHandler;
 

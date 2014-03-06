@@ -11,7 +11,7 @@
  * You should have received a copy of the GNU Lesser General Public License along with this software; if not, write to the Free
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-package io.undertow.proxy.xml;
+package io.undertow.server.handlers.proxy.mod_proxy.xml;
 
 import javax.xml.bind.annotation.XmlRegistry;
 

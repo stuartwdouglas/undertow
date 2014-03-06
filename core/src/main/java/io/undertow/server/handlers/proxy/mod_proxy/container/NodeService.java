@@ -19,11 +19,11 @@
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF
  * site: http://www.fsf.org.
  */
-package io.undertow.proxy.container;
+package io.undertow.server.handlers.proxy.mod_proxy.container;
 
-import io.undertow.proxy.xml.XmlConfig;
-import io.undertow.proxy.xml.XmlNode;
-import io.undertow.proxy.xml.XmlNodes;
+import io.undertow.server.handlers.proxy.mod_proxy.xml.XmlConfig;
+import io.undertow.server.handlers.proxy.mod_proxy.xml.XmlNode;
+import io.undertow.server.handlers.proxy.mod_proxy.xml.XmlNodes;
 import io.undertow.server.handlers.Cookie;
 
 import java.util.ArrayList;

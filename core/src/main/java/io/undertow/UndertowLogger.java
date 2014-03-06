@@ -51,6 +51,8 @@ public interface UndertowLogger extends BasicLogger {
      */
     UndertowLogger REQUEST_IO_LOGGER = Logger.getMessageLogger(UndertowLogger.class, UndertowLogger.class.getPackage().getName() + ".request.io");
 
+    UndertowLogger MOD_PROXY_LOGGER = Logger.getMessageLogger(UndertowLogger.class, UndertowLogger.class.getPackage().getName() + ".mod_proxy");
+
     @LogMessage(level = Logger.Level.ERROR)
     @Message(id = 5001, value = "An exception occurred processing the request")
     void exceptionProcessingRequest(@Cause Throwable cause);
@@ -138,4 +140,8 @@ public interface UndertowLogger extends BasicLogger {
     @LogMessage(level = Logger.Level.ERROR)
     @Message(id = 5024, value = "Could not register resource change listener for caching resource manager, automatic invalidation of cached resource will not work")
     void couldNotRegisterChangeListener(@Cause Exception e);
+
+    @LogMessage(level = Logger.Level.ERROR)
+    @Message(id = 5025, value = "mod_proxy management request failed")
+    void modProxyManagementRequestFailed(@Cause Exception e);
 }

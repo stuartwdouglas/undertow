@@ -1,14 +1,15 @@
-package io.undertow.proxy;
+package io.undertow.server.handlers.proxy.mod_proxy;
 
-import io.undertow.proxy.container.Balancer;
-import io.undertow.proxy.container.Context;
-import io.undertow.proxy.container.Context.Status;
-import io.undertow.proxy.container.MCMConfig;
-import io.undertow.proxy.container.Node;
-import io.undertow.proxy.container.Node.NodeStatus;
-import io.undertow.proxy.container.SessionId;
-import io.undertow.proxy.container.VHost;
-import io.undertow.proxy.mcmp.Constants;
+import io.undertow.UndertowLogger;
+import io.undertow.server.handlers.proxy.mod_proxy.container.Balancer;
+import io.undertow.server.handlers.proxy.mod_proxy.container.Context;
+import io.undertow.server.handlers.proxy.mod_proxy.container.Context.Status;
+import io.undertow.server.handlers.proxy.mod_proxy.container.MCMConfig;
+import io.undertow.server.handlers.proxy.mod_proxy.container.Node;
+import io.undertow.server.handlers.proxy.mod_proxy.container.Node.NodeStatus;
+import io.undertow.server.handlers.proxy.mod_proxy.container.SessionId;
+import io.undertow.server.handlers.proxy.mod_proxy.container.VHost;
+import io.undertow.server.handlers.proxy.mod_proxy.mcmp.Constants;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.form.FormData;
@@ -39,6 +40,7 @@ import java.util.UUID;
 
 public class MCMPHandler implements HttpHandler {
 
+    private static final String MOD_CLUSTER_EXPOSED_VERSION = "mod_cluster_undertow/0.0.0.Beta";
     private String chost = "127.0.0.1";
     private int cport = 6666;
     private ProxyHandler proxy;
@@ -59,11 +61,12 @@ public class MCMPHandler implements HttpHandler {
             conf.init();
             loadBalancer.setNodeservice(conf);
         }
-        if (md == null)
+        if (md == null) {
             md = MessageDigest.getInstance("MD5");
+        }
         if (thread == null) {
             thread = new Thread(new MCMAdapterBackgroundProcessor(),
-                    "MCMAdapaterBackgroundProcessor");
+                    "Mod Cluster Background Process");
             thread.setDaemon(true);
             thread.start();
 
@@ -86,76 +89,65 @@ public class MCMPHandler implements HttpHandler {
         try {
             if (method.equals(Constants.GET)) {
                 // In fact that is /mod_cluster_manager
-                process_manager(exchange);
+                processManager(exchange);
             } else if (method.equals(Constants.CONFIG)) {
-                process_config(exchange);
+                processConfig(exchange);
             } else if (method.equals(Constants.ENABLE_APP)) {
                 try {
-                    Map<String, String[]> params = read_post_parameters(exchange);
+                    Map<String, String[]> params = readPostParameters(exchange);
                     if (params == null) {
-                        process_error(TYPESYNTAX, SMESPAR, exchange);
+                        processError(TYPESYNTAX, SMESPAR, exchange);
                         return;
                     }
-                    process_enable(exchange, params);
-                    process_OK(exchange);
-                } catch (Exception Ex) {
-                    Ex.printStackTrace(System.out);
+                    processEnable(exchange, params);
+                    processOK(exchange);
+                } catch (Exception e) {
+                    //TODO: why is the error response suppressed in this case?
+                    UndertowLogger.MOD_PROXY_LOGGER.modProxyManagementRequestFailed(e);
                 }
             } else if (method.equals(Constants.DISABLE_APP)) {
-                Map<String, String[]> params = read_post_parameters(exchange);
+                Map<String, String[]> params = readPostParameters(exchange);
                 if (params == null) {
-                    process_error(TYPESYNTAX, SMESPAR, exchange);
+                    processError(TYPESYNTAX, SMESPAR, exchange);
                     return;
                 }
-                process_disable(exchange, params);
-                process_OK(exchange);
+                processDisable(exchange, params);
+                processOK(exchange);
             } else if (method.equals(Constants.STOP_APP)) {
-                Map<String, String[]> params = read_post_parameters(exchange);
+                Map<String, String[]> params = readPostParameters(exchange);
                 if (params == null) {
-                    process_error(TYPESYNTAX, SMESPAR, exchange);
+                    processError(TYPESYNTAX, SMESPAR, exchange);
                     return;
                 }
-                process_stop(exchange, params);
-                process_OK(exchange);
+                processStop(exchange, params);
+                processOK(exchange);
             } else if (method.equals(Constants.REMOVE_APP)) {
                 try {
-                    process_remove(exchange);
-                } catch (Exception Ex) {
-                    Ex.printStackTrace(System.out);
+                    processRemove(exchange);
+                } catch (Exception e) {
+                    UndertowLogger.MOD_PROXY_LOGGER.modProxyManagementRequestFailed(e);
                 }
             } else if (method.equals(Constants.STATUS)) {
-                process_status(exchange);
+                processStatus(exchange);
             } else if (method.equals(Constants.DUMP)) {
-                process_dump(exchange);
+                processDump(exchange);
             } else if (method.equals(Constants.INFO)) {
                 try {
-                    process_info(exchange);
-                } catch (Exception Ex) {
-                    Ex.printStackTrace(System.out);
+                    processInfo(exchange);
+                    //TODO: why is the error response suppressed in this case?
+                } catch (Exception e) {
+                    UndertowLogger.MOD_PROXY_LOGGER.modProxyManagementRequestFailed(e);
                 }
             } else if (method.equals(Constants.PING)) {
-                process_ping(exchange);
+                processPing(exchange);
             }
         } catch (Exception e) {
-            e.printStackTrace(System.out);
+            UndertowLogger.MOD_PROXY_LOGGER.modProxyManagementRequestFailed(e);
             exchange.setResponseCode(500);
-            StreamSinkChannel resp = exchange.getResponseChannel();
-
-            ByteBuffer bb = ByteBuffer.allocate(100);
-            bb.put(e.toString().getBytes());
-            bb.flip();
-
-            try {
-                resp.write(bb);
-            } catch (IOException e1) {
-                e1.printStackTrace();
-            }
-            exchange.endExchange();
-            return;
+            exchange.getResponseSender().send(e.toString());
         }
     }
 
-    static String MOD_CLUSTER_EXPOSED_VERSION = "mod_cluster_undertow/0.0.0.Beta";
     /*
      * build the mod_cluster_manager page
      * It builds the html like mod_manager.c
@@ -166,7 +158,7 @@ public class MCMPHandler implements HttpHandler {
     boolean allowCmd = true;
     boolean displaySessionids = true;
 
-    private void process_manager(HttpServerExchange exchange) throws Exception {
+    private void processManager(HttpServerExchange exchange) throws Exception {
 
         Map<String, Deque<String>> params = exchange.getQueryParameters();
         boolean hasNonce = params.containsKey("nonce");
@@ -189,10 +181,10 @@ public class MCMPHandler implements HttpHandler {
                     if (cmd) {
                         String scmd = params.get("Cmd").getFirst();
                         if (scmd.equals("INFO")) {
-                            process_info(exchange);
+                            processInfo(exchange);
                             return;
                         } else if (scmd.equals("DUMP")) {
-                            process_dump(exchange);
+                            processDump(exchange);
                             return;
                         } else if (scmd.equals("ENABLE-APP") && range) {
                             String srange = params.get("Range").getFirst();
@@ -571,8 +563,8 @@ public class MCMPHandler implements HttpHandler {
                     seq++;
                 }
                 s.leaveGroup(group);
-            } catch (Exception Ex) {
-                Ex.printStackTrace(System.out);
+            } catch (Exception e) {
+                UndertowLogger.MOD_PROXY_LOGGER.modProxyManagementRequestFailed(e);
             }
         }
 
@@ -597,15 +589,13 @@ public class MCMPHandler implements HttpHandler {
     /**
      * Process <tt>PING</tt> request
      *
-     * @param req
-     * @param res
      * @throws Exception
      */
-    private void process_ping(HttpServerExchange exchange) throws Exception {
-        System.out.println("process_ping");
-        Map<String, String[]> params = read_post_parameters(exchange);
+    private void processPing(HttpServerExchange exchange) throws Exception {
+        System.out.println("processPing");
+        Map<String, String[]> params = readPostParameters(exchange);
         if (params == null) {
-            process_error(TYPESYNTAX, SMESPAR, exchange);
+            processError(TYPESYNTAX, SMESPAR, exchange);
             return;
         }
         String jvmRoute = null;
@@ -626,7 +616,7 @@ public class MCMPHandler implements HttpHandler {
             } else if (name.equalsIgnoreCase("Host")) {
                 host = value;
             } else {
-                process_error(TYPESYNTAX, SBADFLD + name + SBADFLD1, exchange);
+                processError(TYPESYNTAX, SBADFLD + name + SBADFLD1, exchange);
                 return;
             }
         }
@@ -642,7 +632,7 @@ public class MCMPHandler implements HttpHandler {
                 return;
             } else {
                 if (scheme == null || host == null || port == null) {
-                    process_error(TYPESYNTAX, SMISFLD, exchange);
+                    processError(TYPESYNTAX, SMISFLD, exchange);
                     return;
                 }
                 exchange.getResponseHeaders().add(new HttpString("Content-Type"), "text/plain");
@@ -662,7 +652,7 @@ public class MCMPHandler implements HttpHandler {
             // ping the corresponding node.
             Node node = conf.getNode(jvmRoute);
             if (node == null) {
-                process_error(TYPEMEM, MNODERD, exchange);
+                processError(TYPEMEM, MNODERD, exchange);
                 return;
             }
             exchange.getResponseHeaders().add(new HttpString("Content-Type"), "text/plain");
@@ -684,7 +674,7 @@ public class MCMPHandler implements HttpHandler {
      * TODO: this is a ugly hack. (it should even have channel.awaitReadable() to block until the whole MCM is received.
      * copied from io/undertow/server/handlers/form/FormEncodedDataHandler.java
      */
-    private Map<String, String[]> read_post_parameters(HttpServerExchange exchange) throws IOException {
+    private Map<String, String[]> readPostParameters(HttpServerExchange exchange) throws IOException {
         final Map<String, String[]> ret = new HashMap<String, String[]>();
         FormData formData = handleEvent(exchange);
         Iterator<String> it = formData.iterator();
@@ -799,12 +789,12 @@ public class MCMPHandler implements HttpHandler {
     }
 
     private boolean isnode_up(Node node) {
-        System.out.println("process_ping: " + node);
+        System.out.println("processPing: " + node);
         return false;
     }
 
     private boolean ishost_up(String scheme, String host, String port) {
-        System.out.println("process_ping: " + scheme + "://" + host + ":" + port);
+        System.out.println("processPing: " + scheme + "://" + host + ":" + port);
         return false;
     }
 
@@ -826,7 +816,7 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_info(HttpServerExchange exchange) throws Exception {
+    private void processInfo(HttpServerExchange exchange) throws Exception {
 
         String data = process_info_string();
         exchange.setResponseCode(200);
@@ -902,7 +892,7 @@ public class MCMPHandler implements HttpHandler {
      * @param exchange
      * @throws IOException
      */
-    private void process_dump(HttpServerExchange exchange) throws IOException {
+    private void processDump(HttpServerExchange exchange) throws IOException {
         String data = process_dump_string();
         exchange.setResponseCode(200);
         exchange.getResponseHeaders().add(new HttpString("Content-Type"), "text/plain");
@@ -984,10 +974,10 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_status(HttpServerExchange exchange) throws Exception {
-        Map<String, String[]> params = read_post_parameters(exchange);
+    private void processStatus(HttpServerExchange exchange) throws Exception {
+        Map<String, String[]> params = readPostParameters(exchange);
         if (params == null) {
-            process_error(TYPESYNTAX, SMESPAR, exchange);
+            processError(TYPESYNTAX, SMESPAR, exchange);
             return;
         }
         String jvmRoute = null;
@@ -1002,24 +992,24 @@ public class MCMPHandler implements HttpHandler {
             } else if (name.equalsIgnoreCase("Load")) {
                 load = value;
             } else {
-                process_error(TYPESYNTAX, SBADFLD + value + SBADFLD1, exchange);
+                processError(TYPESYNTAX, SBADFLD + value + SBADFLD1, exchange);
                 return;
             }
         }
         if (load == null || jvmRoute == null) {
-            process_error(TYPESYNTAX, SMISFLD, exchange);
+            processError(TYPESYNTAX, SMISFLD, exchange);
             return;
         }
 
         Node node = conf.getNode(jvmRoute);
         if (node == null) {
-            process_error(TYPEMEM, MNODERD, exchange);
+            processError(TYPEMEM, MNODERD, exchange);
             return;
         }
         node.setLoad(Integer.parseInt(load));
         /* TODO we need to check the node here */
         node.setStatus(Node.NodeStatus.NODE_UP);
-        process_OK(exchange);
+        processOK(exchange);
     }
 
     /**
@@ -1029,10 +1019,10 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_remove(HttpServerExchange exchange) throws Exception {
-        Map<String, String[]> params = read_post_parameters(exchange);
+    private void processRemove(HttpServerExchange exchange) throws Exception {
+        Map<String, String[]> params = readPostParameters(exchange);
         if (params == null) {
-            process_error(TYPESYNTAX, SMESPAR, exchange);
+            processError(TYPESYNTAX, SMESPAR, exchange);
             return;
         }
 
@@ -1049,7 +1039,7 @@ public class MCMPHandler implements HttpHandler {
             String value = values[0];
             if (name.equalsIgnoreCase("JVMRoute")) {
                 if (conf.getNodeId(value) == -1) {
-                    process_error(TYPEMEM, MNODERD, exchange);
+                    processError(TYPEMEM, MNODERD, exchange);
                     return;
                 }
                 host.setJVMRoute(value);
@@ -1064,7 +1054,7 @@ public class MCMPHandler implements HttpHandler {
 
         }
         if (context.getJVMRoute() == null) {
-            process_error(TYPESYNTAX, SROUBAD, exchange);
+            processError(TYPESYNTAX, SROUBAD, exchange);
             return;
         }
 
@@ -1072,7 +1062,7 @@ public class MCMPHandler implements HttpHandler {
             conf.removeNode(context.getJVMRoute());
         else
             conf.remove(context, host);
-        process_OK(exchange);
+        processOK(exchange);
     }
 
     /**
@@ -1082,7 +1072,7 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_stop(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
+    private void processStop(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
         process_cmd(exchange, params, Context.Status.STOPPED);
     }
 
@@ -1093,7 +1083,7 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_disable(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
+    private void processDisable(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
         process_cmd(exchange, params, Context.Status.DISABLED);
     }
 
@@ -1104,7 +1094,7 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_enable(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
+    private void processEnable(HttpServerExchange exchange, Map<String, String[]> params) throws Exception {
         process_cmd(exchange, params, Context.Status.ENABLED);
     }
 
@@ -1123,7 +1113,7 @@ public class MCMPHandler implements HttpHandler {
             String value = values[0];
             if (name.equalsIgnoreCase("JVMRoute")) {
                 if (conf.getNodeId(value) == -1) {
-                    process_error(TYPEMEM, MNODERD, exchange);
+                    processError(TYPEMEM, MNODERD, exchange);
                     return;
                 }
                 host.setJVMRoute(value);
@@ -1138,7 +1128,7 @@ public class MCMPHandler implements HttpHandler {
 
         }
         if (context.getJVMRoute() == null) {
-            process_error(TYPESYNTAX, SROUBAD, exchange);
+            processError(TYPESYNTAX, SROUBAD, exchange);
             return;
         }
         context.setStatus(status);
@@ -1159,7 +1149,7 @@ public class MCMPHandler implements HttpHandler {
             }
         }
         if (jvmRoute == null) {
-            process_error(TYPESYNTAX, SROUBAD, exchange);
+            processError(TYPESYNTAX, SROUBAD, exchange);
             return;
         }
 
@@ -1186,10 +1176,10 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_config(HttpServerExchange exchange) throws Exception {
-        Map<String, String[]> params = read_post_parameters(exchange);
+    private void processConfig(HttpServerExchange exchange) throws Exception {
+        Map<String, String[]> params = readPostParameters(exchange);
         if (params == null) {
-            process_error(TYPESYNTAX, SMESPAR, exchange);
+            processError(TYPESYNTAX, SMESPAR, exchange);
             return;
         }
 
@@ -1248,14 +1238,14 @@ public class MCMPHandler implements HttpHandler {
             } else if (name.equalsIgnoreCase("Timeout")) {
                 node.setTimeout(Integer.valueOf(value));
             } else {
-                process_error(TYPESYNTAX, SBADFLD + name + SBADFLD1, exchange);
+                processError(TYPESYNTAX, SBADFLD + name + SBADFLD1, exchange);
                 return;
             }
         }
 
         conf.insertupdate(balancer);
         conf.insertupdate(node);
-        process_OK(exchange);
+        processOK(exchange);
     }
 
     /**
@@ -1264,7 +1254,7 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_OK(HttpServerExchange exchange) throws Exception {
+    private void processOK(HttpServerExchange exchange) throws Exception {
         exchange.setResponseCode(200);
         exchange.getResponseHeaders().add(new HttpString("Content-type"), "plain/text");
         exchange.endExchange();
@@ -1278,7 +1268,7 @@ public class MCMPHandler implements HttpHandler {
      * @param res
      * @throws Exception
      */
-    private void process_error(String type, String errstring, HttpServerExchange exchange) throws Exception {
+    private void processError(String type, String errstring, HttpServerExchange exchange) throws Exception {
         exchange.setResponseCode(500);
         // res.setMessage("ERROR");
         exchange.getResponseHeaders().add(new HttpString("Version"), VERSION_PROTOCOL);
