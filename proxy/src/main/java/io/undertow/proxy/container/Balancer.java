@@ -25,7 +25,7 @@ import java.io.Serializable;
 
 /**
  * {@code Balancer}
- *
+ * <p/>
  * Created on Jun 12, 2012 at 3:32:28 PM
  *
  * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>
@@ -99,8 +99,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the name
      *
-     * @param name
-     *            the name to set
+     * @param name the name to set
      */
     public void setName(String name) {
         if (name != null && name.length() > 40) {
@@ -122,8 +121,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the stickySession
      *
-     * @param stickySession
-     *            the stickySession to set
+     * @param stickySession the stickySession to set
      */
     public void setStickySession(boolean stickySession) {
         this.stickySession = stickySession;
@@ -141,8 +139,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the stickySessionCookie
      *
-     * @param stickySessionCookie
-     *            the stickySessionCookie to set
+     * @param stickySessionCookie the stickySessionCookie to set
      */
     public void setStickySessionCookie(String stickySessionCookie) {
         if (stickySessionCookie != null && stickySessionCookie.length() > 30) {
@@ -165,8 +162,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the stickySessionPath
      *
-     * @param stickySessionPath
-     *            the stickySessionPath to set
+     * @param stickySessionPath the stickySessionPath to set
      */
     public void setStickySessionPath(String stickySessionPath) {
         if (stickySessionPath != null && stickySessionPath.length() > 30) {
@@ -188,8 +184,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the stickySessionRemove
      *
-     * @param stickySessionRemove
-     *            the stickySessionRemove to set
+     * @param stickySessionRemove the stickySessionRemove to set
      */
     public void setStickySessionRemove(boolean stickySessionRemove) {
         this.stickySessionRemove = stickySessionRemove;
@@ -207,8 +202,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the stickySessionForce
      *
-     * @param stickySessionForce
-     *            the stickySessionForce to set
+     * @param stickySessionForce the stickySessionForce to set
      */
     public void setStickySessionForce(boolean stickySessionForce) {
         this.stickySessionForce = stickySessionForce;
@@ -226,8 +220,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the waitWorker
      *
-     * @param waitWorker
-     *            the waitWorker to set
+     * @param waitWorker the waitWorker to set
      */
     public void setWaitWorker(int waitWorker) {
         this.waitWorker = waitWorker;
@@ -245,8 +238,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the maxattempts
      *
-     * @param maxattempts
-     *            the maxattempts to set
+     * @param maxattempts the maxattempts to set
      */
     public void setMaxattempts(int maxattempts) {
         this.maxattempts = maxattempts;
@@ -264,8 +256,7 @@ public class Balancer implements Serializable {
     /**
      * Setter for the number
      *
-     * @param number
-     *            the number to set
+     * @param number the number to set
      */
     public void setNumber(int number) {
         this.number = number;

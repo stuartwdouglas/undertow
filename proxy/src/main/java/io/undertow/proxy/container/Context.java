@@ -25,7 +25,7 @@ import java.io.Serializable;
 
 /**
  * {@code Context}
- *
+ * <p/>
  * Created on Jun 12, 2012 at 4:24:58 PM
  *
  * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>
@@ -51,7 +51,7 @@ public class Context implements Serializable {
      *
      */
     private static final long serialVersionUID = -3107364662635260034L;
-     /**
+    /**
      * Status of the application: ENABLED, DISABLED or STOPPED.
      */
     private Status status;
@@ -102,6 +102,7 @@ public class Context implements Serializable {
     public boolean isStopped() {
         return this.status == Status.STOPPED;
     }
+
     /**
      * Getter for status
      *
@@ -114,8 +115,7 @@ public class Context implements Serializable {
     /**
      * Setter for the status
      *
-     * @param status
-     *            the status to set
+     * @param status the status to set
      */
     public void setStatus(Status status) {
         this.status = status;
@@ -128,7 +128,7 @@ public class Context implements Serializable {
      */
     @Override
     public String toString() {
-        return "Context[Path: " + this.path + ", Status: " + this.status + ", Node: " + this.JVMRoute + ", Host: " + this.hostid +  "]";
+        return "Context[Path: " + this.path + ", Status: " + this.status + ", Node: " + this.JVMRoute + ", Host: " + this.hostid + "]";
     }
 
     /**

@@ -1,5 +1,23 @@
 package io.undertow.proxy;
 
+import io.undertow.proxy.container.Balancer;
+import io.undertow.proxy.container.Context;
+import io.undertow.proxy.container.Context.Status;
+import io.undertow.proxy.container.MCMConfig;
+import io.undertow.proxy.container.Node;
+import io.undertow.proxy.container.Node.NodeStatus;
+import io.undertow.proxy.container.SessionId;
+import io.undertow.proxy.container.VHost;
+import io.undertow.proxy.mcmp.Constants;
+import io.undertow.server.HttpHandler;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.handlers.form.FormData;
+import io.undertow.server.handlers.proxy.ProxyHandler;
+import io.undertow.util.HttpString;
+import org.xnio.Pooled;
+import org.xnio.channels.StreamSinkChannel;
+import org.xnio.channels.StreamSourceChannel;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -19,25 +37,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
-import org.xnio.Pooled;
-import org.xnio.channels.StreamSinkChannel;
-import org.xnio.channels.StreamSourceChannel;
-
-import io.undertow.proxy.container.Balancer;
-import io.undertow.proxy.container.Context;
-import io.undertow.proxy.container.Context.Status;
-import io.undertow.proxy.container.MCMConfig;
-import io.undertow.proxy.container.Node;
-import io.undertow.proxy.container.Node.NodeStatus;
-import io.undertow.proxy.container.SessionId;
-import io.undertow.proxy.container.VHost;
-import io.undertow.proxy.mcmp.Constants;
-import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpServerExchange;
-import io.undertow.server.handlers.form.FormData;
-import io.undertow.server.handlers.proxy.ProxyHandler;
-import io.undertow.util.HttpString;
-
 public class MCMPHandler implements HttpHandler {
 
     private String chost = "127.0.0.1";
@@ -48,6 +47,7 @@ public class MCMPHandler implements HttpHandler {
     private final ModClusterLoadBalancingProxyClient loadBalancer;
 
     private final HttpHandler next;
+
     public MCMPHandler(HttpHandler next, ModClusterLoadBalancingProxyClient loadBalancer) {
         this.next = next;
         this.loadBalancer = loadBalancer;
@@ -165,6 +165,7 @@ public class MCMPHandler implements HttpHandler {
     boolean reduceDisplay = false;
     boolean allowCmd = true;
     boolean displaySessionids = true;
+
     private void process_manager(HttpServerExchange exchange) throws Exception {
 
         Map<String, Deque<String>> params = exchange.getQueryParameters();
@@ -209,7 +210,7 @@ public class MCMPHandler implements HttpHandler {
                             if (srange.equals("CONTEXT")) {
                                 process_cmd(exchange, mparams, Status.ENABLED);
                             }
-                         } else if (scmd.equals("DISABLE-APP") && range) {
+                        } else if (scmd.equals("DISABLE-APP") && range) {
                             String srange = params.get("Range").getFirst();
                             Map<String, String[]> mparams = buildMap(params);
                             if (srange.equals("NODE")) {
@@ -237,16 +238,16 @@ public class MCMPHandler implements HttpHandler {
         StreamSinkChannel resp = exchange.getResponseChannel();
         StringBuilder buf = new StringBuilder();
         buf.append("<html><head>\n<title>Mod_cluster Status</title>\n</head><body>\n");
-        buf.append("<h1>"+ MOD_CLUSTER_EXPOSED_VERSION + "</h1>");
+        buf.append("<h1>" + MOD_CLUSTER_EXPOSED_VERSION + "</h1>");
 
         String uri = exchange.getRequestPath();
         String nonce = getNonce();
-        if (refreshTime<=0)
+        if (refreshTime <= 0)
             buf.append("<a href=\"" + uri + "?" + nonce +
                     "&refresh=10" +
                     "\">Auto Refresh</a>");
 
-        buf.append(" <a href=\"" +  uri + "?" + nonce +
+        buf.append(" <a href=\"" + uri + "?" + nonce +
                 "&Cmd=DUMP&Range=ALL" +
                 "\">show DUMP output</a>");
 
@@ -301,7 +302,7 @@ public class MCMPHandler implements HttpHandler {
             printInfoHost(buf, uri, reduceDisplay, allowCmd, node.getJvmRoute());
         }
 
-       // Display the all the actives sessions
+        // Display the all the actives sessions
         if (displaySessionids)
             printInfoSessions(buf, conf.getSessionids());
 
@@ -309,7 +310,7 @@ public class MCMPHandler implements HttpHandler {
         ByteBuffer src = ByteBuffer.wrap(buf.toString().getBytes());
         resp.write(src);
         exchange.endExchange();
-     }
+    }
 
     private void process_domain_cmd(HttpServerExchange exchange, String domain, Status status) throws Exception {
         for (Node node : conf.getNodes()) {
@@ -321,7 +322,7 @@ public class MCMPHandler implements HttpHandler {
                 process_node_cmd(exchange, params, status);
             }
         }
-     }
+    }
 
     private Map<String, String[]> buildMap(Map<String, Deque<String>> params) {
         Map<String, String[]> sparams = new HashMap<String, String[]>();
@@ -418,17 +419,17 @@ public class MCMPHandler implements HttpHandler {
         buf.append("JVMRoute=" + jvmRoute + "&Alias=");
         boolean first = true;
         for (String a : alias) {
-             if (first)
+            if (first)
                 first = false;
             else
                 buf.append(",");
             buf.append(a);
         }
-       buf.append("&Context=" + path);
+        buf.append("&Context=" + path);
     }
 
     private void nodeCommandString(StringBuilder buf, String uri, Status status, String jvmRoute) {
-        switch(status) {
+        switch (status) {
             case ENABLED:
                 buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=NODE&JVMRoute=" + jvmRoute + "\">Enable Contexts</a> ");
                 break;
@@ -438,9 +439,9 @@ public class MCMPHandler implements HttpHandler {
         }
     }
 
-    private void printProxyStat(StringBuilder buf, Node node, boolean reduceDisplay ) {
+    private void printProxyStat(StringBuilder buf, Node node, boolean reduceDisplay) {
         String status = "NOTOK";
-        if (node.getStatus()==NodeStatus.NODE_UP)
+        if (node.getStatus() == NodeStatus.NODE_UP)
             status = "OK";
         if (reduceDisplay)
             buf.append(" " + status + " ");
@@ -452,7 +453,7 @@ public class MCMPHandler implements HttpHandler {
 
     /* based on domain_command_string */
     private void domainCommandString(StringBuilder buf, String uri, Status status, String lbgroup) {
-        switch(status) {
+        switch (status) {
             case ENABLED:
                 buf.append("<a href=\"" + uri + "?" + getNonce() + "&Cmd=ENABLE-APP&Range=DOMAIN&Domain=" + lbgroup + "\">Enable Nodes</a>");
                 break;
@@ -614,7 +615,7 @@ public class MCMPHandler implements HttpHandler {
 
         for (Map.Entry<String, String[]> e : params.entrySet()) {
             String name = e.getKey();
-            String[] values =  e.getValue();
+            String[] values = e.getValue();
             String value = values[0];
             if (name.equalsIgnoreCase("JVMRoute")) {
                 jvmRoute = value;
@@ -638,7 +639,7 @@ public class MCMPHandler implements HttpHandler {
                 bb.put(data.getBytes());
                 bb.flip();
                 resp.write(bb);
-                   return;
+                return;
             } else {
                 if (scheme == null || host == null || port == null) {
                     process_error(TYPESYNTAX, SMISFLD, exchange);
@@ -712,90 +713,90 @@ public class MCMPHandler implements HttpHandler {
     }
 
     /* more code adapted from FormEncodedDataHandler (handleEvent) */
-        public FormData handleEvent(HttpServerExchange exchange) {
-            StreamSourceChannel channel = exchange.getRequestChannel();
-            FormData data = new FormData(10);
-            final Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
-            try {
-                final ByteBuffer buffer = pooled.getResource();
-                int state = 0;
-                String name = null;
-                StringBuilder builder = new StringBuilder();
-                int c;
-                do {
-                    c = channel.read(buffer);
-                    if (c > 0) {
-                        buffer.flip();
-                        while (buffer.hasRemaining()) {
-                            byte n = buffer.get();
-                            switch (state) {
-                                case 0: {
-                                    if (n == '=') {
-                                        name = builder.toString();
-                                        builder.setLength(0);
-                                        state = 2;
-                                    } else if (n == '%' || n == '+') {
-                                        state = 1;
-                                        builder.append((char) n);
-                                    } else {
-                                        builder.append((char) n);
-                                    }
-                                    break;
+    public FormData handleEvent(HttpServerExchange exchange) {
+        StreamSourceChannel channel = exchange.getRequestChannel();
+        FormData data = new FormData(10);
+        final Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
+        try {
+            final ByteBuffer buffer = pooled.getResource();
+            int state = 0;
+            String name = null;
+            StringBuilder builder = new StringBuilder();
+            int c;
+            do {
+                c = channel.read(buffer);
+                if (c > 0) {
+                    buffer.flip();
+                    while (buffer.hasRemaining()) {
+                        byte n = buffer.get();
+                        switch (state) {
+                            case 0: {
+                                if (n == '=') {
+                                    name = builder.toString();
+                                    builder.setLength(0);
+                                    state = 2;
+                                } else if (n == '%' || n == '+') {
+                                    state = 1;
+                                    builder.append((char) n);
+                                } else {
+                                    builder.append((char) n);
                                 }
-                                case 1: {
-                                    if (n == '=') {
-                                        name = URLDecoder.decode(builder.toString(), "UTF-8");
-                                        builder.setLength(0);
-                                        state = 2;
-                                    } else {
-                                        builder.append((char) n);
-                                    }
-                                    break;
+                                break;
+                            }
+                            case 1: {
+                                if (n == '=') {
+                                    name = URLDecoder.decode(builder.toString(), "UTF-8");
+                                    builder.setLength(0);
+                                    state = 2;
+                                } else {
+                                    builder.append((char) n);
                                 }
-                                case 2: {
-                                    if (n == '&') {
-                                        data.add(name, builder.toString());
-                                        builder.setLength(0);
-                                        state = 0;
-                                    } else if (n == '%' || n == '+') {
-                                        state = 3;
-                                        builder.append((char) n);
-                                    } else {
-                                        builder.append((char) n);
-                                    }
-                                    break;
+                                break;
+                            }
+                            case 2: {
+                                if (n == '&') {
+                                    data.add(name, builder.toString());
+                                    builder.setLength(0);
+                                    state = 0;
+                                } else if (n == '%' || n == '+') {
+                                    state = 3;
+                                    builder.append((char) n);
+                                } else {
+                                    builder.append((char) n);
                                 }
-                                case 3: {
-                                    if (n == '&') {
-                                        data.add(name, URLDecoder.decode(builder.toString(), "UTF-8"));
-                                        builder.setLength(0);
-                                        state = 0;
-                                    } else {
-                                        builder.append((char) n);
-                                    }
-                                    break;
+                                break;
+                            }
+                            case 3: {
+                                if (n == '&') {
+                                    data.add(name, URLDecoder.decode(builder.toString(), "UTF-8"));
+                                    builder.setLength(0);
+                                    state = 0;
+                                } else {
+                                    builder.append((char) n);
                                 }
+                                break;
                             }
                         }
                     }
-                } while (c > 0);
-                if (c == -1) {
-                    if (state == 2) {
-                        data.add(name, builder.toString());
-                    } else if (state == 3) {
-                        data.add(name, URLDecoder.decode(builder.toString(), "UTF-8"));
-                    }
-                    state = 4;
                 }
-            } catch (IOException e) {
-                System.out.println("Failed parsing: " + e);
-
-            } finally {
-                pooled.free();
+            } while (c > 0);
+            if (c == -1) {
+                if (state == 2) {
+                    data.add(name, builder.toString());
+                } else if (state == 3) {
+                    data.add(name, URLDecoder.decode(builder.toString(), "UTF-8"));
+                }
+                state = 4;
             }
+        } catch (IOException e) {
+            System.out.println("Failed parsing: " + e);
 
-            return data;
+        } finally {
+            pooled.free();
         }
+
+        return data;
+    }
 
     private boolean isnode_up(Node node) {
         System.out.println("process_ping: " + node);
@@ -916,6 +917,7 @@ public class MCMPHandler implements HttpHandler {
         exchange.endExchange();
 
     }
+
     private String process_dump_string() {
         StringBuilder data = new StringBuilder();
         int i = 1;
@@ -930,7 +932,7 @@ public class MCMPHandler implements HttpHandler {
             i++;
         }
 
-        i  = 1;
+        i = 1;
         for (Node node : conf.getNodes()) {
             data.append("node: [").append(i).append(":").append(i).append("]")
                     .append(",Balancer: ").append(node.getBalancer())
@@ -954,8 +956,8 @@ public class MCMPHandler implements HttpHandler {
             long node = conf.getNodeId(host.getJVMRoute());
             for (String alias : host.getAliases()) {
                 data.append("host: ").append(j).append(" [")
-                    .append(alias).append("] vhost: ").append(host.getId())
-                    .append(" node: ").append(node).append("\n");
+                        .append(alias).append("] vhost: ").append(host.getId())
+                        .append(" node: ").append(node).append("\n");
 
                 j++;
             }
@@ -973,7 +975,7 @@ public class MCMPHandler implements HttpHandler {
         }
 
         return data.toString();
-     }
+    }
 
     /**
      * Process <tt>STATUS</tt> request
@@ -993,7 +995,7 @@ public class MCMPHandler implements HttpHandler {
 
         for (Map.Entry<String, String[]> e : params.entrySet()) {
             String name = e.getKey();
-            String[] values =  e.getValue();
+            String[] values = e.getValue();
             String value = values[0];
             if (name.equalsIgnoreCase("JVMRoute")) {
                 jvmRoute = value;
@@ -1107,8 +1109,8 @@ public class MCMPHandler implements HttpHandler {
     }
 
     private void process_cmd(HttpServerExchange exchange, Map<String, String[]> params, Context.Status status) throws Exception {
-         if (exchange.getRequestPath().equals("*") || exchange.getRequestPath().endsWith("/*")) {
-            process_node_cmd(exchange, params,  status);
+        if (exchange.getRequestPath().equals("*") || exchange.getRequestPath().endsWith("/*")) {
+            process_node_cmd(exchange, params, status);
             return;
         }
 
@@ -1288,16 +1290,18 @@ public class MCMPHandler implements HttpHandler {
     /* Nonce logic */
     private final Random r = new SecureRandom();
     private String nonce = null;
+
     String getNonce() {
         return "nonce=" + getRawNonce();
     }
+
     String getRawNonce() {
         if (this.nonce == null) {
             byte[] nonce = new byte[16];
             r.nextBytes(nonce);
             this.nonce = "";
-            for (int i=0; i<16; i=i+2) {
-                this.nonce = this.nonce.concat(Integer.toHexString(0xFF&nonce[i]*16 + 0xFF&nonce[i+1]));
+            for (int i = 0; i < 16; i = i + 2) {
+                this.nonce = this.nonce.concat(Integer.toHexString(0xFF & nonce[i] * 16 + 0xFF & nonce[i + 1]));
             }
         }
         return nonce;

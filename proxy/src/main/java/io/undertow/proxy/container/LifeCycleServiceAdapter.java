@@ -16,8 +16,8 @@ package io.undertow.proxy.container;
 /**
  * {@code LifeCycleServiceAdapter} An abstract adapter class for receiving life cycle events. The methods in this class are
  * empty. This class exists as convenience for creating service objects.
- *
- *
+ * <p/>
+ * <p/>
  * Created on Jul 6, 2012 at 7:08:24 PM
  *
  * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>

@@ -36,7 +36,7 @@ import org.jboss.logging.Logger;
 
 /**
  * {@code NodeService}
- *
+ * <p/>
  * Created on Jun 20, 2012 at 3:16:46 PM
  *
  * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>
@@ -195,7 +195,7 @@ public class NodeService extends LifeCycleServiceAdapter {
 
     /**
      * {@code HealthChecker}
-     *
+     * <p/>
      * Created on Sep 18, 2012 at 3:46:36 PM
      *
      * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>
@@ -286,7 +286,7 @@ public class NodeService extends LifeCycleServiceAdapter {
 
     /**
      * {@code NodeStatusChecker}
-     *
+     * <p/>
      * Created on Sep 18, 2012 at 3:49:56 PM
      *
      * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>
@@ -393,10 +393,10 @@ public class NodeService extends LifeCycleServiceAdapter {
      * the format is sessionid.JVMRoute
      */
     public Node getNodeByCookie(String cookie) {
-        int index =  cookie.lastIndexOf(".");
+        int index = cookie.lastIndexOf(".");
         if (index == -1)
             return null;
-        return getNode(cookie.substring(index+1));
+        return getNode(cookie.substring(index + 1));
     }
 
     /*
@@ -427,7 +427,7 @@ public class NodeService extends LifeCycleServiceAdapter {
                 node = nod;
         }
         if (node != null)
-            node.setElected(node.getElected()+1);
+            node.setElected(node.getElected() + 1);
         return node;
     }
 }

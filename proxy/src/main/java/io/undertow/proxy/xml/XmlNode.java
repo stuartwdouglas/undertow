@@ -20,7 +20,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * {@code Node}
- *
+ * <p/>
  * Created on Jul 5, 2012 at 2:24:42 PM
  *
  * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>

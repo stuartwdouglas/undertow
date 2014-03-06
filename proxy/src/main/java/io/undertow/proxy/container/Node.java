@@ -12,6 +12,7 @@ package io.undertow.proxy.container;
 
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import io.undertow.server.handlers.proxy.ProxyConnectionPool;
 
 /**

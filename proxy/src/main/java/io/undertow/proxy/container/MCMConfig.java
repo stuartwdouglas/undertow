@@ -25,7 +25,6 @@ import java.util.List;
  * And provider of the node for the ProxyHander.
  *
  * @author Jean-Frederic Clere
- *
  */
 public class MCMConfig extends NodeService {
 
@@ -37,7 +36,7 @@ public class MCMConfig extends NodeService {
     /**
      * Create a new instance of {@code NodeService}
      */
-    public MCMConfig()  {
+    public MCMConfig() {
         super();
     }
 
@@ -53,13 +52,13 @@ public class MCMConfig extends NodeService {
         setInitialized(true);
     }
 
-     protected class MCMConfigBackgroundProcessor implements Runnable {
+    protected class MCMConfigBackgroundProcessor implements Runnable {
 
         @Override
         public void run() {
             while (true) {
                 try {
-                    Thread.sleep(lbstatus_recalc_time *1000);
+                    Thread.sleep(lbstatus_recalc_time * 1000);
                 } catch (InterruptedException e) {
                     continue;
                 }
@@ -68,7 +67,7 @@ public class MCMConfig extends NodeService {
             }
         }
 
-     }
+    }
 
     public void insertupdate(Node node) {
         if (getNodes().isEmpty()) {
@@ -117,7 +116,6 @@ public class MCMConfig extends NodeService {
     }
 
 
-
     public long getNodeId(String jvmRoute) {
         for (Node nod : getNodes()) {
             if (nod.getJvmRoute().equals(jvmRoute)) {
@@ -126,7 +124,6 @@ public class MCMConfig extends NodeService {
         }
         return -1;
     }
-
 
 
     public long insertupdate(VHost host) {
@@ -240,7 +237,7 @@ public class MCMConfig extends NodeService {
             if (con.getJVMRoute().equals(jvmRoute))
                 remcons.add(con);
         }
-        for (Context con : remcons )
+        for (Context con : remcons)
             getContexts().remove(con);
 
         List<VHost> remhosts = new ArrayList<VHost>();

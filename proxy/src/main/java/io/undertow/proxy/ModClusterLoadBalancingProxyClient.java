@@ -19,6 +19,7 @@ import io.undertow.server.handlers.proxy.ProxyClient;
 import io.undertow.server.handlers.proxy.ProxyConnection;
 import io.undertow.server.handlers.proxy.ProxyConnectionPool;
 import io.undertow.util.AttachmentKey;
+
 import static org.xnio.IoUtils.safeClose;
 
 public class ModClusterLoadBalancingProxyClient implements ProxyClient {
@@ -46,7 +47,7 @@ public class ModClusterLoadBalancingProxyClient implements ProxyClient {
 
         @Override
         public void queuedConnectionFailed(ProxyTarget proxyTarget, HttpServerExchange exchange,
-                ProxyCallback<ProxyConnection> callback, long timeoutMills) {
+                                           ProxyCallback<ProxyConnection> callback, long timeoutMills) {
             getConnection(proxyTarget, exchange, callback, timeoutMills, TimeUnit.MILLISECONDS);
         }
 
@@ -81,7 +82,7 @@ public class ModClusterLoadBalancingProxyClient implements ProxyClient {
 
     @Override
     public void getConnection(ProxyTarget target, HttpServerExchange exchange, final ProxyCallback<ProxyConnection> callback,
-            long timeout, TimeUnit timeUnit) {
+                              long timeout, TimeUnit timeUnit) {
         final ExclusiveConnectionHolder holder = exchange.getConnection().getAttachment(exclusiveConnectionKey);
         if (holder != null && holder.connection.getConnection().isOpen()) {
             // Something has already caused an exclusive connection to be

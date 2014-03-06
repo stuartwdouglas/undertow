@@ -61,10 +61,8 @@ public class VHost implements Serializable {
     /**
      * Create a new instance of {@code VHost}
      *
-     * @param name
-     *            The name of the virtual Host
-     * @param aliases
-     *            the list of aliases of the virtual host
+     * @param name    The name of the virtual Host
+     * @param aliases the list of aliases of the virtual host
      */
     public VHost(String name, List<String> aliases) {
         this.name = name;
@@ -74,8 +72,7 @@ public class VHost implements Serializable {
     /**
      * Add the specified alias to the list
      *
-     * @param alias
-     *            the alias to be added
+     * @param alias the alias to be added
      * @return <tt>true</tt> if the {@code alias} was added successfully else
      *         <tt>false</tt>
      */
@@ -86,8 +83,7 @@ public class VHost implements Serializable {
     /**
      * Add the collection of aliases to the list
      *
-     * @param c
-     *            the collection to add
+     * @param c the collection to add
      * @return <tt>true</tt> if the aliases was added successfully else
      *         <tt>false</tt>
      */
@@ -98,8 +94,7 @@ public class VHost implements Serializable {
     /**
      * Remove the specified alias from the list of aliases
      *
-     * @param alias
-     *            the alias to be removed
+     * @param alias the alias to be removed
      * @return <tt>true</tt> if the {@code alias} was removed else
      *         <tt>false</tt>
      */
@@ -119,8 +114,7 @@ public class VHost implements Serializable {
     /**
      * Setter for the aliases list
      *
-     * @param aliases
-     *            the alias to set
+     * @param aliases the alias to set
      */
     public void setAliases(List<String> aliases) {
         this.aliases = aliases;
@@ -138,8 +132,7 @@ public class VHost implements Serializable {
     /**
      * Setter for the name
      *
-     * @param name
-     *            the name to set
+     * @param name the name to set
      */
     public void setName(String name) {
         this.name = name;

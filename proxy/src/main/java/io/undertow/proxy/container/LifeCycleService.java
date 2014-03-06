@@ -23,7 +23,7 @@ package io.undertow.proxy.container;
 
 /**
  * {@code LifeCycleService}
- *
+ * <p/>
  * Created on Jul 6, 2012 at 7:04:17 PM
  *
  * @author <a href="mailto:nbenothm@redhat.com">Nabil Benothman</a>
