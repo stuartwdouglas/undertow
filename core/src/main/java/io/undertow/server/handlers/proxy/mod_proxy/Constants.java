@@ -15,7 +15,7 @@
  * the License.
  */
 
-package io.undertow.server.handlers.proxy.mod_proxy.mcmp;
+package io.undertow.server.handlers.proxy.mod_proxy;
 
 import io.undertow.util.HttpString;
 
@@ -25,7 +25,7 @@ import io.undertow.util.HttpString;
  *
  * @author Jean-Frederic Clere
  */
-public final class Constants {
+final class Constants {
 
 
     public static final HttpString CONFIG = new HttpString("CONFIG");
@@ -48,4 +48,5 @@ public final class Constants {
 
     public static final HttpString GET = new HttpString("GET");
 
+    public static final HttpString REFRESH_HEADER = new HttpString("Refresh");
 }
