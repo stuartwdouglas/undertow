@@ -63,6 +63,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
     private HttpServerExchange exchange;
 
     private ByteBuffer[] writevBuffer;
+    private boolean done = false;
 
     private static final int STATE_BODY = 0; // Message body, normal pass-through operation
     private static final int STATE_START = 1; // No headers written yet
@@ -114,6 +115,9 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
      * @throws IOException
      */
     private int processWrite(int state, final Object userData, int pos, int length) throws IOException {
+        if(done) {
+            throw new ClosedChannelException();
+        }
         assert state != STATE_BODY;
         if (state == STATE_BUF_FLUSH) {
             final ByteBuffer byteBuffer = pooledBuffer.getResource();
@@ -677,6 +681,7 @@ final class HttpResponseConduit extends AbstractStreamSinkConduit<StreamSinkCond
     }
 
     void freeBuffers() {
+        done = true;
         if(pooledBuffer != null) {
             bufferDone();
         }

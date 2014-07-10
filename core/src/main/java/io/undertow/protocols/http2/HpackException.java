@@ -16,34 +16,13 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
-
-import java.nio.ByteBuffer;
+package io.undertow.protocols.http2;
 
 /**
- * Parser for SPDY ping frames.
- *
- * @author Stuart Douglas
+ * Exception that is thrown when the HPACK compress context is broken.
+ * <p/>
+ * In this case the connection must be closed.
  */
-class SpdyWindowUpdateParser extends SpdyPushBackParser {
+public class HpackException extends Exception {
 
-    private int deltaWindowSize;
-
-    public SpdyWindowUpdateParser(int frameLength) {
-        super(frameLength);
-    }
-
-    @Override
-    protected void handleData(ByteBuffer resource) {
-        if (resource.remaining() < 8) {
-            return;
-        }
-        streamId = SpdyProtocolUtils.readInt(resource);
-        deltaWindowSize = SpdyProtocolUtils.readInt(resource);
-
-    }
-
-    public int getDeltaWindowSize() {
-        return deltaWindowSize;
-    }
 }

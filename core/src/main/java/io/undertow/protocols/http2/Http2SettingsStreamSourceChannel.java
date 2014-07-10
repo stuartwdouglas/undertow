@@ -16,34 +16,30 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
+package io.undertow.protocols.http2;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.List;
+import org.xnio.Pooled;
 
 /**
- * Parser for SPDY ping frames.
+ * A HTTP2 Settings frame
  *
  * @author Stuart Douglas
  */
-class SpdyWindowUpdateParser extends SpdyPushBackParser {
+public class Http2SettingsStreamSourceChannel extends AbstractHttp2StreamSourceChannel {
 
-    private int deltaWindowSize;
+    private final List<Http2Setting> settings;
 
-    public SpdyWindowUpdateParser(int frameLength) {
-        super(frameLength);
+
+    Http2SettingsStreamSourceChannel(Http2Channel framedChannel, Pooled<ByteBuffer> data, long frameDataRemaining, List<Http2Setting> settings) {
+        super(framedChannel, data, frameDataRemaining);
+        this.settings = settings;
+        lastFrame();
     }
 
-    @Override
-    protected void handleData(ByteBuffer resource) {
-        if (resource.remaining() < 8) {
-            return;
-        }
-        streamId = SpdyProtocolUtils.readInt(resource);
-        deltaWindowSize = SpdyProtocolUtils.readInt(resource);
-
-    }
-
-    public int getDeltaWindowSize() {
-        return deltaWindowSize;
+    public List<Http2Setting> getSettings() {
+        return Collections.unmodifiableList(settings);
     }
 }

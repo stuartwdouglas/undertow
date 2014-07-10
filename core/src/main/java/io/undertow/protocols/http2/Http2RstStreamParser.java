@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
+package io.undertow.protocols.http2;
 
 import java.nio.ByteBuffer;
 
@@ -25,25 +25,24 @@ import java.nio.ByteBuffer;
  *
  * @author Stuart Douglas
  */
-class SpdyWindowUpdateParser extends SpdyPushBackParser {
+class Http2RstStreamParser extends Http2PushBackParser {
 
-    private int deltaWindowSize;
+    private int errorCode;
 
-    public SpdyWindowUpdateParser(int frameLength) {
+    public Http2RstStreamParser(int frameLength) {
         super(frameLength);
     }
 
     @Override
-    protected void handleData(ByteBuffer resource) {
+    protected void handleData(ByteBuffer resource, Http2FrameHeaderParser headerParser) {
         if (resource.remaining() < 8) {
             return;
         }
-        streamId = SpdyProtocolUtils.readInt(resource);
-        deltaWindowSize = SpdyProtocolUtils.readInt(resource);
+        errorCode = Http2ProtocolUtils.readInt(resource);
 
     }
 
-    public int getDeltaWindowSize() {
-        return deltaWindowSize;
+    public int getErrorCode() {
+        return errorCode;
     }
 }

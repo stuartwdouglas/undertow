@@ -16,9 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
-
-import org.xnio.Pool;
+package io.undertow.protocols.http2;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -27,20 +25,20 @@ import java.util.List;
 /**
  * @author Stuart Douglas
  */
-class SpdySettingsParser extends SpdyPushBackParser {
+class Http2SettingsParser extends Http2PushBackParser {
 
     private int length = -1;
 
     private int count = 0;
 
-    private final List<SpdySetting> settings = new ArrayList<>();
+    private final List<Http2Setting> settings = new ArrayList<>();
 
-    public SpdySettingsParser(Pool<ByteBuffer> bufferPool, int frameLength) {
+    public Http2SettingsParser(int frameLength) {
         super(frameLength);
     }
 
     @Override
-    protected void handleData(ByteBuffer resource) {
+    protected void handleData(ByteBuffer resource, Http2FrameHeaderParser parser) {
         if (length == -1) {
             if (resource.remaining() < 4) {
                 return;
@@ -64,20 +62,21 @@ class SpdySettingsParser extends SpdyPushBackParser {
             value += (resource.get() & 0xFF);
             boolean found = false;
             //according to the spec we MUST ignore duplicates
-            for (SpdySetting existing : settings) {
+            for (Http2Setting existing : settings) {
                 if (existing.getId() == id) {
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                settings.add(new SpdySetting(flags, id, value));
+                settings.add(new Http2Setting(flags, id, value));
             }
             count++;
         }
+        finish();
     }
 
-    public List<SpdySetting> getSettings() {
+    public List<Http2Setting> getSettings() {
         return settings;
     }
 }

@@ -16,34 +16,38 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
+package io.undertow.protocols.http2;
 
-import io.undertow.server.protocol.framed.SendFrameHeader;
-import io.undertow.util.HeaderMap;
-import io.undertow.util.Headers;
-import io.undertow.util.ImmediatePooled;
+import java.nio.ByteBuffer;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.Pooled;
 
-import java.nio.ByteBuffer;
-import java.util.zip.Deflater;
+import io.undertow.server.protocol.framed.SendFrameHeader;
+import io.undertow.util.HeaderMap;
+import io.undertow.util.ImmediatePooled;
 
 /**
+ * Headers channel
+ *
  * @author Stuart Douglas
  */
-public class SpdySynReplyStreamSinkChannel extends SpdyStreamStreamSinkChannel {
+public class Http2HeadersStreamSinkChannel extends Http2StreamSinkChannel {
 
-    private final HeaderMap headers = new HeaderMap();
+    private final HeaderMap headers;
 
     private boolean first = true;
-    private final Deflater deflater;
-    private ChannelListener<SpdySynReplyStreamSinkChannel> completionListener;
+    private final HpackEncoder encoder;
+    private ChannelListener<Http2HeadersStreamSinkChannel> completionListener;
 
+    Http2HeadersStreamSinkChannel(Http2Channel channel, int streamId) {
+        this(channel, streamId, new HeaderMap());
+    }
 
-    SpdySynReplyStreamSinkChannel(SpdyChannel channel, int streamId, Deflater deflater) {
+    Http2HeadersStreamSinkChannel(Http2Channel channel, int streamId, HeaderMap headers) {
         super(channel, streamId);
-        this.deflater = deflater;
+        this.encoder = channel.getEncoder();
+        this.headers = headers;
     }
 
     @Override
@@ -61,19 +65,29 @@ public class SpdySynReplyStreamSinkChannel extends SpdyStreamStreamSinkChannel {
         if (first) {
             firstFrame = true;
             first = false;
-            int firstInt = SpdyChannel.CONTROL_FRAME | (getChannel().getSpdyVersion() << 16) | 2;
-            SpdyProtocolUtils.putInt(firstBuffer, firstInt);
-            SpdyProtocolUtils.putInt(firstBuffer, 0); //we back fill the length
-            HeaderMap headers = this.headers;
+            //back fill the length
+            firstBuffer.put((byte) 0);
+            firstBuffer.put((byte) 0);
+            firstBuffer.put((byte) 0);
 
-            SpdyProtocolUtils.putInt(firstBuffer, getStreamId());
+            firstBuffer.put((byte) Http2Channel.FRAME_TYPE_HEADERS); //type
+            firstBuffer.put((byte) ((isWritesShutdown() && !getBuffer().hasRemaining() ? Http2Channel.HEADERS_FLAG_END_STREAM : 0) | Http2Channel.HEADERS_FLAG_END_HEADERS)); //flags
 
+            Http2ProtocolUtils.putInt(firstBuffer, getStreamId());
 
-            headers.remove(Headers.CONNECTION); //todo: should this be here?
-            headers.remove(Headers.KEEP_ALIVE);
-            headers.remove(Headers.TRANSFER_ENCODING);
-
-            allHeaderBuffers = createHeaderBlock(firstHeaderBuffer, allHeaderBuffers, firstBuffer, headers);
+            HpackEncoder.State result = encoder.encode(headers, firstBuffer);
+            Pooled<ByteBuffer> current = firstHeaderBuffer;
+            int length = firstBuffer.position() - 9;
+            while (result != HpackEncoder.State.COMPLETE) {
+                //todo: add some kind of limit here
+                allHeaderBuffers = allocateAll(allHeaderBuffers, current);
+                current = allHeaderBuffers[allHeaderBuffers.length - 1];
+                result = encoder.encode(headers, current.getResource());
+                length += current.getResource().position();
+            }
+            firstBuffer.put(0, (byte) ((length >> 16) & 0xFF));
+            firstBuffer.put(1, (byte) ((length >> 8) & 0xFF));
+            firstBuffer.put(2, (byte) (length & 0xFF));
         }
 
         Pooled<ByteBuffer> currentPooled = allHeaderBuffers == null ? firstHeaderBuffer : allHeaderBuffers[allHeaderBuffers.length - 1];
@@ -82,21 +96,31 @@ public class SpdySynReplyStreamSinkChannel extends SpdyStreamStreamSinkChannel {
         if (getBuffer().remaining() > 0) {
             if (fcWindow > 0) {
                 //make sure we have room in the header buffer
-                if(currentBuffer.remaining() < 8) {
+                if (currentBuffer.remaining() < 8) {
                     allHeaderBuffers = allocateAll(allHeaderBuffers, currentPooled);
                     currentPooled = allHeaderBuffers == null ? firstHeaderBuffer : allHeaderBuffers[allHeaderBuffers.length - 1];
                     currentBuffer = currentPooled.getResource();
                 }
                 remainingInBuffer = getBuffer().remaining() - fcWindow;
                 getBuffer().limit(getBuffer().position() + fcWindow);
-                SpdyProtocolUtils.putInt(currentBuffer, getStreamId());
-                SpdyProtocolUtils.putInt(currentBuffer, ((finalFrame ? SpdyChannel.FLAG_FIN : 0) << 24) + fcWindow);
+
+                currentBuffer.put((byte) ((fcWindow >> 16) & 0xFF));
+                currentBuffer.put((byte) ((fcWindow >> 8) & 0xFF));
+                currentBuffer.put((byte) (fcWindow & 0xFF));
+                currentBuffer.put((byte) Http2Channel.FRAME_TYPE_DATA); //type
+                currentBuffer.put((byte) (finalFrame ? Http2Channel.HEADERS_FLAG_END_STREAM : 0)); //flags
+                Http2ProtocolUtils.putInt(currentBuffer, getStreamId());
+
             } else {
                 remainingInBuffer = getBuffer().remaining();
             }
-        } else if(finalFrame && !firstFrame) {
-            SpdyProtocolUtils.putInt(currentBuffer, getStreamId());
-            SpdyProtocolUtils.putInt(currentBuffer, SpdyChannel.FLAG_FIN  << 24);
+        } else if (finalFrame && !firstFrame) {
+            currentBuffer.put((byte) 0);
+            currentBuffer.put((byte) 0);
+            currentBuffer.put((byte) 0);
+            currentBuffer.put((byte) Http2Channel.FRAME_TYPE_DATA); //type
+            currentBuffer.put((byte) (Http2Channel.HEADERS_FLAG_END_STREAM & 0xFF)); //flags
+            Http2ProtocolUtils.putInt(currentBuffer, getStreamId());
         }
         if (allHeaderBuffers == null) {
             //only one buffer required
@@ -125,12 +149,9 @@ public class SpdySynReplyStreamSinkChannel extends SpdyStreamStreamSinkChannel {
                 }
             }
         }
+
     }
 
-    @Override
-    protected Deflater getDeflater() {
-        return deflater;
-    }
 
     public HeaderMap getHeaders() {
         return headers;
@@ -146,11 +167,11 @@ public class SpdySynReplyStreamSinkChannel extends SpdyStreamStreamSinkChannel {
         }
     }
 
-    public ChannelListener<SpdySynReplyStreamSinkChannel> getCompletionListener() {
+    public ChannelListener<Http2HeadersStreamSinkChannel> getCompletionListener() {
         return completionListener;
     }
 
-    public void setCompletionListener(ChannelListener<SpdySynReplyStreamSinkChannel> completionListener) {
+    public void setCompletionListener(ChannelListener<Http2HeadersStreamSinkChannel> completionListener) {
         this.completionListener = completionListener;
     }
 }

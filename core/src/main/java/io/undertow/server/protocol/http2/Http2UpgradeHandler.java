@@ -16,34 +16,23 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
+package io.undertow.server.protocol.http2;
 
-import java.nio.ByteBuffer;
+import io.undertow.server.HttpHandler;
+import io.undertow.server.HttpServerExchange;
 
 /**
- * Parser for SPDY ping frames.
- *
  * @author Stuart Douglas
  */
-class SpdyWindowUpdateParser extends SpdyPushBackParser {
+public class Http2UpgradeHandler implements HttpHandler {
 
-    private int deltaWindowSize;
+    private final HttpHandler next;
 
-    public SpdyWindowUpdateParser(int frameLength) {
-        super(frameLength);
+    public Http2UpgradeHandler(HttpHandler next) {
+        this.next = next;
     }
 
     @Override
-    protected void handleData(ByteBuffer resource) {
-        if (resource.remaining() < 8) {
-            return;
-        }
-        streamId = SpdyProtocolUtils.readInt(resource);
-        deltaWindowSize = SpdyProtocolUtils.readInt(resource);
-
-    }
-
-    public int getDeltaWindowSize() {
-        return deltaWindowSize;
+    public void handleRequest(HttpServerExchange exchange) throws Exception {
     }
 }

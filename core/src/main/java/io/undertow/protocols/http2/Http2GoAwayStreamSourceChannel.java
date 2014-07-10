@@ -16,34 +16,33 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
+package io.undertow.protocols.http2;
 
 import java.nio.ByteBuffer;
+import org.xnio.Pooled;
 
 /**
- * Parser for SPDY ping frames.
+ * A HTTP2 go away frame
  *
  * @author Stuart Douglas
  */
-class SpdyWindowUpdateParser extends SpdyPushBackParser {
+public class Http2GoAwayStreamSourceChannel extends AbstractHttp2StreamSourceChannel {
 
-    private int deltaWindowSize;
+    private final int status;
+    private final int lastGoodStreamId;
 
-    public SpdyWindowUpdateParser(int frameLength) {
-        super(frameLength);
+    Http2GoAwayStreamSourceChannel(Http2Channel framedChannel, Pooled<ByteBuffer> data, long frameDataRemaining, int status, int lastGoodStreamId) {
+        super(framedChannel, data, frameDataRemaining);
+        this.status = status;
+        this.lastGoodStreamId = lastGoodStreamId;
+        lastFrame();
     }
 
-    @Override
-    protected void handleData(ByteBuffer resource) {
-        if (resource.remaining() < 8) {
-            return;
-        }
-        streamId = SpdyProtocolUtils.readInt(resource);
-        deltaWindowSize = SpdyProtocolUtils.readInt(resource);
-
+    public int getStatus() {
+        return status;
     }
 
-    public int getDeltaWindowSize() {
-        return deltaWindowSize;
+    public int getLastGoodStreamId() {
+        return lastGoodStreamId;
     }
 }

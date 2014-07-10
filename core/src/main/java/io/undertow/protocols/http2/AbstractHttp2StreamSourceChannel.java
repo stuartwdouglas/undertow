@@ -16,10 +16,9 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
+package io.undertow.protocols.http2;
 
 import java.nio.ByteBuffer;
-import org.xnio.Bits;
 import org.xnio.Pooled;
 
 import io.undertow.server.protocol.framed.AbstractFramedStreamSourceChannel;
@@ -30,25 +29,27 @@ import io.undertow.server.protocol.framed.FrameHeaderData;
  *
  * @author Stuart Douglas
  */
-public class SpdyStreamSourceChannel extends AbstractFramedStreamSourceChannel<SpdyChannel, SpdyStreamSourceChannel, SpdyStreamSinkChannel> {
+public class AbstractHttp2StreamSourceChannel extends AbstractFramedStreamSourceChannel<Http2Channel, AbstractHttp2StreamSourceChannel, AbstractHttp2StreamSinkChannel> {
 
-    SpdyStreamSourceChannel(SpdyChannel framedChannel) {
+    AbstractHttp2StreamSourceChannel(Http2Channel framedChannel) {
         super(framedChannel);
     }
 
-    SpdyStreamSourceChannel(SpdyChannel framedChannel, Pooled<ByteBuffer> data, long frameDataRemaining) {
+    AbstractHttp2StreamSourceChannel(Http2Channel framedChannel, Pooled<ByteBuffer> data, long frameDataRemaining) {
         super(framedChannel, data, frameDataRemaining);
     }
 
     @Override
     protected void handleHeaderData(FrameHeaderData headerData) {
-        SpdyChannel.SpdyFrameParser data = (SpdyChannel.SpdyFrameParser) headerData;
-        if(Bits.anyAreSet(data.flags, SpdyChannel.FLAG_FIN)) {
-            this.lastFrame();
-        }
+        //by default we do nothing
     }
 
-    public SpdyChannel getSpdyChannel() {
+    @Override
+    protected Http2Channel getFramedChannel() {
+        return super.getFramedChannel();
+    }
+
+    public Http2Channel getHttp2Channel() {
         return getFramedChannel();
     }
 
