@@ -126,7 +126,7 @@ class NodePingUtil {
             return;
         }
 
-        final int timeout = node.getNodeConfig().getTimeout();
+        final int timeout = node.getNodeConfig().getPing();
         exchange.dispatch(exchange.isInIoThread() ? SameThreadExecutor.INSTANCE : exchange.getIoThread(), new Runnable() {
             @Override
             public void run() {
@@ -144,6 +144,25 @@ class NodePingUtil {
                 }, timeout, TimeUnit.SECONDS, false);
             }
         });
+    }
+
+    /**
+     * Internally ping a node. This should probably use the connections from the nodes pool, if there are any available.
+     *
+     * @param node          the node
+     * @param callback      the ping callback
+     * @param ioThread      the xnio i/o thread
+     * @param bufferPool    the xnio buffer pool
+     * @param client        the undertow client
+     * @param xnioSsl       the ssl setup
+     * @param options       the options
+     */
+    static void internalPingNode(Node node, PingCallback callback, XnioIoThread ioThread, Pool<ByteBuffer> bufferPool, UndertowClient client, XnioSsl xnioSsl, OptionMap options) {
+
+        final URI uri = node.getNodeConfig().getConnectionURI();
+        final long timeout = node.getNodeConfig().getPing();
+        final HttpClientPingTask r = new HttpClientPingTask(uri, callback, ioThread, client, xnioSsl, bufferPool, options);
+        ioThread.execute(r);
     }
 
     static class ConnectionPoolPingTask implements Runnable {

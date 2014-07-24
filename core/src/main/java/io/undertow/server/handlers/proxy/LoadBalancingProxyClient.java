@@ -84,10 +84,33 @@ public class LoadBalancingProxyClient implements ProxyClient {
     private static final ProxyTarget PROXY_TARGET = new ProxyTarget() {
     };
 
+    private volatile boolean problems = false;
+
     private final ConnectionPoolManager manager = new ConnectionPoolManager() {
+
+        @Override
+        public boolean isAvailable() {
+            return !problems;
+        }
+
+        @Override
+        public void connectionError() {
+            problems = true;
+        }
+
+        @Override
+        public void clearErrorState() {
+            problems = false;
+        }
+
         @Override
         public boolean canCreateConnection(int connections, ProxyConnectionPool proxyConnectionPool) {
             return connections < connectionsPerThread;
+        }
+
+        @Override
+        public boolean cacheConnection(int connections, ProxyConnectionPool proxyConnectionPool) {
+            return connections <= connectionsPerThread;
         }
 
         @Override
