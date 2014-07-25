@@ -182,19 +182,8 @@ class NodePingUtil {
             proxyConnection.getConnection().sendRequest(PING_REQUEST, new ClientCallback<ClientExchange>() {
                 @Override
                 public void completed(final ClientExchange result) {
-                    result.setResponseListener(new ClientCallback<ClientExchange>() {
-                        @Override
-                        public void completed(ClientExchange result) {
-                            final RequestExchangeListener listener = new RequestExchangeListener(callback, result, false);
-                            result.setResponseListener(listener);
-                        }
-
-                        @Override
-                        public void failed(IOException e) {
-                            callback.failed();
-                            IoUtils.safeClose(result.getConnection());
-                        }
-                    });
+                    final RequestExchangeListener listener = new RequestExchangeListener(callback, result, false);
+                    result.setResponseListener(listener);
                 }
 
                 @Override
@@ -283,7 +272,7 @@ class NodePingUtil {
                     result.sendRequest(PING_REQUEST, new ClientCallback<ClientExchange>() {
                         @Override
                         public void completed(ClientExchange result) {
-                            final RequestExchangeListener listener = new RequestExchangeListener(callback, result, true);
+                            final RequestExchangeListener listener = new RequestExchangeListener(callback, result, false);
                             result.setResponseListener(listener);
                         }
 
