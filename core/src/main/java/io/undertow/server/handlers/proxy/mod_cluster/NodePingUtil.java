@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 import java.util.concurrent.TimeUnit;
 
 import io.undertow.client.ClientCallback;
@@ -45,6 +46,7 @@ import org.xnio.Pool;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
+import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
 import org.xnio.ssl.XnioSsl;
 
@@ -184,6 +186,22 @@ class NodePingUtil {
                 public void completed(final ClientExchange result) {
                     final RequestExchangeListener listener = new RequestExchangeListener(callback, result, false);
                     result.setResponseListener(listener);
+                    try {
+                        result.getRequestChannel().shutdownWrites();
+                        if(!result.getRequestChannel().flush()) {
+                            result.getRequestChannel().getWriteSetter().set(ChannelListeners.flushingChannelListener(null, new ChannelExceptionHandler<StreamSinkChannel>() {
+                                @Override
+                                public void handleException(StreamSinkChannel channel, IOException exception) {
+                                    IoUtils.safeClose(proxyConnection.getConnection());
+                                    callback.failed();
+                                }
+                            }));
+                            result.getRequestChannel().resumeWrites();
+                        }
+                    } catch (IOException e) {
+                        IoUtils.safeClose(proxyConnection.getConnection());
+                        callback.failed();
+                    }
                 }
 
                 @Override
