@@ -335,4 +335,7 @@ public interface UndertowMessages {
 
     @Message(id = 103, value = "Http2 stream was reset")
     IOException http2StreamWasReset();
+
+    @Message(id = 104, value = "Incorrect HTTP2 preface")
+    IOException incorrectHttp2Preface();
 }

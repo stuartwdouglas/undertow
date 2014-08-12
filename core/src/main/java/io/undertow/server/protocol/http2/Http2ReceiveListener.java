@@ -28,11 +28,14 @@ import io.undertow.UndertowLogger;
 import io.undertow.UndertowOptions;
 import io.undertow.protocols.http2.AbstractHttp2StreamSourceChannel;
 import io.undertow.protocols.http2.Http2Channel;
+import io.undertow.protocols.http2.Http2DataStreamSinkChannel;
 import io.undertow.protocols.http2.Http2HeadersStreamSinkChannel;
 import io.undertow.protocols.http2.Http2StreamSourceChannel;
 import io.undertow.server.Connectors;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HeaderMap;
+import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.URLUtils;
@@ -103,9 +106,9 @@ public class Http2ReceiveListener implements ChannelListener<Http2Channel> {
                 if(session != null) {
                     connection.setSslSessionInfo(new Http2SslSessionInfo(channel));
                 }
-                dataChannel.getResponseChannel().setCompletionListener(new ChannelListener<Http2HeadersStreamSinkChannel>() {
+                dataChannel.getResponseChannel().setCompletionListener(new ChannelListener<Http2DataStreamSinkChannel>() {
                     @Override
-                    public void handleEvent(Http2HeadersStreamSinkChannel channel) {
+                    public void handleEvent(Http2DataStreamSinkChannel channel) {
                         Connectors.terminateResponse(exchange);
                     }
                 });
@@ -127,6 +130,42 @@ public class Http2ReceiveListener implements ChannelListener<Http2Channel> {
             UndertowLogger.REQUEST_IO_LOGGER.ioException(e);
             IoUtils.safeClose(channel);
         }
+    }
+
+    /**
+     * Handles the initial request when the exchange was started by a HTTP ugprade.
+     *
+     *
+     * @param initial The initial upgrade request that started the HTTP2 connection
+     */
+    void handleInitialRequest(HttpServerExchange initial, Http2Channel channel) {
+
+        //we have a request
+        Http2HeadersStreamSinkChannel sink = new Http2HeadersStreamSinkChannel(channel, 1);
+        final Http2ServerConnection connection = new Http2ServerConnection(channel, sink, undertowOptions, bufferSize);
+
+        HeaderMap requestHeaders = new HeaderMap();
+        for(HeaderValues hv : initial.getRequestHeaders()) {
+            requestHeaders.putAll(hv.getHeaderName(), hv);
+        }
+        final HttpServerExchange exchange = new HttpServerExchange(connection, requestHeaders, sink.getHeaders(), maxEntitySize);
+        exchange.setRequestScheme(initial.getRequestScheme());
+        exchange.setProtocol(initial.getProtocol());
+        exchange.setRequestMethod(initial.getRequestMethod());
+        setRequestPath(exchange, exchange.getRequestURI(), encoding, allowEncodingSlash, decodeBuffer);
+
+        SSLSession session = channel.getSslSession();
+        if(session != null) {
+            connection.setSslSessionInfo(new Http2SslSessionInfo(channel));
+        }
+        Connectors.terminateRequest(exchange);
+        sink.setCompletionListener(new ChannelListener<Http2DataStreamSinkChannel>() {
+            @Override
+            public void handleEvent(Http2DataStreamSinkChannel channel) {
+                Connectors.terminateResponse(exchange);
+            }
+        });
+        Connectors.executeRootHandler(rootHandler, exchange);
     }
 
     /**

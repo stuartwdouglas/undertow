@@ -100,6 +100,10 @@ public class Http2Channel extends AbstractFramedChannel<Http2Channel, AbstractHt
 
 
     static final int DEFAULT_INITIAL_WINDOW_SIZE = 65535;
+    public static final byte[] PREFACE_BYTES = {
+            0x50, 0x52, 0x49, 0x20, 0x2a, 0x20, 0x48, 0x54,
+            0x54, 0x50, 0x2f, 0x32, 0x2e, 0x30, 0x0d, 0x0a,
+            0x0d, 0x0a, 0x53, 0x4d, 0x0d, 0x0a, 0x0d, 0x0a};
 
     private Http2FrameHeaderParser frameParser;
     private final Map<Integer, AbstractHttp2StreamSourceChannel> incomingStreams = new ConcurrentHashMap<>();
@@ -127,11 +131,43 @@ public class Http2Channel extends AbstractFramedChannel<Http2Channel, AbstractHt
     private final HpackDecoder decoder = new HpackDecoder();
     private final HpackEncoder encoder = new HpackEncoder();
 
+    int prefaceCount;
+
     private final Map<AttachmentKey<?>, Object> attachments = Collections.synchronizedMap(new HashMap<AttachmentKey<?>, Object>());
 
     public Http2Channel(StreamConnection connectedStreamChannel, Pool<ByteBuffer> bufferPool, Pooled<ByteBuffer> data, boolean clientSide) {
         super(connectedStreamChannel, bufferPool, Http2FramePriority.INSTANCE, data);
         streamIdCounter = clientSide ? 1 : 2;
+
+        sendPreface();
+    }
+
+    private void sendPreface() {
+        Http2PrefaceStreamSinkChannel preface = new Http2PrefaceStreamSinkChannel(this);
+        try {
+            preface.shutdownWrites();
+            if(!preface.flush()) {
+                preface.getWriteSetter().set(ChannelListeners.flushingChannelListener(null, null));
+                preface.resumeWrites();
+            }
+        } catch (IOException e) {
+            UndertowLogger.REQUEST_IO_LOGGER.ioException(e);
+        }
+    }
+
+    public Http2Channel(StreamConnection connectedStreamChannel, Pool<ByteBuffer> bufferPool, Pooled<ByteBuffer> data, boolean clientSide, ByteBuffer initialSettings) {
+        super(connectedStreamChannel, bufferPool, Http2FramePriority.INSTANCE, data);
+        streamIdCounter = clientSide ? 1 : 2;
+        Http2SettingsParser parser = new Http2SettingsParser(initialSettings.remaining());
+        try {
+            parser.parse(initialSettings, new Http2FrameHeaderParser(this));
+            updateSettings(parser.getSettings());
+        } catch (IOException e) {
+            IoUtils.safeClose(connectedStreamChannel);
+            //should never happen
+            throw new RuntimeException(e);
+        }
+        sendPreface();
     }
 
     @Override
@@ -209,6 +245,15 @@ public class Http2Channel extends AbstractFramedChannel<Http2Channel, AbstractHt
 
     @Override
     protected FrameHeaderData parseFrame(ByteBuffer data) throws IOException {
+        if(prefaceCount < PREFACE_BYTES.length) {
+            while (data.hasRemaining() && prefaceCount < PREFACE_BYTES.length) {
+                if(data.get() != PREFACE_BYTES[prefaceCount]) {
+                    IoUtils.safeClose(getUnderlyingConnection());
+                    throw UndertowMessages.MESSAGES.incorrectHttp2Preface();
+                }
+                prefaceCount++;
+            }
+        }
         Http2FrameHeaderParser frameParser = this.frameParser;
         if (frameParser == null) {
             this.frameParser = frameParser = new Http2FrameHeaderParser(this);

@@ -565,7 +565,7 @@ public class SpdyChannel extends AbstractFramedChannel<SpdyChannel, SpdyStreamSo
                         break;
                     }
                     case SETTINGS: {
-                        parser = new SpdySettingsParser(getBufferPool(), length);
+                        parser = new SpdySettingsParser(length);
                         break;
                     }
                     case WINDOW_UPDATE: {

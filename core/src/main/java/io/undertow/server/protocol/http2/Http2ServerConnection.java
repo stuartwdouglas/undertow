@@ -39,7 +39,9 @@ import org.xnio.conduits.StreamSourceConduit;
 
 import io.undertow.UndertowMessages;
 import io.undertow.protocols.http2.Http2Channel;
+import io.undertow.protocols.http2.Http2DataStreamSinkChannel;
 import io.undertow.protocols.http2.Http2HeadersStreamSinkChannel;
+import io.undertow.protocols.http2.Http2StreamSinkChannel;
 import io.undertow.protocols.http2.Http2StreamSourceChannel;
 import io.undertow.server.Connectors;
 import io.undertow.server.HttpServerExchange;
@@ -66,7 +68,7 @@ public class Http2ServerConnection extends ServerConnection {
 
     private final Http2Channel channel;
     private final Http2StreamSourceChannel requestChannel;
-    private final Http2HeadersStreamSinkChannel responseChannel;
+    private final Http2DataStreamSinkChannel responseChannel;
     private final ConduitStreamSinkChannel conduitStreamSinkChannel;
     private final ConduitStreamSourceChannel conduitStreamSourceChannel;
     private final StreamSinkConduit originalSinkConduit;
@@ -81,6 +83,24 @@ public class Http2ServerConnection extends ServerConnection {
         this.undertowOptions = undertowOptions;
         this.bufferSize = bufferSize;
         responseChannel = requestChannel.getResponseChannel();
+        originalSinkConduit = new StreamSinkChannelWrappingConduit(responseChannel);
+        originalSourceConduit = new StreamSourceChannelWrappingConduit(requestChannel);
+        this.conduitStreamSinkChannel = new ConduitStreamSinkChannel(responseChannel, originalSinkConduit);
+        this.conduitStreamSourceChannel = new ConduitStreamSourceChannel(requestChannel, originalSourceConduit);
+    }
+
+    /**
+     * Channel that is used when the request is already half closed
+     * @param channel
+     * @param undertowOptions
+     * @param bufferSize
+     */
+    public Http2ServerConnection(Http2Channel channel, Http2DataStreamSinkChannel sinkChannel, OptionMap undertowOptions, int bufferSize) {
+        this.channel = channel;
+        this.requestChannel = null;
+        this.undertowOptions = undertowOptions;
+        this.bufferSize = bufferSize;
+        responseChannel = sinkChannel;
         originalSinkConduit = new StreamSinkChannelWrappingConduit(responseChannel);
         originalSourceConduit = new StreamSourceChannelWrappingConduit(requestChannel);
         this.conduitStreamSinkChannel = new ConduitStreamSinkChannel(responseChannel, originalSinkConduit);

@@ -18,39 +18,23 @@
 
 package io.undertow.protocols.http2;
 
+import java.nio.ByteBuffer;
+
+import io.undertow.server.protocol.framed.SendFrameHeader;
+import io.undertow.util.ImmediatePooled;
+
 /**
- * A Http2 Setting
+ * channel implementation that sends the initial HTTP2 preface
  *
  * @author Stuart Douglas
  */
-public class Http2Setting {
-
-    public static final int SETTINGS_HEADER_TABLE_SIZE = 0x1;
-    public static final int SETTINGS_ENABLE_PUSH = 0x2;
-    public static final int SETTINGS_MAX_CONCURRENT_STREAMS = 0x3;
-    public static final int SETTINGS_INITIAL_WINDOW_SIZE = 0x4;
-    public static final int SETTINGS_MAX_FRAME_SIZE = 0x5;
-    public static final int SETTINGS_MAX_HEADER_LIST_SIZE = 0x6;
-
-    private final int flags;
-    private final int id;
-    private final int value;
-
-    Http2Setting(int flags, int id, int value) {
-        this.flags = flags;
-        this.id = id;
-        this.value = value;
+class Http2PrefaceStreamSinkChannel extends Http2StreamSinkChannel {
+    Http2PrefaceStreamSinkChannel(Http2Channel channel) {
+        super(channel, 0);
     }
 
-    public int getFlags() {
-        return flags;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public int getValue() {
-        return value;
+    @Override
+    protected SendFrameHeader createFrameHeaderImpl() {
+        return new SendFrameHeader(new ImmediatePooled<>(ByteBuffer.wrap(Http2Channel.PREFACE_BYTES)));
     }
 }
