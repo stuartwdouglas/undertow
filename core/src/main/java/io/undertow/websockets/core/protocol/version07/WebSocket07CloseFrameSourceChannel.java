@@ -30,14 +30,14 @@ import java.nio.ByteBuffer;
  */
 class WebSocket07CloseFrameSourceChannel extends StreamSourceFrameChannel {
 
-    WebSocket07CloseFrameSourceChannel(WebSocket07Channel wsChannel, int rsv, Masker masker, Pooled<ByteBuffer> pooled, long frameLength) {
+    WebSocket07CloseFrameSourceChannel(WebSocket07Channel wsChannel, int rsv, Masker masker, long frameLength) {
         // no fragmentation allowed per spec
-        super(wsChannel, WebSocketFrameType.CLOSE, rsv, true, pooled, frameLength, masker, new CloseFrameValidatorChannelFunction(wsChannel));
+        super(wsChannel, WebSocketFrameType.CLOSE, rsv, true, frameLength, masker, new CloseFrameValidatorChannelFunction(wsChannel));
     }
 
-    WebSocket07CloseFrameSourceChannel(WebSocket07Channel wsChannel, int rsv, Pooled<ByteBuffer> pooled, long frameLength) {
+    WebSocket07CloseFrameSourceChannel(WebSocket07Channel wsChannel, int rsv, long frameLength) {
         // no fragmentation allowed per spec
-        super(wsChannel, WebSocketFrameType.CLOSE, rsv, true, pooled, frameLength, new CloseFrameValidatorChannelFunction(wsChannel));
+        super(wsChannel, WebSocketFrameType.CLOSE, rsv, true, frameLength, null, new CloseFrameValidatorChannelFunction(wsChannel));
     }
 
     public static class CloseFrameValidatorChannelFunction extends UTF8Checker {

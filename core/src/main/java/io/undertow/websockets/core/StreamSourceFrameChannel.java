@@ -19,19 +19,14 @@
 package io.undertow.websockets.core;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.List;
 
-import io.undertow.websockets.core.function.ChannelFunction;
-import io.undertow.websockets.core.function.ChannelFunctionFileChannel;
 import io.undertow.websockets.core.protocol.version07.Masker;
 import io.undertow.websockets.core.protocol.version07.UTF8Checker;
 import io.undertow.websockets.extensions.ExtensionByteBuffer;
 import io.undertow.websockets.extensions.ExtensionFunction;
 import org.xnio.Pooled;
-import org.xnio.channels.StreamSinkChannel;
 
 import io.undertow.server.protocol.framed.AbstractFramedStreamSourceChannel;
 import io.undertow.server.protocol.framed.FrameHeaderData;
@@ -44,36 +39,25 @@ import io.undertow.server.protocol.framed.FrameHeaderData;
 public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourceChannel<WebSocketChannel, StreamSourceFrameChannel, StreamSinkFrameChannel> {
 
     protected final WebSocketFrameType type;
+    private final Masker masker;
+    private final UTF8Checker checker;
 
     private boolean finalFragment;
     private final int rsv;
-    private final ChannelFunction[] functions;
     private final List<ExtensionFunction> extensions;
     private ExtensionByteBuffer extensionResult;
-    private Masker masker;
-    private UTF8Checker checker;
 
-    protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type, Pooled<ByteBuffer> pooled, long frameLength) {
-        this(wsChannel, type, 0, true, pooled, frameLength);
+    protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type,  long frameLength) {
+        this(wsChannel, type, 0, true, frameLength, null, null);
     }
 
-    protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type, int rsv, boolean finalFragment, Pooled<ByteBuffer> pooled, long frameLength, ChannelFunction... functions) {
-        super(wsChannel, pooled, frameLength);
+    protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type, int rsv, boolean finalFragment, long frameLength, Masker masker, UTF8Checker checker) {
+        super(wsChannel, null, frameLength);
         this.type = type;
         this.finalFragment = finalFragment;
         this.rsv = rsv;
-
-        this.functions = functions;
-        masker = null;
-        checker = null;
-        for (ChannelFunction func : functions) {
-            if (func instanceof Masker) {
-                masker = (Masker) func;
-            }
-            if (func instanceof UTF8Checker) {
-                checker = (UTF8Checker) func;
-            }
-        }
+        this.masker = masker;
+        this.checker = checker;
         if (wsChannel.areExtensionsSupported() && wsChannel.getExtensions() != null && !wsChannel.getExtensions().isEmpty()) {
             extensions = wsChannel.getExtensions();
         } else {
@@ -112,7 +96,7 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
 
     @Override
     protected WebSocketChannel getFramedChannel() {
-        return (WebSocketChannel) super.getFramedChannel();
+        return super.getFramedChannel();
     }
 
     public WebSocketChannel getWebSocketChannel() {
@@ -124,145 +108,73 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
         this.finalFragment = true;
     }
 
+    //TODO: reduce visibility
+    public void firstFrameData(Pooled<ByteBuffer> data) {
+        dataReady(null, data);
+    }
+
+    @Override
+    protected void dataReady(FrameHeaderData headerData, Pooled<ByteBuffer> frameData) {
+        if(headerData != null) {
+            if (masker != null) {
+                masker.newFrame(headerData);
+            }
+            if (checker != null) {
+                checker.newFrame(headerData);
+            }
+        }
+        if(frameData != null) {
+            List<Pooled<ByteBuffer>> expanded = handleBuffer(frameData);
+            super.dataReady(headerData, frameData);
+            if(expanded != null) {
+                for(Pooled<ByteBuffer> d : expanded) {
+                    super.dataReady(null, d);
+                }
+            }
+        } else {
+            super.dataReady(headerData, frameData);
+        }
+    }
+
+    protected void complete() throws IOException {
+        try {
+            if (checker != null) {
+                checker.complete();
+            }
+            if (masker != null) {
+                masker.complete();
+            }
+        } catch (IOException e) {
+            getFramedChannel().markReadsBroken(e);
+            throw e;
+        }
+    }
+
+
     @Override
     protected void handleHeaderData(FrameHeaderData headerData) {
-        super.handleHeaderData(headerData);
-        if (((WebSocketFrame) headerData).isFinalFragment()) {
-            finalFrame();
-        }
-        if(functions != null) {
-            for(ChannelFunction func : functions) {
-                func.newFrame(headerData);
+        if(headerData != null) {
+            if (((WebSocketFrame) headerData).isFinalFragment()) {
+                finalFrame();
             }
         }
     }
 
-
-    @Override
-    public final long transferTo(long position, long count, FileChannel target) throws IOException {
-        long r;
-        if (functions != null && functions.length > 0) {
-            r = super.transferTo(position, count, new ChannelFunctionFileChannel(target, functions));
-        } else {
-            r = super.transferTo(position, count, target);
+    private List<Pooled<ByteBuffer>> handleBuffer(Pooled<ByteBuffer> frameData) {
+        ByteBuffer resource = frameData.getResource();
+        if(masker != null) {
+            masker.afterRead(resource, resource.position(), resource.remaining());
         }
-        return r;
-    }
 
-    @Override
-    public final long transferTo(long count, ByteBuffer throughBuffer, StreamSinkChannel target) throws IOException {
-        // use this because of XNIO bug
-        // See https://issues.jboss.org/browse/XNIO-185
-        return WebSocketUtils.transfer(this, count, throughBuffer, target);
-    }
 
-    @Override
-    public int read(ByteBuffer dst) throws IOException {
-        int r;
-        int position = dst.position();
-        if (extensionResult == null) {
-            r = super.read(dst);
-            if (r > 0) {
-                masker(dst, position, r);
-            }
-            if (getRsv() > 0) {
-                extensionResult = applyExtensions(dst, position, r);
-            }
-            if (r > 0) {
-                boolean complete = isComplete() && extensionResult == null;
-                checker(dst, position, dst.position() - position, complete);
-            }
-            return r;
-        } else {
-            r = extensionResult.flushExtra(dst);
-            if (!extensionResult.hasExtra()) {
-                extensionResult.free();
-                extensionResult = null;
-            }
-            if (r > 0) {
-                checker(dst, position, dst.position() - position, isComplete() && extensionResult == null);
-            }
-            return r;
-        }
-    }
-
-    @Override
-    public final long read(ByteBuffer[] dsts) throws IOException {
-        return read(dsts, 0, dsts.length);
-    }
-
-    @Override
-    public long read(ByteBuffer[] dsts, int offset, int length) throws IOException {
-        Bounds[] old = new Bounds[length];
-        for (int i = offset; i < length; i++) {
-            ByteBuffer dst = dsts[i];
-            old[i - offset] = new Bounds(dst.position(), dst.limit());
-        }
-        long b = super.read(dsts, offset, length);
-        if (b > 0) {
-            for (int i = offset; i < length; i++) {
-                ByteBuffer dst = dsts[i];
-                int oldPos = old[i - offset].position;
-                afterRead(dst, oldPos, dst.position() - oldPos);
+        if(checker != null) {
+            try {
+                checker.afterRead(resource, resource.position(), resource.remaining());
+            } catch (IOException e) {
+                getFramedChannel().markReadsBroken(e);
             }
         }
-        return b;
-    }
-
-    /**
-     * Called after data was read into the {@link ByteBuffer}
-     *
-     * @param buffer   the {@link ByteBuffer} into which the data was read
-     * @param position the position it was written to
-     * @param length   the number of bytes there were written
-     * @throws IOException thrown if an error occurs
-     */
-    protected void afterRead(ByteBuffer buffer, int position, int length) throws IOException {
-        try {
-            for (ChannelFunction func : functions) {
-                func.afterRead(buffer, position, length);
-            }
-            if (isComplete()) {
-                try {
-                    for (ChannelFunction func : functions) {
-                        func.complete();
-                    }
-                } catch (UnsupportedEncodingException e) {
-                    getFramedChannel().markReadsBroken(e);
-                    throw e;
-                }
-            }
-        } catch (UnsupportedEncodingException e) {
-            getFramedChannel().markReadsBroken(e);
-            throw e;
-        }
-    }
-
-    protected void masker(ByteBuffer buffer, int position, int length) throws IOException {
-        if (masker == null) {
-            return;
-        }
-        masker.afterRead(buffer, position, length);
-    }
-
-    protected void checker(ByteBuffer buffer, int position, int length, boolean complete) throws IOException {
-        if (checker == null) {
-            return;
-        }
-        try {
-            checker.afterRead(buffer, position, length);
-            if (complete) {
-                try {
-                    checker.complete();
-                } catch (UnsupportedEncodingException e) {
-                    getFramedChannel().markReadsBroken(e);
-                    throw e;
-                }
-            }
-        } catch (UnsupportedEncodingException e) {
-            getFramedChannel().markReadsBroken(e);
-            throw e;
-        }
+        return null;
     }
 
     /**

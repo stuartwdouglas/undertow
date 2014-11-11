@@ -28,13 +28,13 @@ import java.nio.ByteBuffer;
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
 class WebSocket07PongFrameSourceChannel extends StreamSourceFrameChannel {
-    WebSocket07PongFrameSourceChannel(WebSocketChannel wsChannel, int rsv, final Masker masker, Pooled<ByteBuffer> pooled, long frameLength) {
+    WebSocket07PongFrameSourceChannel(WebSocketChannel wsChannel, int rsv, final Masker masker, long frameLength) {
         // can not be fragmented
-        super(wsChannel, WebSocketFrameType.PONG, rsv, true, pooled, frameLength, masker);
+        super(wsChannel, WebSocketFrameType.PONG, rsv, true, frameLength, masker, null);
     }
 
-    WebSocket07PongFrameSourceChannel(WebSocketChannel wsChannel, int rsv, Pooled<ByteBuffer> pooled, long frameLength) {
+    WebSocket07PongFrameSourceChannel(WebSocketChannel wsChannel, int rsv, long frameLength) {
         // can not be fragmented
-        super(wsChannel, WebSocketFrameType.PONG, rsv, true, pooled, frameLength);
+        super(wsChannel, WebSocketFrameType.PONG, rsv, true, frameLength, null, null);
     }
 }

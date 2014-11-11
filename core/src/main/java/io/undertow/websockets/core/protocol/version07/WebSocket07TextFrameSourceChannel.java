@@ -28,11 +28,11 @@ import java.nio.ByteBuffer;
  */
 class WebSocket07TextFrameSourceChannel extends StreamSourceFrameChannel {
 
-    WebSocket07TextFrameSourceChannel(WebSocket07Channel wsChannel, int rsv, boolean finalFragment, Masker masker, UTF8Checker checker, Pooled<ByteBuffer> pooled, long frameLength) {
-        super(wsChannel, WebSocketFrameType.TEXT, rsv, finalFragment, pooled, frameLength, masker, checker);
+    WebSocket07TextFrameSourceChannel(WebSocket07Channel wsChannel, int rsv, boolean finalFragment, Masker masker, UTF8Checker checker, long frameLength) {
+        super(wsChannel, WebSocketFrameType.TEXT, rsv, finalFragment, frameLength, masker, checker);
     }
 
-    WebSocket07TextFrameSourceChannel(WebSocket07Channel wsChannel, int rsv, boolean finalFragment, UTF8Checker checker, Pooled<ByteBuffer> pooled, long frameLength) {
-        super(wsChannel, WebSocketFrameType.TEXT, rsv, finalFragment, pooled, frameLength, checker);
+    WebSocket07TextFrameSourceChannel(WebSocket07Channel wsChannel, int rsv, boolean finalFragment, UTF8Checker checker, long frameLength) {
+        super(wsChannel, WebSocketFrameType.TEXT, rsv, finalFragment, frameLength, null, checker);
     }
 }
