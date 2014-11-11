@@ -19,9 +19,6 @@ package io.undertow.websockets.core.protocol.version07;
 
 import io.undertow.websockets.core.StreamSourceFrameChannel;
 import io.undertow.websockets.core.WebSocketFrameType;
-import org.xnio.Pooled;
-
-import java.nio.ByteBuffer;
 
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>

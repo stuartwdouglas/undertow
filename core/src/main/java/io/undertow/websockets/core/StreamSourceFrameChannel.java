@@ -20,6 +20,7 @@ package io.undertow.websockets.core;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 
 import io.undertow.websockets.core.protocol.version07.Masker;
@@ -45,7 +46,6 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
     private boolean finalFragment;
     private final int rsv;
     private final List<ExtensionFunction> extensions;
-    private ExtensionByteBuffer extensionResult;
 
     protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type,  long frameLength) {
         this(wsChannel, type, 0, true, frameLength, null, null);
@@ -63,7 +63,6 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
         } else {
             extensions = null;
         }
-        this.extensionResult = null;
     }
 
 
@@ -113,29 +112,6 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
         dataReady(null, data);
     }
 
-    @Override
-    protected void dataReady(FrameHeaderData headerData, Pooled<ByteBuffer> frameData) {
-        if(headerData != null) {
-            if (masker != null) {
-                masker.newFrame(headerData);
-            }
-            if (checker != null) {
-                checker.newFrame(headerData);
-            }
-        }
-        if(frameData != null) {
-            List<Pooled<ByteBuffer>> expanded = handleBuffer(frameData);
-            super.dataReady(headerData, frameData);
-            if(expanded != null) {
-                for(Pooled<ByteBuffer> d : expanded) {
-                    super.dataReady(null, d);
-                }
-            }
-        } else {
-            super.dataReady(headerData, frameData);
-        }
-    }
-
     protected void complete() throws IOException {
         try {
             if (checker != null) {
@@ -158,23 +134,42 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
                 finalFrame();
             }
         }
+        if(headerData != null) {
+            if (masker != null) {
+                masker.newFrame(headerData);
+            }
+            if (checker != null) {
+                checker.newFrame(headerData);
+            }
+        }
     }
 
-    private List<Pooled<ByteBuffer>> handleBuffer(Pooled<ByteBuffer> frameData) {
+    protected Pooled<ByteBuffer>[] process(Pooled<ByteBuffer> frameData) {
         ByteBuffer resource = frameData.getResource();
         if(masker != null) {
             masker.afterRead(resource, resource.position(), resource.remaining());
         }
 
+        try {
+            Pooled<ByteBuffer>[] res =  applyExtensions(resource);
 
-        if(checker != null) {
-            try {
-                checker.afterRead(resource, resource.position(), resource.remaining());
-            } catch (IOException e) {
-                getFramedChannel().markReadsBroken(e);
+            if(checker != null) {
+                try {
+                    checker.afterRead(resource, resource.position(), resource.remaining());
+                    if(res != null) {
+                        for(Pooled<ByteBuffer> i : res) {
+                            checker.afterRead(i.getResource(), i.getResource().position(), i.getResource().remaining());
+                        }
+                    }
+                } catch (IOException e) {
+                    getFramedChannel().markReadsBroken(e);
+                }
             }
+            return res;
+        } catch (IOException e) {
+            getFramedChannel().markReadsBroken(e);
+            return null;
         }
-        return null;
     }
 
     /**
@@ -185,39 +180,20 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
      * {@code ByteBuffer} .
      *
      * @param buffer    the buffer to operate on
-     * @param position  the index in the buffer to start from
-     * @param length    the number of bytes to operate on
      * @return          a {@link ExtensionByteBuffer} instance as a wrapper of original buffer with extra buffers;
      *                  {@code null} if no extra buffers needed
      * @throws IOException
      */
-    protected ExtensionByteBuffer applyExtensions(final ByteBuffer buffer, final int position, final int length) throws IOException {
-        ExtensionByteBuffer extBuffer = new ExtensionByteBuffer(getWebSocketChannel(), buffer, position);
-        int newLength = length;
+    protected Pooled<ByteBuffer>[] applyExtensions(final ByteBuffer buffer) throws IOException {
+        ExtensionByteBuffer extBuffer = new ExtensionByteBuffer(getWebSocketChannel(), buffer, buffer.position());
         if (extensions != null) {
             for (ExtensionFunction ext : extensions) {
-                ext.afterRead(this, extBuffer, position, newLength);
-                if (extBuffer.getFilled() == 0) {
-                    buffer.position(position);
-                    newLength = 0;
-                } else if (extBuffer.getFilled() != newLength) {
-                    newLength = extBuffer.getFilled();
-                }
+                ext.afterRead(this, extBuffer);
             }
         }
         if (!extBuffer.hasExtra()) {
             return null;
         }
-        return extBuffer;
-    }
-
-    private static class Bounds {
-        final int position;
-        final int limit;
-
-        Bounds(int position, int limit) {
-            this.position = position;
-            this.limit = limit;
-        }
+        return extBuffer.getExtraBuffers();
     }
 }
