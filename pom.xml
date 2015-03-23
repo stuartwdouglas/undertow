@@ -104,6 +104,7 @@
         <module>servlet</module>
         <module>examples</module>
         <module>websockets-jsr</module>
+        <module>js</module>
     </modules>
 
     <build>
