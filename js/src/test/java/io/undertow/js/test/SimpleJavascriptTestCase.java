@@ -19,7 +19,9 @@
 package io.undertow.js.test;
 
 import io.undertow.js.UndertowJS;
-import io.undertow.server.handlers.ResponseCodeHandler;
+import io.undertow.server.HttpHandler;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.handlers.resource.ClassPathResourceManager;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpClientUtils;
 import io.undertow.testutils.TestHttpClient;
@@ -27,6 +29,7 @@ import io.undertow.util.StatusCodes;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -39,20 +42,69 @@ import java.io.IOException;
 @RunWith(DefaultServer.class)
 public class SimpleJavascriptTestCase {
 
-    @Test
-    public void testSomeJsStuff() throws ScriptException, IOException {
+    @BeforeClass
+    public static void setup() throws ScriptException, IOException {
 
+        UndertowJS js = UndertowJS.builder()
+                .addResources(new ClassPathResourceManager(SimpleJavascriptTestCase.class.getClassLoader(), SimpleJavascriptTestCase.class.getPackage()), "test.js").build();
+        js.start();
+        DefaultServer.setRootHandler(js.getHandler(new HttpHandler() {
+            @Override
+            public void handleRequest(HttpServerExchange exchange) throws Exception {
+                exchange.getResponseSender().send("Default Response");
+            }
+        }));
+    }
+
+    @Test
+    public void testDefaultResponse() throws IOException {
         final TestHttpClient client = new TestHttpClient();
         try {
-            UndertowJS js = UndertowJS.builder().build();
-            js.start();
-            DefaultServer.setRootHandler(js.getHandler(ResponseCodeHandler.HANDLE_404));
-
-
             HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/");
             HttpResponse result = client.execute(get);
             Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
-            Assert.assertEquals("Hi", HttpClientUtils.readResponse(result));
+            Assert.assertEquals("Default Response", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
+
+    @Test
+    public void testResponseSender() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testResponseSender");
+            HttpResponse result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("Response Sender", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
+
+    @Test
+    public void testRequestHeaders() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testRequestHeaders");
+            get.setHeader("my-header", "some-header-value");
+            HttpResponse result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("some-header-value", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
+
+    @Test
+    public void testResponseHeaders() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testResponseHeaders");
+            HttpResponse result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("my-header-value", result.getFirstHeader("my-header").getValue());
+            HttpClientUtils.readResponse(result);
         } finally {
             client.getConnectionManager().shutdown();
         }

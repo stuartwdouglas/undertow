@@ -19,13 +19,82 @@
 /**
  * Undertow scripts that provide core javascript functionality
  */
+var HttpHandler = Java.type("io.undertow.server.HttpHandler");
+var HttpString = Java.type("io.undertow.util.HttpString");
 
-$undertow = {};
+var createHandlerFunction = function (userHandler) {
+    var handler = userHandler;
+    if(userHandler.constructor === Array) {
+        for(var i = 0; i < userHandler.length; ++i) {
 
-$undertow.handle = function (exchange) {
-    exchange.getResponseSender().send("Hi")
-}
+        }
+    }
 
-$undertow.get = function (route, handler) {
+    return new HttpHandler({
+        handleRequest: function(underlyingExchange) {
 
-}
+            var $exchange  = {
+                $underlying: underlyingExchange,
+
+                requestHeaders: function(name, value) {
+                    if(value && name) {
+                        underlyingExchange.requestHeaders.put(new HttpString(name), value);
+                    } else if(name) {
+                        return underlyingExchange.requestHeaders.getFirst(name);
+                    } else {
+                        //TODO: return some kind of headers object
+                    }
+                },
+
+
+                responseHeaders: function(name, value) {
+                    if(value && name) {
+                        underlyingExchange.responseHeaders.put(new HttpString(name), value);
+                    } else if(name) {
+                        return underlyingExchange.responseHeaders.getFirst(name);
+                    } else {
+                        //TODO: return some kind of headers object
+                    }
+                },
+
+                send: function(val) {
+                    underlyingExchange.responseSender.send(val);
+                },
+
+                read: function(callback) {
+
+                }
+
+            }
+
+            handler($exchange)
+        }
+    });
+};
+
+$undertow = {
+    get: function(route, handler) {
+        $undertow_routing_handler.get(route, createHandlerFunction(handler));
+        return $undertow;
+    },
+
+    post: function(route, handler) {
+        $undertow_routing_handler.post(route, createHandlerFunction(handler));
+        return $undertow;
+    },
+
+    put: function(route, handler) {
+        $undertow_routing_handler.put(route, createHandlerFunction(handler));
+        return $undertow;
+    },
+
+    delete: function(route, handler) {
+        $undertow_routing_handler.delete(route, createHandlerFunction(handler));
+        return $undertow;
+    },
+
+    route: function(method, route, handler) {
+        $undertow_routing_handler.add(method, route, createHandlerFunction(handler));
+        return $undertow;
+    },
+};
