@@ -26,4 +26,10 @@ $undertow
     .get("/testResponseHeaders", function ($exchange) {
         $exchange.responseHeaders("my-header", "my-header-value");
     })
-;
+    .get("/testArrayParam", ['$entity:json', 'jndi:java:datasources/DefaultDS', function($exchange, $next, json, ds) {
+        $exchange.send("Array Param");
+    }])
+    .get("/testSendRedirect", function($exchange) {
+        $exchange.sendRedirect("/testResponseSender");
+    });
+

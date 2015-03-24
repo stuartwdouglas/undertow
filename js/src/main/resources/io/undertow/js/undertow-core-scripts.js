@@ -61,6 +61,24 @@ var createHandlerFunction = function (userHandler) {
                     underlyingExchange.responseSender.send(val);
                 },
 
+                sendRedirect: function(location) {
+                    $exchange.responseHeaders("Location", location);
+                    $exchange.status(302);
+                    $exchange.endExchange();
+                },
+
+                status: function(code) {
+                    if(code) {
+                        underlyingExchange.setResponseCode(code);
+                    } else {
+                        return underlyingExchange.responseCode;
+                    }
+                },
+
+                endExchange: function() {
+                    underlyingExchange.endExchange();
+                },
+
                 read: function(callback) {
 
                 }
@@ -96,5 +114,5 @@ $undertow = {
     route: function(method, route, handler) {
         $undertow_routing_handler.add(method, route, createHandlerFunction(handler));
         return $undertow;
-    },
+    }
 };

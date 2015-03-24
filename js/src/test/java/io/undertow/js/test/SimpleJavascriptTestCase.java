@@ -83,7 +83,7 @@ public class SimpleJavascriptTestCase {
     }
 
     @Test
-    public void testRequestHeaders() throws IOException {
+    public void testRequestHeaders() throws IOException, InterruptedException {
         final TestHttpClient client = new TestHttpClient();
         try {
             HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testRequestHeaders");
@@ -110,4 +110,17 @@ public class SimpleJavascriptTestCase {
         }
     }
 
+
+    @Test
+    public void testSendRedirect() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testSendRedirect");
+            HttpResponse result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("Response Sender", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
 }
