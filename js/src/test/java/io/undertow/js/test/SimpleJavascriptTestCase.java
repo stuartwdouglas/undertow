@@ -110,7 +110,6 @@ public class SimpleJavascriptTestCase {
         }
     }
 
-
     @Test
     public void testSendRedirect() throws IOException {
         final TestHttpClient client = new TestHttpClient();
@@ -119,6 +118,39 @@ public class SimpleJavascriptTestCase {
             HttpResponse result = client.execute(get);
             Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
             Assert.assertEquals("Response Sender", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
+
+    @Test
+    public void testPredicatedHandlers() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testPredicatedHandlers");
+            HttpResponse result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("No match", HttpClientUtils.readResponse(result));
+
+            get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testPredicatedHandlers");
+            get.setHeader("my-header", "foo");
+            result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("Foo Header", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
+
+
+    @Test
+    public void testParams() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testParams/hello");
+            HttpResponse result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("ID hello", HttpClientUtils.readResponse(result));
         } finally {
             client.getConnectionManager().shutdown();
         }

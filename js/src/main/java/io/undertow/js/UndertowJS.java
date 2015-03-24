@@ -59,6 +59,7 @@ public class UndertowJS {
     private final List<ResourceSet> resources;
     private final boolean hotDeployment;
     private final Map<ResourceSet, ResourceChangeListener> listeners = new IdentityHashMap<>();
+    private final ClassLoader classLoader;
 
 
     private ScriptEngine engine;
@@ -67,7 +68,8 @@ public class UndertowJS {
 
     private HttpHandler handler;
 
-    public UndertowJS(List<ResourceSet> resources, boolean hotDeployment) {
+    public UndertowJS(List<ResourceSet> resources, boolean hotDeployment, ClassLoader classLoader) {
+        this.classLoader = classLoader;
         this.resources = new ArrayList<>(resources);
         this.hotDeployment = hotDeployment;
     }
@@ -117,6 +119,7 @@ public class UndertowJS {
             }
         });
         engine.put("$undertow_routing_handler", routingHandler);
+        engine.put("$undertow_class_loader", classLoader);
 
         engine.eval(FileUtils.readFile(UndertowJS.class, "undertow-core-scripts.js"));
 
@@ -176,6 +179,7 @@ public class UndertowJS {
 
         private final List<ResourceSet> resources = new ArrayList<>();
         private boolean hotDeployment = true;
+        private ClassLoader classLoader = UndertowJS.class.getClassLoader();
 
         public ResourceSet addResourceSet(ResourceManager manager) {
             ResourceSet resourceSet = new ResourceSet(manager);
@@ -206,8 +210,17 @@ public class UndertowJS {
             return this;
         }
 
+        public ClassLoader getClassLoader() {
+            return classLoader;
+        }
+
+        public Builder setClassLoader(ClassLoader classLoader) {
+            this.classLoader = classLoader;
+            return this;
+        }
+
         public UndertowJS build() {
-            return new UndertowJS(resources, hotDeployment);
+            return new UndertowJS(resources, hotDeployment, classLoader);
         }
     }
 

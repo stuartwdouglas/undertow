@@ -21,13 +21,13 @@
  */
 var HttpHandler = Java.type("io.undertow.server.HttpHandler");
 var HttpString = Java.type("io.undertow.util.HttpString");
+var PredicateParser = Java.type("io.undertow.predicate.PredicateParser");
 
 var createHandlerFunction = function (userHandler) {
     var handler = userHandler;
+    var params = []
     if(userHandler.constructor === Array) {
-        for(var i = 0; i < userHandler.length; ++i) {
-
-        }
+        params = userHandler.slice(1);
     }
 
     return new HttpHandler({
@@ -37,9 +37,9 @@ var createHandlerFunction = function (userHandler) {
                 $underlying: underlyingExchange,
 
                 requestHeaders: function(name, value) {
-                    if(value && name) {
+                    if(arguments.length >= 2) {
                         underlyingExchange.requestHeaders.put(new HttpString(name), value);
-                    } else if(name) {
+                    } else if(arguments.length == 1) {
                         return underlyingExchange.requestHeaders.getFirst(name);
                     } else {
                         //TODO: return some kind of headers object
@@ -47,11 +47,11 @@ var createHandlerFunction = function (userHandler) {
                 },
 
 
-                responseHeaders: function(name, value) {
-                    if(value && name) {
-                        underlyingExchange.responseHeaders.put(new HttpString(name), value);
-                    } else if(name) {
-                        return underlyingExchange.responseHeaders.getFirst(name);
+                responseHeaders: function() {
+                    if(arguments.length >= 2) {
+                        underlyingExchange.responseHeaders.put(new HttpString(arguments[0]), arguments[1]);
+                    } else if(arguments.length == 1) {
+                        return underlyingExchange.responseHeaders.getFirst(arguments[1]);
                     } else {
                         //TODO: return some kind of headers object
                     }
@@ -67,9 +67,9 @@ var createHandlerFunction = function (userHandler) {
                     $exchange.endExchange();
                 },
 
-                status: function(code) {
-                    if(code) {
-                        underlyingExchange.setResponseCode(code);
+                status: function() {
+                    if(arguments.length > 0) {
+                        underlyingExchange.setResponseCode(arguments[0]);
                     } else {
                         return underlyingExchange.responseCode;
                     }
@@ -79,40 +79,68 @@ var createHandlerFunction = function (userHandler) {
                     underlyingExchange.endExchange();
                 },
 
-                read: function(callback) {
+                param: function(name) {
+                    var paramList = underlyingExchange.queryParameters.get(name);
+                    if(paramList == null) {
+                        return null;
+                    }
+                    return paramList.getFirst();
+                },
 
+                params: function(name) {
+                    var params = underlyingExchange.queryParameters.get(name);
+                    if(params == null) {
+                        return null;
+                    }
+                    var it = params.iterator();
+                    var ret = [];
+                    while(it.hasNext()) {
+                        ret.push(it.next());
+                    }
+                    return ret;
                 }
 
             }
 
-            handler($exchange)
+            var paramList = [];
+            paramList.push($exchange);
+            for(var i = 0; i < params.length; ++i) {
+                paramList.push($undertow_injection_resolver.resolve(params[i]));
+            }
+
+            handler.apply(null, paramList);
         }
     });
 };
 
 $undertow = {
-    get: function(route, handler) {
-        $undertow_routing_handler.get(route, createHandlerFunction(handler));
+    onGet: function(route) {
+        if(arguments.length > 2) {
+            $undertow_routing_handler.get(route, PredicateParser.parse(arguments[1], $undertow_class_loader), createHandlerFunction(arguments[2]));
+        } else {
+            $undertow_routing_handler.get(route, createHandlerFunction(arguments[1]));
+        }
         return $undertow;
     },
 
-    post: function(route, handler) {
+    onPost: function(route, handler) {
         $undertow_routing_handler.post(route, createHandlerFunction(handler));
         return $undertow;
     },
 
-    put: function(route, handler) {
+    onPut: function(route, handler) {
         $undertow_routing_handler.put(route, createHandlerFunction(handler));
         return $undertow;
     },
 
-    delete: function(route, handler) {
+    onDelete: function(route, handler) {
         $undertow_routing_handler.delete(route, createHandlerFunction(handler));
         return $undertow;
     },
 
-    route: function(method, route, handler) {
+    onRequest: function(method, route, handler) {
         $undertow_routing_handler.add(method, route, createHandlerFunction(handler));
         return $undertow;
     }
+
 };

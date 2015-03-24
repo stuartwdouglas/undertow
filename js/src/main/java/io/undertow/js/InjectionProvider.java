@@ -18,6 +18,8 @@
 
 package io.undertow.js;
 
+import io.undertow.server.HttpServerExchange;
+
 /**
  * Provider interface that allows injection into javascript handlers
  * and filters.
@@ -26,6 +28,6 @@ package io.undertow.js;
  */
 public interface InjectionProvider {
 
-    Object getObject(String name);
+    Object getObject(HttpServerExchange exchange, String name);
 
 }

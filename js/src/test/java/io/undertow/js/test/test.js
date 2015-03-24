@@ -17,19 +17,28 @@
  */
 
 $undertow
-    .get("/testResponseSender", function ($exchange) {
+    .onGet("/testResponseSender", function ($exchange) {
         $exchange.send("Response Sender");
     })
-    .get("/testRequestHeaders", function ($exchange) {
+    .onGet("/testRequestHeaders", function ($exchange) {
         $exchange.send($exchange.requestHeaders("my-header"));
     })
-    .get("/testResponseHeaders", function ($exchange) {
+    .onGet("/testResponseHeaders", function ($exchange) {
         $exchange.responseHeaders("my-header", "my-header-value");
     })
-    .get("/testArrayParam", ['$entity:json', 'jndi:java:datasources/DefaultDS', function($exchange, $next, json, ds) {
+    .onGet("/testArrayParam", ['$entity:json', 'jndi:java:datasources/DefaultDS', function($exchange, $next, json, ds) {
         $exchange.send("Array Param");
     }])
-    .get("/testSendRedirect", function($exchange) {
+    .onGet("/testSendRedirect", function($exchange) {
         $exchange.sendRedirect("/testResponseSender");
+    })
+    .onGet("/testPredicatedHandlers", "equals[%{i,my-header}, foo]", function ($exchange) {
+        $exchange.send("Foo Header");
+    })
+    .onGet("/testPredicatedHandlers", function ($exchange) {
+        $exchange.send("No match");
+    })
+    .onGet("/testParams/{id}", function ($exchange) {
+        $exchange.send("ID " + $exchange.params('id')[0]);
     });
 
