@@ -26,11 +26,83 @@ var PredicateParser = Java.type("io.undertow.predicate.PredicateParser");
 
 var $undertow = {
 
+    Exchange: function (underlyingExchange) {
+
+        this.$underlying = underlyingExchange;
+
+        this.requestHeaders = function (name, value) {
+            if (arguments.length >= 2) {
+                underlyingExchange.requestHeaders.put(new HttpString(name), value);
+            } else if (arguments.length == 1) {
+                return underlyingExchange.requestHeaders.getFirst(name);
+            } else {
+                //TODO: return some kind of headers object
+            }
+        };
+
+
+        this.responseHeaders = function () {
+            if (arguments.length >= 2) {
+                underlyingExchange.responseHeaders.put(new HttpString(arguments[0]), arguments[1]);
+            } else if (arguments.length == 1) {
+                return underlyingExchange.responseHeaders.getFirst(arguments[1]);
+            } else {
+                //TODO: return some kind of headers object
+            }
+        };
+
+        this.send = function (val) {
+            if (val == null) {
+                underlyingExchange.responseSender.send("");
+            } else {
+                underlyingExchange.responseSender.send(val);
+            }
+        };
+
+        this.sendRedirect = function (location) {
+            this.responseHeaders("Location", location);
+            this.status(302);
+            this.endExchange();
+        };
+
+        this.status = function () {
+            if (arguments.length > 0) {
+                underlyingExchange.setResponseCode(arguments[0]);
+            } else {
+                return underlyingExchange.responseCode;
+            }
+        };
+
+        this.endExchange = function () {
+            underlyingExchange.endExchange();
+        };
+
+        this.param = function (name) {
+            var paramList = underlyingExchange.queryParameters.get(name);
+            if (paramList == null) {
+                return null;
+            }
+            return paramList.getFirst();
+        };
+
+        this.params = function (name) {
+            var params = underlyingExchange.queryParameters.get(name);
+            if (params == null) {
+                return null;
+            }
+            var it = params.iterator();
+            var ret = [];
+            while (it.hasNext()) {
+                ret.push(it.next());
+            }
+            return ret;
+        };
+    },
 
     injection_aliases: {},
     entity_parsers: {},
 
-    _create_injection_function: function(p) {
+    _create_injection_function: function (p) {
         var index = p.indexOf(":");
         if (index < 0) {
             //no prefix, it has to be an alias
@@ -57,7 +129,7 @@ var $undertow = {
     },
 
     _create_handler_function: function (userHandler) {
-        if(userHandler == null) {
+        if (userHandler == null) {
             throw "handler function cannot be null";
         }
         var handler = userHandler;
@@ -72,78 +144,7 @@ var $undertow = {
         return new HttpHandler({
             handleRequest: function (underlyingExchange) {
 
-                var $exchange = {
-                    $underlying: underlyingExchange,
-
-                    requestHeaders: function (name, value) {
-                        if (arguments.length >= 2) {
-                            underlyingExchange.requestHeaders.put(new HttpString(name), value);
-                        } else if (arguments.length == 1) {
-                            return underlyingExchange.requestHeaders.getFirst(name);
-                        } else {
-                            //TODO: return some kind of headers object
-                        }
-                    },
-
-
-                    responseHeaders: function () {
-                        if (arguments.length >= 2) {
-                            underlyingExchange.responseHeaders.put(new HttpString(arguments[0]), arguments[1]);
-                        } else if (arguments.length == 1) {
-                            return underlyingExchange.responseHeaders.getFirst(arguments[1]);
-                        } else {
-                            //TODO: return some kind of headers object
-                        }
-                    },
-
-                    send: function (val) {
-                        if(val == null) {
-                            underlyingExchange.responseSender.send("");
-                        } else {
-                            underlyingExchange.responseSender.send(val);
-                        }
-                    },
-
-                    sendRedirect: function (location) {
-                        $exchange.responseHeaders("Location", location);
-                        $exchange.status(302);
-                        $exchange.endExchange();
-                    },
-
-                    status: function () {
-                        if (arguments.length > 0) {
-                            underlyingExchange.setResponseCode(arguments[0]);
-                        } else {
-                            return underlyingExchange.responseCode;
-                        }
-                    },
-
-                    endExchange: function () {
-                        underlyingExchange.endExchange();
-                    },
-
-                    param: function (name) {
-                        var paramList = underlyingExchange.queryParameters.get(name);
-                        if (paramList == null) {
-                            return null;
-                        }
-                        return paramList.getFirst();
-                    },
-
-                    params: function (name) {
-                        var params = underlyingExchange.queryParameters.get(name);
-                        if (params == null) {
-                            return null;
-                        }
-                        var it = params.iterator();
-                        var ret = [];
-                        while (it.hasNext()) {
-                            ret.push(it.next());
-                        }
-                        return ret;
-                    }
-
-                }
+                var $exchange = new $undertow.Exchange(underlyingExchange)
 
                 var paramList = [];
                 paramList.push($exchange);
@@ -161,9 +162,10 @@ var $undertow = {
         });
     },
 
+
     onGet: function () {
         var args = ["GET"];
-        for(var i = 0; i < arguments.length; ++i) {
+        for (var i = 0; i < arguments.length; ++i) {
             args.push(arguments[i]);
         }
         $undertow.onRequest.apply(null, args);
@@ -172,7 +174,7 @@ var $undertow = {
 
     onPost: function (route, handler) {
         var args = ["POST"];
-        for(var i = 0; i < arguments.length; ++i) {
+        for (var i = 0; i < arguments.length; ++i) {
             args.push(arguments[i]);
         }
         $undertow.onRequest.apply(null, args);
@@ -181,7 +183,7 @@ var $undertow = {
 
     onPut: function (route, handler) {
         var args = ["PUT"];
-        for(var i = 0; i < arguments.length; ++i) {
+        for (var i = 0; i < arguments.length; ++i) {
             args.push(arguments[i]);
         }
         $undertow.onRequest.apply(null, args);
@@ -190,7 +192,7 @@ var $undertow = {
 
     onDelete: function (route, handler) {
         var args = ["DELETE"];
-        for(var i = 0; i < arguments.length; ++i) {
+        for (var i = 0; i < arguments.length; ++i) {
             args.push(arguments[i]);
         }
         $undertow.onRequest.apply(null, args);
@@ -198,7 +200,7 @@ var $undertow = {
     },
 
     onRequest: function (method, route) {
-        if(arguments.length > 3) {
+        if (arguments.length > 3) {
             $undertow_routing_handler.add(method, route, PredicateParser.parse(arguments[2], $undertow_class_loader), $undertow._create_handler_function(arguments[3]));
         } else {
             $undertow_routing_handler.add(method, route, $undertow._create_handler_function(arguments[2]));
@@ -207,9 +209,10 @@ var $undertow = {
         return $undertow;
     },
 
-    alias: function(alias, injection) {
+    alias: function (alias, injection) {
         $undertow.injection_aliases[alias] = $undertow._create_injection_function(injection);
         return $undertow;
     }
+
 
 };
