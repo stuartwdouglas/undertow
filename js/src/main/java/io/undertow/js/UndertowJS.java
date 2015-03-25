@@ -45,6 +45,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -81,6 +82,10 @@ public class UndertowJS {
             registerChangeListeners();
         }
         return this;
+    }
+
+    public Object evaluate(String code) throws ScriptException {
+        return engine.eval(code);
     }
 
     private void registerChangeListeners() {

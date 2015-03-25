@@ -20,12 +20,43 @@
 /**
  * Undertow scripts that provide core javascript functionality
  */
-var HttpHandler = Java.type("io.undertow.server.HttpHandler");
-var HttpString = Java.type("io.undertow.util.HttpString");
-var PredicateParser = Java.type("io.undertow.predicate.PredicateParser");
-var StringReadHandler = Java.type("io.undertow.util.StringReadHandler");
+
 
 var $undertow = {
+    _java: {
+        HttpHandler: Java.type("io.undertow.server.HttpHandler"),
+        HttpString: Java.type("io.undertow.util.HttpString"),
+        PredicateParser: Java.type("io.undertow.predicate.PredicateParser"),
+        StringReadHandler: Java.type("io.undertow.util.StringReadHandler"),
+        DataSource: Java.type("javax.sql.DataSource")
+    },
+
+    injection_aliases: {},
+    entity_parsers: {
+        string: function(data) {
+            return data;
+        },
+
+        json: function(data) {
+            return JSON.parse(data);
+        }
+    },
+
+
+
+    injection_wrappers: [
+        /**
+         * JDBC wrapper function. Wraps injected datasources with our JS friendly database API
+         * @param injected
+         */
+        function(injected) {
+            if(injected instanceof $undertow._java.DataSource) {
+                return new $undertow.JDBCWrapper(injected);
+            }
+            return injected;
+        }
+
+    ],
 
     Exchange: function (underlyingExchange) {
 
@@ -33,7 +64,7 @@ var $undertow = {
 
         this.requestHeaders = function (name, value) {
             if (arguments.length >= 2) {
-                underlyingExchange.requestHeaders.put(new HttpString(name), value);
+                underlyingExchange.requestHeaders.put(new $undertow._java.HttpString(name), value);
             } else if (arguments.length == 1) {
                 return underlyingExchange.requestHeaders.getFirst(name);
             } else {
@@ -41,10 +72,9 @@ var $undertow = {
             }
         };
 
-
         this.responseHeaders = function () {
             if (arguments.length >= 2) {
-                underlyingExchange.responseHeaders.put(new HttpString(arguments[0]), arguments[1]);
+                underlyingExchange.responseHeaders.put(new $undertow._java.HttpString(arguments[0]), arguments[1]);
             } else if (arguments.length == 1) {
                 return underlyingExchange.responseHeaders.getFirst(arguments[1]);
             } else {
@@ -100,17 +130,132 @@ var $undertow = {
         };
     },
 
-    injection_aliases: {},
-    entity_parsers: {
-        string: function(data) {
-            return data;
-        },
+    JDBCWrapper: function($underlying) {
+        this.$underlying = $underlying;
 
-        json: function(data) {
-            return JSON.parse(data);
+        this.query = function() {
+            var conn = null;
+            var statement = null;
+            try {
+                conn = $underlying.getConnection();
+                conn.setAutoCommit(true); //TODO: how to deal with transactions?
+                statement = conn.prepareStatement(arguments[0]);
+                for(var i = 1; i < arguments.length; ++i) {
+                    statement.setObject(i, arguments[i]);
+                }
+                statement.execute();
+            } finally {
+                if (statement != null) {
+                    statement.close();
+                }
+                if (conn != null) {
+                    conn.close();
+                }
+
+            }
+        }
+
+        this.select = function() {
+            var conn = null;
+            var statement = null;
+            var rs = null;
+            try {
+                conn = $underlying.getConnection();
+                conn.setAutoCommit(true); //TODO: how to deal with transactions?
+                statement = conn.prepareStatement(arguments[0]);
+                for(var i = 1; i < arguments.length; ++i) {
+                    statement.setObject(i, arguments[i]);
+                }
+
+                rs = statement.executeQuery();
+                var ret = [];
+                var md = rs.getMetaData();
+                var columnCount = md.getColumnCount();
+                var types = {};
+                var names = {};
+                for(var i = 1; i <= columnCount; ++i) {
+                    types[i] = md.getColumnClassName(i);
+                    names[i] = md.getColumnName(i);
+                }
+                while(rs.next()) {
+                    var rec = {};
+                    for(var j = 1; j <= columnCount; ++j) {
+                        var name = names[j];
+                        var type = types[j];
+                        switch (type) {
+                            case "java.lang.String":
+                                rec[name] = rs.getString(j);
+                                break;
+                            case "java.lang.Integer":
+                                rec[name] = rs.getInt(j);
+                                break;
+                            case "java.lang.Double":
+                                rec[name] = rs.getDouble(j);
+                                break;
+                            case "java.lang.Float":
+                                rec[name] = rs.getFloat(j);
+                                break;
+                            case "java.lang.Boolean":
+                                rec[name] = rs.getBoolean(j);
+                                break;
+                            case "java.lang.Long":
+                                rec[name] = rs.getLong(j);
+                                break;
+                            case "java.lang.Short":
+                                rec[name] = rs.getShort(j);
+                                break;
+                            case "java.lang.Byte":
+                                rec[name] = rs.getByte(j);
+                                break;
+                            case "java.sql.Date":
+                                rec[name] = rs.getDate(j);
+                                break;
+                            case "java.sql.Time":
+                                rec[name] = rs.getTime(j);
+                                break;
+                            default :
+                                rec[name] = rs.getString(j);
+                        }
+                    }
+                    ret.push(rec)
+                }
+                rs.close();
+                statement.close();
+                conn.close();
+                return ret;
+            } catch (e) {
+                if (rs != null) {
+                    rs.close();
+                }
+                if (statement != null) {
+                    statement.close();
+                }
+                if (conn != null) {
+                    conn.close();
+                }
+            }
+        };
+
+        this.selectOne = function() {
+
+            var result = this.select.apply(null, arguments);
+            if(result.length == 0) {
+                return null;
+            } else if(result.length > 1) {
+                throw "More than one result returned";
+            } else {
+                return result[0];
+            }
         }
     },
 
+    /**
+     * Create an injection function from a given injection string
+     *
+     * @param p the injection string
+     * @returns {*} a function that can be invoked to get the object to be injected
+     * @private
+     */
     _create_injection_function: function (p) {
         var index = p.indexOf(":");
         if (index < 0) {
@@ -122,7 +267,7 @@ var $undertow = {
             var suffix = p.substr(index + 1);
             if (prefix == '$entity') {
                 return function(exchange) {
-                    var data = exchange.$underlying.getAttachment(StringReadHandler.DATA);
+                    var data = exchange.$underlying.getAttachment($undertow._java.StringReadHandler.DATA);
                     if(suffix == null) {
                         return data;
                     } else {
@@ -149,6 +294,13 @@ var $undertow = {
         }
     },
 
+    /**
+     * Creates a handler function for a terminal handler
+     *
+     * @param  userHandler The handler function/array
+     * @returns {*} a HttpHandler implementation that can be registered with Undertow
+     * @private
+     */
     _create_handler_function: function (userHandler) {
         if (userHandler == null) {
             throw "handler function cannot be null";
@@ -161,10 +313,10 @@ var $undertow = {
                 params.push($undertow._create_injection_function(userHandler[i]));
             }
         }
-        return new StringReadHandler(new HttpHandler({
+        return new $undertow._java.StringReadHandler(new $undertow._java.HttpHandler({
             handleRequest: function (underlyingExchange) {
 
-                var $exchange = new $undertow.Exchange(underlyingExchange)
+                var $exchange = new $undertow.Exchange(underlyingExchange);
 
                 var paramList = [];
                 paramList.push($exchange);
@@ -173,7 +325,11 @@ var $undertow = {
                     if (param == null) {
                         paramList.push(null);
                     } else {
-                        paramList.push(param($exchange));
+                        var toInject = param($exchange);
+                        for(var j = 0; j < $undertow.injection_wrappers.length; ++j) {
+                            toInject = $undertow.injection_wrappers[j](toInject);
+                        }
+                        paramList.push(toInject);
                     }
                 }
 
@@ -221,7 +377,7 @@ var $undertow = {
 
     onRequest: function (method, route) {
         if (arguments.length > 3) {
-            $undertow_routing_handler.add(method, route, PredicateParser.parse(arguments[2], $undertow_class_loader), $undertow._create_handler_function(arguments[3]));
+            $undertow_routing_handler.add(method, route, $undertow._java.PredicateParser.parse(arguments[2], $undertow_class_loader), $undertow._create_handler_function(arguments[3]));
         } else {
             $undertow_routing_handler.add(method, route, $undertow._create_handler_function(arguments[2]));
         }
