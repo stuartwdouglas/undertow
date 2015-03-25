@@ -1,3 +1,4 @@
+"use strict";
 /*
  * JBoss, Home of Professional Open Source.
  * Copyright 2014 Red Hat, Inc., and individual contributors
@@ -23,123 +24,191 @@ var HttpHandler = Java.type("io.undertow.server.HttpHandler");
 var HttpString = Java.type("io.undertow.util.HttpString");
 var PredicateParser = Java.type("io.undertow.predicate.PredicateParser");
 
-var createHandlerFunction = function (userHandler) {
-    var handler = userHandler;
-    var params = []
-    if(userHandler.constructor === Array) {
-        params = userHandler.slice(1);
-    }
-
-    return new HttpHandler({
-        handleRequest: function(underlyingExchange) {
-
-            var $exchange  = {
-                $underlying: underlyingExchange,
-
-                requestHeaders: function(name, value) {
-                    if(arguments.length >= 2) {
-                        underlyingExchange.requestHeaders.put(new HttpString(name), value);
-                    } else if(arguments.length == 1) {
-                        return underlyingExchange.requestHeaders.getFirst(name);
-                    } else {
-                        //TODO: return some kind of headers object
-                    }
-                },
+var $undertow = {
 
 
-                responseHeaders: function() {
-                    if(arguments.length >= 2) {
-                        underlyingExchange.responseHeaders.put(new HttpString(arguments[0]), arguments[1]);
-                    } else if(arguments.length == 1) {
-                        return underlyingExchange.responseHeaders.getFirst(arguments[1]);
-                    } else {
-                        //TODO: return some kind of headers object
-                    }
-                },
+    injection_aliases: {},
+    entity_parsers: {},
 
-                send: function(val) {
-                    underlyingExchange.responseSender.send(val);
-                },
+    _create_injection_function: function(p) {
+        var index = p.indexOf(":");
+        if (index < 0) {
+            //no prefix, it has to be an alias
+            //we just use the alias function directly
+            return $undertow.injection_aliases[p];
+        } else {
+            var prefix = p.substr(0, index);
+            var suffix = p.substr(index);
+            if (prefix == '$entity') {
 
-                sendRedirect: function(location) {
-                    $exchange.responseHeaders("Location", location);
-                    $exchange.status(302);
-                    $exchange.endExchange();
-                },
-
-                status: function() {
-                    if(arguments.length > 0) {
-                        underlyingExchange.setResponseCode(arguments[0]);
-                    } else {
-                        return underlyingExchange.responseCode;
-                    }
-                },
-
-                endExchange: function() {
-                    underlyingExchange.endExchange();
-                },
-
-                param: function(name) {
-                    var paramList = underlyingExchange.queryParameters.get(name);
-                    if(paramList == null) {
+            } else {
+                var provider = $undertow_injection_providers[prefix];
+                if (provider == null) {
+                    return function () {
                         return null;
-                    }
-                    return paramList.getFirst();
-                },
+                    };
+                } else {
+                    return function () {
+                        return provider.getObject(suffix);
+                    };
+                }
+            }
+        }
+    },
 
-                params: function(name) {
-                    var params = underlyingExchange.queryParameters.get(name);
-                    if(params == null) {
-                        return null;
+    _create_handler_function: function (userHandler) {
+        if(userHandler == null) {
+            throw "handler function cannot be null";
+        }
+        var handler = userHandler;
+        var params = []
+        if (userHandler.constructor === Array) {
+            handler = userHandler[userHandler.length - 1];
+            for (var i = 0; i < userHandler.length - 1; ++i) {
+                params.push($undertow._create_injection_function(userHandler[i]));
+            }
+        }
+
+        return new HttpHandler({
+            handleRequest: function (underlyingExchange) {
+
+                var $exchange = {
+                    $underlying: underlyingExchange,
+
+                    requestHeaders: function (name, value) {
+                        if (arguments.length >= 2) {
+                            underlyingExchange.requestHeaders.put(new HttpString(name), value);
+                        } else if (arguments.length == 1) {
+                            return underlyingExchange.requestHeaders.getFirst(name);
+                        } else {
+                            //TODO: return some kind of headers object
+                        }
+                    },
+
+
+                    responseHeaders: function () {
+                        if (arguments.length >= 2) {
+                            underlyingExchange.responseHeaders.put(new HttpString(arguments[0]), arguments[1]);
+                        } else if (arguments.length == 1) {
+                            return underlyingExchange.responseHeaders.getFirst(arguments[1]);
+                        } else {
+                            //TODO: return some kind of headers object
+                        }
+                    },
+
+                    send: function (val) {
+                        if(val == null) {
+                            underlyingExchange.responseSender.send("");
+                        } else {
+                            underlyingExchange.responseSender.send(val);
+                        }
+                    },
+
+                    sendRedirect: function (location) {
+                        $exchange.responseHeaders("Location", location);
+                        $exchange.status(302);
+                        $exchange.endExchange();
+                    },
+
+                    status: function () {
+                        if (arguments.length > 0) {
+                            underlyingExchange.setResponseCode(arguments[0]);
+                        } else {
+                            return underlyingExchange.responseCode;
+                        }
+                    },
+
+                    endExchange: function () {
+                        underlyingExchange.endExchange();
+                    },
+
+                    param: function (name) {
+                        var paramList = underlyingExchange.queryParameters.get(name);
+                        if (paramList == null) {
+                            return null;
+                        }
+                        return paramList.getFirst();
+                    },
+
+                    params: function (name) {
+                        var params = underlyingExchange.queryParameters.get(name);
+                        if (params == null) {
+                            return null;
+                        }
+                        var it = params.iterator();
+                        var ret = [];
+                        while (it.hasNext()) {
+                            ret.push(it.next());
+                        }
+                        return ret;
                     }
-                    var it = params.iterator();
-                    var ret = [];
-                    while(it.hasNext()) {
-                        ret.push(it.next());
-                    }
-                    return ret;
+
                 }
 
-            }
+                var paramList = [];
+                paramList.push($exchange);
+                for (var i = 0; i < params.length; ++i) {
+                    var param = params[i];
+                    if (param == null) {
+                        paramList.push(null);
+                    } else {
+                        paramList.push(param());
+                    }
+                }
 
-            var paramList = [];
-            paramList.push($exchange);
-            for(var i = 0; i < params.length; ++i) {
-                paramList.push($undertow_injection_resolver.resolve(params[i]));
+                handler.apply(null, paramList);
             }
+        });
+    },
 
-            handler.apply(null, paramList);
+    onGet: function () {
+        var args = ["GET"];
+        for(var i = 0; i < arguments.length; ++i) {
+            args.push(arguments[i]);
         }
-    });
-};
+        $undertow.onRequest.apply(null, args);
+        return $undertow;
+    },
 
-$undertow = {
-    onGet: function(route) {
-        if(arguments.length > 2) {
-            $undertow_routing_handler.get(route, PredicateParser.parse(arguments[1], $undertow_class_loader), createHandlerFunction(arguments[2]));
+    onPost: function (route, handler) {
+        var args = ["POST"];
+        for(var i = 0; i < arguments.length; ++i) {
+            args.push(arguments[i]);
+        }
+        $undertow.onRequest.apply(null, args);
+        return $undertow;
+    },
+
+    onPut: function (route, handler) {
+        var args = ["PUT"];
+        for(var i = 0; i < arguments.length; ++i) {
+            args.push(arguments[i]);
+        }
+        $undertow.onRequest.apply(null, args);
+        return $undertow;
+    },
+
+    onDelete: function (route, handler) {
+        var args = ["DELETE"];
+        for(var i = 0; i < arguments.length; ++i) {
+            args.push(arguments[i]);
+        }
+        $undertow.onRequest.apply(null, args);
+        return $undertow;
+    },
+
+    onRequest: function (method, route) {
+        if(arguments.length > 3) {
+            $undertow_routing_handler.add(method, route, PredicateParser.parse(arguments[2], $undertow_class_loader), $undertow._create_handler_function(arguments[3]));
         } else {
-            $undertow_routing_handler.get(route, createHandlerFunction(arguments[1]));
+            $undertow_routing_handler.add(method, route, $undertow._create_handler_function(arguments[2]));
         }
+
         return $undertow;
     },
 
-    onPost: function(route, handler) {
-        $undertow_routing_handler.post(route, createHandlerFunction(handler));
-        return $undertow;
-    },
-
-    onPut: function(route, handler) {
-        $undertow_routing_handler.put(route, createHandlerFunction(handler));
-        return $undertow;
-    },
-
-    onDelete: function(route, handler) {
-        $undertow_routing_handler.delete(route, createHandlerFunction(handler));
-        return $undertow;
-    },
-
-    onRequest: function(method, route, handler) {
-        $undertow_routing_handler.add(method, route, createHandlerFunction(handler));
+    alias: function(alias, injection) {
+        $undertow.injection_aliases[alias] = $undertow._create_injection_function(injection);
         return $undertow;
     }
 

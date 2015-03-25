@@ -40,5 +40,8 @@ $undertow
     })
     .onGet("/testParams/{id}", function ($exchange) {
         $exchange.send("ID " + $exchange.params('id')[0]);
-    });
+    })
+    .onGet("/testSimpleInjection", ["test:my-injection", function($exchange, invection) {
+        $exchange.send(invection);
+    }]);
 

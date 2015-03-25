@@ -18,6 +18,7 @@
 
 package io.undertow.js.test;
 
+import io.undertow.js.InjectionProvider;
 import io.undertow.js.UndertowJS;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
@@ -46,6 +47,7 @@ public class SimpleJavascriptTestCase {
     public static void setup() throws ScriptException, IOException {
 
         UndertowJS js = UndertowJS.builder()
+                .addInjectionProvider("test", new TestInjectionProvider())
                 .addResources(new ClassPathResourceManager(SimpleJavascriptTestCase.class.getClassLoader(), SimpleJavascriptTestCase.class.getPackage()), "test.js").build();
         js.start();
         DefaultServer.setRootHandler(js.getHandler(new HttpHandler() {
@@ -153,6 +155,27 @@ public class SimpleJavascriptTestCase {
             Assert.assertEquals("ID hello", HttpClientUtils.readResponse(result));
         } finally {
             client.getConnectionManager().shutdown();
+        }
+    }
+
+    @Test
+    public void testSimpleInjection() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testSimpleInjection");
+            HttpResponse result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("INJECTED::my-injection", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
+
+    private static final class TestInjectionProvider implements InjectionProvider {
+
+        @Override
+        public Object getObject(String name) {
+            return "INJECTED:" + name;
         }
     }
 }

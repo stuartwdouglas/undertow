@@ -18,30 +18,37 @@
 
 package io.undertow.util;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
-import io.undertow.websockets.core.UTF8Output;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
 import org.xnio.Pool;
 import org.xnio.Pooled;
 import org.xnio.channels.StreamSourceChannel;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
 /**
  * Simple utility class for reading a string
  * <p/>
- * todo: handle unicode properly
+ * TODO: support different character encodings
  *
  * @author Stuart Douglas
  */
 public abstract class StringReadChannelListener implements ChannelListener<StreamSourceChannel> {
 
-    private final UTF8Output string = new UTF8Output();
+    private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     private final Pool<ByteBuffer> bufferPool;
+
+    private final String encoding;
 
     public StringReadChannelListener(final Pool<ByteBuffer> bufferPool) {
         this.bufferPool = bufferPool;
+        this.encoding = "UTF-8";
+    }
+    public StringReadChannelListener(String encoding, final Pool<ByteBuffer> bufferPool) {
+        this.bufferPool = bufferPool;
+        this.encoding = encoding;
     }
 
     public void setup(final StreamSourceChannel channel) {
@@ -55,11 +62,13 @@ public abstract class StringReadChannelListener implements ChannelListener<Strea
                     channel.getReadSetter().set(this);
                     channel.resumeReads();
                 } else if (r == -1) {
-                    stringDone(string.extract());
+                    stringDone(bytes.toString(encoding));
                     IoUtils.safeClose(channel);
                 } else {
                     buffer.flip();
-                    string.write(buffer);
+                    while (buffer.hasRemaining()) {
+                        bytes.write(buffer.get());
+                    }
                 }
             } while (r > 0);
         } catch (IOException e) {
@@ -80,11 +89,13 @@ public abstract class StringReadChannelListener implements ChannelListener<Strea
                 if (r == 0) {
                     return;
                 } else if (r == -1) {
-                    stringDone(string.extract());
+                    stringDone(bytes.toString(encoding));
                     IoUtils.safeClose(channel);
                 } else {
                     buffer.flip();
-                    string.write(buffer);
+                    while (buffer.hasRemaining()) {
+                        bytes.write(buffer.get());
+                    }
                 }
             } while (r > 0);
         } catch (IOException e) {

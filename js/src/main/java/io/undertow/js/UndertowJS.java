@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -60,16 +61,16 @@ public class UndertowJS {
     private final boolean hotDeployment;
     private final Map<ResourceSet, ResourceChangeListener> listeners = new IdentityHashMap<>();
     private final ClassLoader classLoader;
+    private final Map<String, InjectionProvider> injectionProviders;
 
 
     private ScriptEngine engine;
     private Object undertowObject;
     private RoutingHandler routingHandler;
 
-    private HttpHandler handler;
-
-    public UndertowJS(List<ResourceSet> resources, boolean hotDeployment, ClassLoader classLoader) {
+    public UndertowJS(List<ResourceSet> resources, boolean hotDeployment, ClassLoader classLoader, Map<String, InjectionProvider> injectionProviders) {
         this.classLoader = classLoader;
+        this.injectionProviders = injectionProviders;
         this.resources = new ArrayList<>(resources);
         this.hotDeployment = hotDeployment;
     }
@@ -120,6 +121,7 @@ public class UndertowJS {
         });
         engine.put("$undertow_routing_handler", routingHandler);
         engine.put("$undertow_class_loader", classLoader);
+        engine.put("$undertow_injection_providers", injectionProviders);
 
         engine.eval(FileUtils.readFile(UndertowJS.class, "undertow-core-scripts.js"));
 
@@ -180,6 +182,7 @@ public class UndertowJS {
         private final List<ResourceSet> resources = new ArrayList<>();
         private boolean hotDeployment = true;
         private ClassLoader classLoader = UndertowJS.class.getClassLoader();
+        private final Map<String, InjectionProvider> injectionProviders = new HashMap<>();
 
         public ResourceSet addResourceSet(ResourceManager manager) {
             ResourceSet resourceSet = new ResourceSet(manager);
@@ -219,8 +222,13 @@ public class UndertowJS {
             return this;
         }
 
+        public Builder addInjectionProvider(String prefix, InjectionProvider provider) {
+            this.injectionProviders.put(prefix, provider);
+            return this;
+        }
+
         public UndertowJS build() {
-            return new UndertowJS(resources, hotDeployment, classLoader);
+            return new UndertowJS(resources, hotDeployment, classLoader, injectionProviders);
         }
     }
 
