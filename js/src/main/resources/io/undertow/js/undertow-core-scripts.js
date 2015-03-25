@@ -23,6 +23,7 @@
 var HttpHandler = Java.type("io.undertow.server.HttpHandler");
 var HttpString = Java.type("io.undertow.util.HttpString");
 var PredicateParser = Java.type("io.undertow.predicate.PredicateParser");
+var StringReadHandler = Java.type("io.undertow.util.StringReadHandler");
 
 var $undertow = {
 
@@ -100,7 +101,15 @@ var $undertow = {
     },
 
     injection_aliases: {},
-    entity_parsers: {},
+    entity_parsers: {
+        string: function(data) {
+            return data;
+        },
+
+        json: function(data) {
+            return JSON.parse(data);
+        }
+    },
 
     _create_injection_function: function (p) {
         var index = p.indexOf(":");
@@ -110,9 +119,21 @@ var $undertow = {
             return $undertow.injection_aliases[p];
         } else {
             var prefix = p.substr(0, index);
-            var suffix = p.substr(index);
+            var suffix = p.substr(index + 1);
             if (prefix == '$entity') {
-
+                return function(exchange) {
+                    var data = exchange.$underlying.getAttachment(StringReadHandler.DATA);
+                    if(suffix == null) {
+                        return data;
+                    } else {
+                        var parser = $undertow.entity_parsers[suffix];
+                        if(parser == null) {
+                            return data;
+                        } else {
+                            return parser(data);
+                        }
+                    }
+                }
             } else {
                 var provider = $undertow_injection_providers[prefix];
                 if (provider == null) {
@@ -133,15 +154,14 @@ var $undertow = {
             throw "handler function cannot be null";
         }
         var handler = userHandler;
-        var params = []
+        var params = [];
         if (userHandler.constructor === Array) {
             handler = userHandler[userHandler.length - 1];
             for (var i = 0; i < userHandler.length - 1; ++i) {
                 params.push($undertow._create_injection_function(userHandler[i]));
             }
         }
-
-        return new HttpHandler({
+        return new StringReadHandler(new HttpHandler({
             handleRequest: function (underlyingExchange) {
 
                 var $exchange = new $undertow.Exchange(underlyingExchange)
@@ -153,13 +173,13 @@ var $undertow = {
                     if (param == null) {
                         paramList.push(null);
                     } else {
-                        paramList.push(param());
+                        paramList.push(param($exchange));
                     }
                 }
 
                 handler.apply(null, paramList);
             }
-        });
+        }));
     },
 
 

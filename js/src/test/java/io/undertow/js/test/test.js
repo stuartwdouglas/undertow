@@ -43,5 +43,11 @@ $undertow
     })
     .onGet("/testSimpleInjection", ["test:my-injection", function($exchange, invection) {
         $exchange.send(invection);
+    }])
+    .onPost("/testEntityInjection", ['$entity:string', function($exchange, entity) {
+        $exchange.send(entity);
+    }])
+    .onPost("/testEntityJsonInjection", "equals[%{i,content-type}, text/json]", ['$entity:json', function($exchange, entity) {
+        $exchange.send(entity['first']);
     }]);
 

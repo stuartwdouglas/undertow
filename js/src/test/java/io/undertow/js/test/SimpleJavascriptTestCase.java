@@ -29,6 +29,8 @@ import io.undertow.testutils.TestHttpClient;
 import io.undertow.util.StatusCodes;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -165,12 +167,40 @@ public class SimpleJavascriptTestCase {
             HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testSimpleInjection");
             HttpResponse result = client.execute(get);
             Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
-            Assert.assertEquals("INJECTED::my-injection", HttpClientUtils.readResponse(result));
+            Assert.assertEquals("INJECTED:my-injection", HttpClientUtils.readResponse(result));
         } finally {
             client.getConnectionManager().shutdown();
         }
     }
 
+    @Test
+    public void testEntityInjection() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpPost post = new HttpPost(DefaultServer.getDefaultServerURL() + "/testEntityInjection");
+            post.setEntity(new StringEntity("A simple entity"));
+            HttpResponse result = client.execute(post);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("A simple entity", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
+
+    @Test
+    public void testJsonEntity() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpPost post = new HttpPost(DefaultServer.getDefaultServerURL() + "/testEntityJsonInjection");
+            post.setHeader("Content-Type", "text/json");
+            post.setEntity(new StringEntity("{\"first\": \"John\", \"last\": \"Doe\"}"));
+            HttpResponse result = client.execute(post);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("John", HttpClientUtils.readResponse(result));
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
     private static final class TestInjectionProvider implements InjectionProvider {
 
         @Override
