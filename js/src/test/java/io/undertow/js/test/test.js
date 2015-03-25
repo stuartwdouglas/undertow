@@ -17,6 +17,7 @@
  */
 
 $undertow
+    .alias("json", "$entity:json")
     .onGet("/testResponseSender", function ($exchange) {
         $exchange.send("Response Sender");
     })
@@ -44,7 +45,7 @@ $undertow
     .onPost("/testEntityInjection", ['$entity:string', function($exchange, entity) {
         $exchange.send(entity);
     }])
-    .onPost("/testEntityJsonInjection", "equals[%{i,content-type}, text/json]", ['$entity:json', function($exchange, entity) {
+    .onPost("/testEntityJsonInjection", "equals[%{i,content-type}, text/json]", ['json', function($exchange, entity) {
         $exchange.send(entity['first']);
     }]);
 
