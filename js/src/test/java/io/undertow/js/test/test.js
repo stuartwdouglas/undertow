@@ -26,9 +26,6 @@ $undertow
     .onGet("/testResponseHeaders", function ($exchange) {
         $exchange.responseHeaders("my-header", "my-header-value");
     })
-    .onGet("/testArrayParam", ['$entity:json', 'jndi:java:datasources/DefaultDS', function($exchange, $next, json, ds) {
-        $exchange.send("Array Param");
-    }])
     .onGet("/testSendRedirect", function($exchange) {
         $exchange.sendRedirect("/testResponseSender");
     })
