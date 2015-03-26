@@ -49,7 +49,7 @@ public class SimpleJavascriptTestCase {
     public static void setup() throws ScriptException, IOException {
 
         UndertowJS js = UndertowJS.builder()
-                .addInjectionProvider("test", new TestInjectionProvider())
+                .addInjectionProvider(new TestInjectionProvider())
                 .addResources(new ClassPathResourceManager(SimpleJavascriptTestCase.class.getClassLoader(), SimpleJavascriptTestCase.class.getPackage()), "test.js").build();
         js.start();
         DefaultServer.setRootHandler(js.getHandler(new HttpHandler() {
@@ -206,6 +206,11 @@ public class SimpleJavascriptTestCase {
         @Override
         public Object getObject(String name) {
             return "INJECTED:" + name;
+        }
+
+        @Override
+        public String getPrefix() {
+            return "test";
         }
     }
 }

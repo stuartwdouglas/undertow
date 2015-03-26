@@ -16,18 +16,14 @@
  *  limitations under the License.
  */
 
-package io.undertow.js;
-
-/**
- * Provider interface that allows injection into javascript handlers
- * and filters.
- *
- * TODO: LIFECYCLE SUPPORT
- *
- * @author Stuart Douglas
- */
-public interface InjectionProvider {
-    Object getObject(String name);
-
-    String getPrefix();
-}
+$undertow
+    .onGet("/bean",['bean:Bob:123 Fake St', function ($exchange, bean) {
+        var data = JSON.stringify(bean);
+        print(data)
+        $exchange.send(data);
+    }])
+    .onGet("/beans",['bean:Bob:123 Fake St:Jane:124 Fake St', function ($exchange, bean) {
+        var data = JSON.stringify(bean);
+        print(data)
+        $exchange.send(data);
+    }]);

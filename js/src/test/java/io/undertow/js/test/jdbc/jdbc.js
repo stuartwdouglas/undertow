@@ -40,4 +40,3 @@ $undertow
         var customers = db.select("select * from customer");
         $exchange.send(JSON.stringify(customers));
     }]);
-

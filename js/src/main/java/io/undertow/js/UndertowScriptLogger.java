@@ -42,4 +42,8 @@ public interface UndertowScriptLogger extends BasicLogger {
     @LogMessage(level = Logger.Level.ERROR)
     @Message(id = 40002, value = "Could not find script file %s")
     void couldNotReadResource(String resource);
+
+    @LogMessage(level = Logger.Level.INFO)
+    @Message(id = 40003, value = "Rebuilding Javascript ending as %s has changed")
+    void rebuildingDueToFileChange(String resource);
 }

@@ -23,7 +23,6 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.resource.Resource;
-import io.undertow.server.handlers.resource.ResourceChangeEvent;
 import io.undertow.server.handlers.resource.ResourceChangeListener;
 import io.undertow.server.handlers.resource.ResourceManager;
 import io.undertow.util.AttachmentKey;
@@ -36,17 +35,18 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Builder class for Undertow Javascipt deployments
@@ -58,16 +58,20 @@ public class UndertowJS {
     private static final AttachmentKey<HttpHandler> NEXT = AttachmentKey.create(HttpHandler.class);
 
     public static final String UNDERTOW = "$undertow";
+    public static final int HOT_DEPLOYMENT_INTERVAL = 500;
     private final List<ResourceSet> resources;
     private final boolean hotDeployment;
     private final Map<ResourceSet, ResourceChangeListener> listeners = new IdentityHashMap<>();
     private final ClassLoader classLoader;
     private final Map<String, InjectionProvider> injectionProviders;
+    private final JavabeanIntrospector javabeanIntrospector = new JavabeanIntrospector();
 
 
     private ScriptEngine engine;
     private Object undertowObject;
     private RoutingHandler routingHandler;
+    private Map<Resource, Date> lastModified;
+    private volatile long lastHotDeploymentCheck = -1;
 
     public UndertowJS(List<ResourceSet> resources, boolean hotDeployment, ClassLoader classLoader, Map<String, InjectionProvider> injectionProviders) {
         this.classLoader = classLoader;
@@ -78,9 +82,6 @@ public class UndertowJS {
 
     public UndertowJS start() throws ScriptException, IOException {
         buildEngine();
-        if(hotDeployment) {
-            registerChangeListeners();
-        }
         return this;
     }
 
@@ -88,32 +89,7 @@ public class UndertowJS {
         return engine.eval(code);
     }
 
-    private void registerChangeListeners() {
-        for(ResourceSet set : resources) {
-            if(set.getResourceManager().isResourceChangeListenerSupported()) {
-                final Set<String> paths = new HashSet<>(set.getResources());
-                ResourceChangeListener listener = new ResourceChangeListener() {
-                    @Override
-                    public void handleChanges(Collection<ResourceChangeEvent> changes) {
-                        for(ResourceChangeEvent event : changes) {
-                            if(paths.contains(event.getResource())) {
-                                try {
-                                    buildEngine();
-                                } catch (Exception e) {
-                                    UndertowScriptLogger.ROOT_LOGGER.failedToRebuildScriptEngine(e);
-                                }
-                                return;
-                            }
-                        }
-                    }
-                };
-                listeners.put(set, listener);
-                set.getResourceManager().registerResourceChangeListener(listener);
-            }
-        }
-    }
-
-    private void buildEngine() throws ScriptException, IOException {
+    private synchronized void buildEngine() throws ScriptException, IOException {
         ScriptEngineManager factory = new ScriptEngineManager();
         ScriptEngine engine = factory.getEngineByName("JavaScript");
 
@@ -127,9 +103,10 @@ public class UndertowJS {
         engine.put("$undertow_routing_handler", routingHandler);
         engine.put("$undertow_class_loader", classLoader);
         engine.put("$undertow_injection_providers", injectionProviders);
+        engine.put("$undertow_javabean_introspector", javabeanIntrospector);
 
         engine.eval(FileUtils.readFile(UndertowJS.class, "undertow-core-scripts.js"));
-
+        Map<Resource, Date> lm = new HashMap<>();
         for(ResourceSet set : resources) {
 
             for(String resource : set.getResources()) {
@@ -140,12 +117,16 @@ public class UndertowJS {
                     try (InputStream stream = res.getUrl().openStream()) {
                         engine.eval(new InputStreamReader(new BufferedInputStream(stream)));
                     }
+                    if(hotDeployment) {
+                        lm.put(res, res.getLastModified());
+                    }
                 }
             }
         }
         this.engine = engine;
         this.undertowObject = engine.get(UNDERTOW);
         this.routingHandler = routingHandler;
+        this.lastModified = lm;
     }
 
     public UndertowJS stop() {
@@ -161,6 +142,24 @@ public class UndertowJS {
         return new HttpHandler() {
             @Override
             public void handleRequest(HttpServerExchange exchange) throws Exception {
+                if(hotDeployment) {
+                    long lastHotDeploymentCheck = UndertowJS.this.lastHotDeploymentCheck;
+                    if(System.currentTimeMillis() > lastHotDeploymentCheck + HOT_DEPLOYMENT_INTERVAL) {
+                        synchronized (UndertowJS.this) {
+                            if(UndertowJS.this.lastHotDeploymentCheck == lastHotDeploymentCheck) {
+                                for(Map.Entry<Resource, Date> entry : lastModified.entrySet()) {
+                                    if(!entry.getValue().equals(entry.getKey().getLastModified())) {
+                                        UndertowScriptLogger.ROOT_LOGGER.rebuildingDueToFileChange(entry.getKey().getPath());
+                                        buildEngine();
+                                        break;
+                                    }
+                                }
+                                UndertowJS.this.lastHotDeploymentCheck = System.currentTimeMillis();
+                            }
+                        }
+                    }
+                }
+
                 exchange.putAttachment(NEXT, next);
                 routingHandler.handleRequest(exchange);
             }
@@ -227,8 +226,8 @@ public class UndertowJS {
             return this;
         }
 
-        public Builder addInjectionProvider(String prefix, InjectionProvider provider) {
-            this.injectionProviders.put(prefix, provider);
+        public Builder addInjectionProvider(InjectionProvider provider) {
+            this.injectionProviders.put(provider.getPrefix(), provider);
             return this;
         }
 
@@ -269,5 +268,37 @@ public class UndertowJS {
             return Collections.unmodifiableList(resources);
         }
     }
+
+    /**
+     * class that is used to inspect java objects from scripts
+     */
+    public static final class JavabeanIntrospector {
+        private Map<Class, Map<String, Method>> cache = new ConcurrentHashMap<>();
+
+        public Map<String, Method> inspect(Class<?> clazz) {
+            Map<String, Method> existing = cache.get(clazz);
+            if(existing != null) {
+                return existing;
+            }
+            existing = new HashMap<>();
+            for(Method method : clazz.getMethods()) {
+                if(method.isBridge() || Modifier.isStatic(method.getModifiers())) {
+                    continue;
+                }
+                if(method.getName().equals("getClass")) {
+                    continue;
+                }
+                if(method.getParameterCount() == 0 &&
+                        method.getName().startsWith("get") &&
+                        method.getName().length() > 3 &&
+                        method.getReturnType() != void.class) {
+                    existing.put(Character.toLowerCase(method.getName().charAt(3)) + method.getName().substring(4), method);
+                }
+            }
+            cache.put(clazz, existing);
+            return existing;
+        }
+
+     }
 
 }

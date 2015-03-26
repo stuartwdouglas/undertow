@@ -313,8 +313,12 @@ var $undertow = {
                 params.push($undertow._create_injection_function(userHandler[i]));
             }
         }
-        return new $undertow._java.StringReadHandler(new $undertow._java.HttpHandler({
+        var httpHandler = new $undertow._java.HttpHandler({
             handleRequest: function (underlyingExchange) {
+                if (underlyingExchange.inIoThread) {
+                    underlyingExchange.dispatch(httpHandler);
+                    return;
+                }
 
                 var $exchange = new $undertow.Exchange(underlyingExchange);
 
@@ -326,7 +330,7 @@ var $undertow = {
                         paramList.push(null);
                     } else {
                         var toInject = param($exchange);
-                        for(var j = 0; j < $undertow.injection_wrappers.length; ++j) {
+                        for (var j = 0; j < $undertow.injection_wrappers.length; ++j) {
                             toInject = $undertow.injection_wrappers[j](toInject);
                         }
                         paramList.push(toInject);
@@ -335,7 +339,8 @@ var $undertow = {
 
                 handler.apply(null, paramList);
             }
-        }));
+        });
+        return new $undertow._java.StringReadHandler(httpHandler);
     },
 
 
@@ -390,5 +395,33 @@ var $undertow = {
         return $undertow;
     }
 
+
+};
+
+
+//setup the JSON stringifyer to handle java object
+$undertow._oldStringify = JSON.stringify;
+JSON.stringify = function(value,replacer,space) {
+    var newReplacer = function(name, value) {
+        if(value == null) {
+            return replacer == null ? null : replacer(name, null);
+        }
+        if (value instanceof Object) {
+            return replacer == null ? value : replacer(name, value);
+        }
+        if (typeof value != 'object') {
+            return replacer == null ? value : replacer(name, value);
+        }
+        if(value instanceof java.util.Collection) {
+            return replacer == null ? Java.from(value) : replacer(name, Java.from(value));
+        }
+        var ret = {};
+        var methodMap = $undertow_javabean_introspector.inspect(value.class);
+        for (name in methodMap) {
+            ret[name] = methodMap[name].invoke(value, []);
+        }
+        return replacer == null ? ret : replacer(name, ret);
+    }
+    return $undertow._oldStringify(value, newReplacer, space);
 
 };

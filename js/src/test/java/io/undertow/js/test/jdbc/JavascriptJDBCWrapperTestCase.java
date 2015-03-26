@@ -81,7 +81,7 @@ public class JavascriptJDBCWrapperTestCase {
 
 
         js = UndertowJS.builder()
-                .addInjectionProvider("db", new TestDatabaseInjection())
+                .addInjectionProvider(new TestDatabaseInjection())
                 .addResources(new ClassPathResourceManager(JavascriptJDBCWrapperTestCase.class.getClassLoader(), JavascriptJDBCWrapperTestCase.class.getPackage()), "jdbc.js").build();
         js.start();
         DefaultServer.setRootHandler(js.getHandler(new HttpHandler() {
@@ -165,6 +165,11 @@ public class JavascriptJDBCWrapperTestCase {
         @Override
         public Object getObject(String name) {
             return ds;
+        }
+
+        @Override
+        public String getPrefix() {
+            return "db";
         }
     }
 }

@@ -255,6 +255,11 @@ public abstract class ServerConnection extends AbstractAttachable implements Con
         return false;
     }
 
+    /**
+     * Returns true if push is supported
+     *
+     * @return <code>true</code> if push is supported on this connection
+     */
     public boolean isPushSupported() {
         return false;
     }
