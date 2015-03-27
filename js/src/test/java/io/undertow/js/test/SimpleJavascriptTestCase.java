@@ -20,12 +20,14 @@ package io.undertow.js.test;
 
 import io.undertow.js.InjectionProvider;
 import io.undertow.js.UndertowJS;
+import io.undertow.server.HandlerWrapper;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.resource.ClassPathResourceManager;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpClientUtils;
 import io.undertow.testutils.TestHttpClient;
+import io.undertow.util.HttpString;
 import io.undertow.util.StatusCodes;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -49,6 +51,18 @@ public class SimpleJavascriptTestCase {
     public static void setup() throws ScriptException, IOException {
 
         UndertowJS js = UndertowJS.builder()
+                .addHandlerWrapper(new HandlerWrapper() {
+                    @Override
+                    public HttpHandler wrap(final HttpHandler handler) {
+                        return new HttpHandler() {
+                            @Override
+                            public void handleRequest(HttpServerExchange exchange) throws Exception {
+                                exchange.getResponseHeaders().add(new HttpString("wrapped-header"), "true");
+                                handler.handleRequest(exchange);
+                            }
+                        };
+                    }
+                })
                 .addInjectionProvider(new TestInjectionProvider())
                 .addResources(new ClassPathResourceManager(SimpleJavascriptTestCase.class.getClassLoader(), SimpleJavascriptTestCase.class.getPackage()), "test.js").build();
         js.start();
@@ -79,6 +93,7 @@ public class SimpleJavascriptTestCase {
         try {
             HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testResponseSender");
             HttpResponse result = client.execute(get);
+            Assert.assertEquals("true", result.getHeaders("wrapped-header")[0].getValue());
             Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
             Assert.assertEquals("Response Sender", HttpClientUtils.readResponse(result));
         } finally {

@@ -280,7 +280,7 @@ var $undertow = {
                     }
                 }
             } else {
-                var provider = $undertow_injection_providers[prefix];
+                var provider = $undertow_support.injectionProviders[prefix];
                 if (provider == null) {
                     return function () {
                         return null;
@@ -340,6 +340,9 @@ var $undertow = {
                 handler.apply(null, paramList);
             }
         });
+        for(var i in $undertow_support.handlerWrappers) {
+            httpHandler = $undertow_support.handlerWrappers[i].wrap(httpHandler);
+        }
         return new $undertow._java.StringReadHandler(httpHandler);
     },
 
@@ -382,9 +385,9 @@ var $undertow = {
 
     onRequest: function (method, route) {
         if (arguments.length > 3) {
-            $undertow_routing_handler.add(method, route, $undertow._java.PredicateParser.parse(arguments[2], $undertow_class_loader), $undertow._create_handler_function(arguments[3]));
+            $undertow_support.routingHandler.add(method, route, $undertow._java.PredicateParser.parse(arguments[2], $undertow_support.classLoader), $undertow._create_handler_function(arguments[3]));
         } else {
-            $undertow_routing_handler.add(method, route, $undertow._create_handler_function(arguments[2]));
+            $undertow_support.routingHandler.add(method, route, $undertow._create_handler_function(arguments[2]));
         }
 
         return $undertow;
@@ -416,7 +419,7 @@ JSON.stringify = function(value,replacer,space) {
             return replacer == null ? Java.from(value) : replacer(name, Java.from(value));
         }
         var ret = {};
-        var methodMap = $undertow_javabean_introspector.inspect(value.class);
+        var methodMap = $undertow_support.javabeanIntrospector.inspect(value.class);
         for (name in methodMap) {
             ret[name] = methodMap[name].invoke(value, []);
         }

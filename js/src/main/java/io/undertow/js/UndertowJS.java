@@ -65,6 +65,7 @@ public class UndertowJS {
     private final ClassLoader classLoader;
     private final Map<String, InjectionProvider> injectionProviders;
     private final JavabeanIntrospector javabeanIntrospector = new JavabeanIntrospector();
+    private final List<HandlerWrapper> handlerWrappers;
 
 
     private ScriptEngine engine;
@@ -73,9 +74,10 @@ public class UndertowJS {
     private Map<Resource, Date> lastModified;
     private volatile long lastHotDeploymentCheck = -1;
 
-    public UndertowJS(List<ResourceSet> resources, boolean hotDeployment, ClassLoader classLoader, Map<String, InjectionProvider> injectionProviders) {
+    public UndertowJS(List<ResourceSet> resources, boolean hotDeployment, ClassLoader classLoader, Map<String, InjectionProvider> injectionProviders, List<HandlerWrapper> handlerWrappers) {
         this.classLoader = classLoader;
         this.injectionProviders = injectionProviders;
+        this.handlerWrappers = handlerWrappers;
         this.resources = new ArrayList<>(resources);
         this.hotDeployment = hotDeployment;
     }
@@ -100,24 +102,22 @@ public class UndertowJS {
                 exchange.getAttachment(NEXT).handleRequest(exchange);
             }
         });
-        engine.put("$undertow_routing_handler", routingHandler);
-        engine.put("$undertow_class_loader", classLoader);
-        engine.put("$undertow_injection_providers", injectionProviders);
-        engine.put("$undertow_javabean_introspector", javabeanIntrospector);
+        UndertowSupport support = new UndertowSupport(routingHandler, classLoader, injectionProviders,javabeanIntrospector, handlerWrappers);
+        engine.put("$undertow_support", support);
 
         engine.eval(FileUtils.readFile(UndertowJS.class, "undertow-core-scripts.js"));
         Map<Resource, Date> lm = new HashMap<>();
-        for(ResourceSet set : resources) {
+        for (ResourceSet set : resources) {
 
-            for(String resource : set.getResources()) {
+            for (String resource : set.getResources()) {
                 Resource res = set.getResourceManager().getResource(resource);
-                if(res == null) {
+                if (res == null) {
                     UndertowScriptLogger.ROOT_LOGGER.couldNotReadResource(resource);
                 } else {
                     try (InputStream stream = res.getUrl().openStream()) {
                         engine.eval(new InputStreamReader(new BufferedInputStream(stream)));
                     }
-                    if(hotDeployment) {
+                    if (hotDeployment) {
                         lm.put(res, res.getLastModified());
                     }
                 }
@@ -130,7 +130,7 @@ public class UndertowJS {
     }
 
     public UndertowJS stop() {
-        for(Map.Entry<ResourceSet, ResourceChangeListener> entry : listeners.entrySet()) {
+        for (Map.Entry<ResourceSet, ResourceChangeListener> entry : listeners.entrySet()) {
             entry.getKey().getResourceManager().removeResourceChangeListener(entry.getValue());
         }
         listeners.clear();
@@ -142,13 +142,13 @@ public class UndertowJS {
         return new HttpHandler() {
             @Override
             public void handleRequest(HttpServerExchange exchange) throws Exception {
-                if(hotDeployment) {
+                if (hotDeployment) {
                     long lastHotDeploymentCheck = UndertowJS.this.lastHotDeploymentCheck;
-                    if(System.currentTimeMillis() > lastHotDeploymentCheck + HOT_DEPLOYMENT_INTERVAL) {
+                    if (System.currentTimeMillis() > lastHotDeploymentCheck + HOT_DEPLOYMENT_INTERVAL) {
                         synchronized (UndertowJS.this) {
-                            if(UndertowJS.this.lastHotDeploymentCheck == lastHotDeploymentCheck) {
-                                for(Map.Entry<Resource, Date> entry : lastModified.entrySet()) {
-                                    if(!entry.getValue().equals(entry.getKey().getLastModified())) {
+                            if (UndertowJS.this.lastHotDeploymentCheck == lastHotDeploymentCheck) {
+                                for (Map.Entry<Resource, Date> entry : lastModified.entrySet()) {
+                                    if (!entry.getValue().equals(entry.getKey().getLastModified())) {
                                         UndertowScriptLogger.ROOT_LOGGER.rebuildingDueToFileChange(entry.getKey().getPath());
                                         buildEngine();
                                         break;
@@ -187,6 +187,7 @@ public class UndertowJS {
         private boolean hotDeployment = true;
         private ClassLoader classLoader = UndertowJS.class.getClassLoader();
         private final Map<String, InjectionProvider> injectionProviders = new HashMap<>();
+        private final List<HandlerWrapper> handlerWrappers = new ArrayList<>();
 
         public ResourceSet addResourceSet(ResourceManager manager) {
             ResourceSet resourceSet = new ResourceSet(manager);
@@ -231,8 +232,13 @@ public class UndertowJS {
             return this;
         }
 
+        public Builder addHandlerWrapper(HandlerWrapper handlerWrapper) {
+            this.handlerWrappers.add(handlerWrapper);
+            return this;
+        }
+
         public UndertowJS build() {
-            return new UndertowJS(resources, hotDeployment, classLoader, injectionProviders);
+            return new UndertowJS(resources, hotDeployment, classLoader, injectionProviders, handlerWrappers);
         }
     }
 
@@ -273,22 +279,27 @@ public class UndertowJS {
      * class that is used to inspect java objects from scripts
      */
     public static final class JavabeanIntrospector {
+
+        private JavabeanIntrospector() {
+
+        }
+
         private Map<Class, Map<String, Method>> cache = new ConcurrentHashMap<>();
 
         public Map<String, Method> inspect(Class<?> clazz) {
             Map<String, Method> existing = cache.get(clazz);
-            if(existing != null) {
+            if (existing != null) {
                 return existing;
             }
             existing = new HashMap<>();
-            for(Method method : clazz.getMethods()) {
-                if(method.isBridge() || Modifier.isStatic(method.getModifiers())) {
+            for (Method method : clazz.getMethods()) {
+                if (method.isBridge() || Modifier.isStatic(method.getModifiers())) {
                     continue;
                 }
-                if(method.getName().equals("getClass")) {
+                if (method.getName().equals("getClass")) {
                     continue;
                 }
-                if(method.getParameterCount() == 0 &&
+                if (method.getParameterCount() == 0 &&
                         method.getName().startsWith("get") &&
                         method.getName().length() > 3 &&
                         method.getReturnType() != void.class) {
@@ -299,6 +310,46 @@ public class UndertowJS {
             return existing;
         }
 
-     }
+    }
+
+    /**
+     * Holder class for objects that undertow needs to access from the script environment
+     */
+    public static class UndertowSupport {
+
+        private final RoutingHandler routingHandler;
+        private final  ClassLoader classLoader;
+        private final Map<String, InjectionProvider> injectionProviders;
+        private final JavabeanIntrospector javabeanIntrospector;
+        private final List<HandlerWrapper> handlerWrappers;
+
+        public UndertowSupport(RoutingHandler routingHandler, ClassLoader classLoader, Map<String, InjectionProvider> injectionProviders, JavabeanIntrospector javabeanIntrospector, List<HandlerWrapper> handlerWrappers) {
+            this.routingHandler = routingHandler;
+            this.classLoader = classLoader;
+            this.injectionProviders = injectionProviders;
+            this.javabeanIntrospector = javabeanIntrospector;
+            this.handlerWrappers = handlerWrappers;
+        }
+
+        public ClassLoader getClassLoader() {
+            return classLoader;
+        }
+
+        public Map<String, InjectionProvider> getInjectionProviders() {
+            return injectionProviders;
+        }
+
+        public JavabeanIntrospector getJavabeanIntrospector() {
+            return javabeanIntrospector;
+        }
+
+        public List<HandlerWrapper> getHandlerWrappers() {
+            return handlerWrappers;
+        }
+
+        public RoutingHandler getRoutingHandler() {
+            return routingHandler;
+        }
+    }
 
 }
