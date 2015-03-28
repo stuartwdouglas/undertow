@@ -396,9 +396,15 @@ var $undertow = {
     alias: function (alias, injection) {
         $undertow.injection_aliases[alias] = $undertow._create_injection_function(injection);
         return $undertow;
+    },
+
+    toJava: function(type, val) {
+        var m = new type();
+        for(var n in val) {
+            //todo: complex graphs
+            m[n] = val[n];
+        }
     }
-
-
 };
 
 
