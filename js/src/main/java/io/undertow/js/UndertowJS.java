@@ -57,7 +57,6 @@ public class UndertowJS {
 
     private static final AttachmentKey<HttpHandler> NEXT = AttachmentKey.create(HttpHandler.class);
 
-    public static final String UNDERTOW = "$undertow";
     public static final int HOT_DEPLOYMENT_INTERVAL = 500;
     private final List<ResourceSet> resources;
     private final boolean hotDeployment;
@@ -69,7 +68,6 @@ public class UndertowJS {
 
 
     private ScriptEngine engine;
-    private Object undertowObject;
     private RoutingHandler routingHandler;
     private Map<Resource, Date> lastModified;
     private volatile long lastHotDeploymentCheck = -1;
@@ -102,7 +100,7 @@ public class UndertowJS {
                 exchange.getAttachment(NEXT).handleRequest(exchange);
             }
         });
-        UndertowSupport support = new UndertowSupport(routingHandler, classLoader, injectionProviders,javabeanIntrospector, handlerWrappers);
+        UndertowSupport support = new UndertowSupport(routingHandler, classLoader, injectionProviders, javabeanIntrospector, handlerWrappers);
         engine.put("$undertow_support", support);
 
         engine.eval(FileUtils.readFile(UndertowJS.class, "undertow-core-scripts.js"));
@@ -124,7 +122,6 @@ public class UndertowJS {
             }
         }
         this.engine = engine;
-        this.undertowObject = engine.get(UNDERTOW);
         this.routingHandler = routingHandler;
         this.lastModified = lm;
     }
@@ -318,7 +315,7 @@ public class UndertowJS {
     public static class UndertowSupport {
 
         private final RoutingHandler routingHandler;
-        private final  ClassLoader classLoader;
+        private final ClassLoader classLoader;
         private final Map<String, InjectionProvider> injectionProviders;
         private final JavabeanIntrospector javabeanIntrospector;
         private final List<HandlerWrapper> handlerWrappers;

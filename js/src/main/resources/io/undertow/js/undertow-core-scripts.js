@@ -28,7 +28,8 @@ var $undertow = {
         HttpString: Java.type("io.undertow.util.HttpString"),
         PredicateParser: Java.type("io.undertow.predicate.PredicateParser"),
         StringReadHandler: Java.type("io.undertow.util.StringReadHandler"),
-        DataSource: Java.type("javax.sql.DataSource")
+        DataSource: Java.type("javax.sql.DataSource"),
+        HandlerWrapper : Java.type("io.undertow.server.HandlerWrapper")
     },
 
     injection_aliases: {},
@@ -41,8 +42,6 @@ var $undertow = {
             return JSON.parse(data);
         }
     },
-
-
 
     injection_wrappers: [
         /**
@@ -57,6 +56,11 @@ var $undertow = {
         }
 
     ],
+
+    /**
+     * filters
+     */
+    _filters: [],
 
     Exchange: function (underlyingExchange) {
 
@@ -391,6 +395,21 @@ var $undertow = {
         }
 
         return $undertow;
+    },
+
+    filter: function() {
+        var predicate = null;
+        var method = null;
+        if(arguments.length == 1) {
+            method = arguments[0];
+        } else {
+            predicate = arguments[0];
+            method = arguments[1];
+        }
+        _filters.push(new $undertow._java.HandlerWrapper() {
+
+        });
+
     },
 
     alias: function (alias, injection) {
