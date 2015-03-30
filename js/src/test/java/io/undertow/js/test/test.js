@@ -18,6 +18,10 @@
 
 $undertow
     .alias("json", "$entity:json")
+    .wrapper("path[/testWrapper]", ["test:my-wrapper",function($exchange, $next, value) {
+        $exchange.responseHeaders("Wrapper", value);
+        $next();
+    }])
     .onGet("/testResponseSender", function ($exchange) {
         $exchange.send("Response Sender");
     })
@@ -43,9 +47,12 @@ $undertow
         $exchange.send(invection);
     }])
     .onPost("/testEntityInjection", ['$entity:string', function($exchange, entity) {
-        $exchange.send(entity);
+        $exchange.send(201, entity);
     }])
     .onPost("/testEntityJsonInjection", "equals[%{i,content-type}, text/json]", ['json', function($exchange, entity) {
         $exchange.send(entity['first']);
-    }]);
+    }])
+    .onGet("/testWrapper", function($exchange) {
+        $exchange.send("wrapper");
+    });
 

@@ -102,7 +102,7 @@ public class UndertowJS {
         });
         UndertowSupport support = new UndertowSupport(routingHandler, classLoader, injectionProviders, javabeanIntrospector, handlerWrappers);
         engine.put("$undertow_support", support);
-
+        engine.put(ScriptEngine.FILENAME, "undertow-core-scripts.js");
         engine.eval(FileUtils.readFile(UndertowJS.class, "undertow-core-scripts.js"));
         Map<Resource, Date> lm = new HashMap<>();
         for (ResourceSet set : resources) {
@@ -113,6 +113,7 @@ public class UndertowJS {
                     UndertowScriptLogger.ROOT_LOGGER.couldNotReadResource(resource);
                 } else {
                     try (InputStream stream = res.getUrl().openStream()) {
+                        engine.put(ScriptEngine.FILENAME, res.getUrl().toString());
                         engine.eval(new InputStreamReader(new BufferedInputStream(stream)));
                     }
                     if (hotDeployment) {

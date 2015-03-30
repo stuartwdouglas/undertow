@@ -195,7 +195,7 @@ public class SimpleJavascriptTestCase {
             HttpPost post = new HttpPost(DefaultServer.getDefaultServerURL() + "/testEntityInjection");
             post.setEntity(new StringEntity("A simple entity"));
             HttpResponse result = client.execute(post);
-            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals(StatusCodes.CREATED, result.getStatusLine().getStatusCode());
             Assert.assertEquals("A simple entity", HttpClientUtils.readResponse(result));
         } finally {
             client.getConnectionManager().shutdown();
@@ -216,6 +216,22 @@ public class SimpleJavascriptTestCase {
             client.getConnectionManager().shutdown();
         }
     }
+
+
+    @Test
+    public void testWrapperFunction() throws IOException {
+        final TestHttpClient client = new TestHttpClient();
+        try {
+            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/testWrapper");
+            HttpResponse result = client.execute(get);
+            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+            Assert.assertEquals("wrapper", HttpClientUtils.readResponse(result));
+            Assert.assertEquals("INJECTED:my-wrapper", result.getFirstHeader("Wrapper").getValue());
+        } finally {
+            client.getConnectionManager().shutdown();
+        }
+    }
+
     private static final class TestInjectionProvider implements InjectionProvider {
 
         @Override

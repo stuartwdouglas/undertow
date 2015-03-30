@@ -27,18 +27,19 @@ var $undertow = {
         HttpHandler: Java.type("io.undertow.server.HttpHandler"),
         HttpString: Java.type("io.undertow.util.HttpString"),
         PredicateParser: Java.type("io.undertow.predicate.PredicateParser"),
+        PredicateHandler: Java.type("io.undertow.server.handlers.PredicateHandler"),
         StringReadHandler: Java.type("io.undertow.util.StringReadHandler"),
         DataSource: Java.type("javax.sql.DataSource"),
-        HandlerWrapper : Java.type("io.undertow.server.HandlerWrapper")
+        HandlerWrapper: Java.type("io.undertow.server.HandlerWrapper")
     },
 
     injection_aliases: {},
     entity_parsers: {
-        string: function(data) {
+        string: function (data) {
             return data;
         },
 
-        json: function(data) {
+        json: function (data) {
             return JSON.parse(data);
         }
     },
@@ -48,8 +49,8 @@ var $undertow = {
          * JDBC wrapper function. Wraps injected datasources with our JS friendly database API
          * @param injected
          */
-        function(injected) {
-            if(injected instanceof $undertow._java.DataSource) {
+            function (injected) {
+            if (injected instanceof $undertow._java.DataSource) {
                 return new $undertow.JDBCWrapper(injected);
             }
             return injected;
@@ -60,7 +61,7 @@ var $undertow = {
     /**
      * filters
      */
-    _filters: [],
+    _wrappers: [],
 
     Exchange: function (underlyingExchange) {
 
@@ -86,12 +87,15 @@ var $undertow = {
             }
         };
 
-        this.send = function (val) {
-            if (val == null) {
-                underlyingExchange.responseSender.send("");
+        this.send = function () {
+            var toSend = "";
+            if(arguments.length == 1) {
+                toSend = arguments[0];
             } else {
-                underlyingExchange.responseSender.send(val);
+                toSend = arguments[1];
+                this.status(arguments[0]);
             }
+            underlyingExchange.responseSender.send(toSend);
         };
 
         this.sendRedirect = function (location) {
@@ -134,17 +138,17 @@ var $undertow = {
         };
     },
 
-    JDBCWrapper: function($underlying) {
+    JDBCWrapper: function ($underlying) {
         this.$underlying = $underlying;
 
-        this.query = function() {
+        this.query = function () {
             var conn = null;
             var statement = null;
             try {
                 conn = $underlying.getConnection();
                 conn.setAutoCommit(true); //TODO: how to deal with transactions?
                 statement = conn.prepareStatement(arguments[0]);
-                for(var i = 1; i < arguments.length; ++i) {
+                for (var i = 1; i < arguments.length; ++i) {
                     statement.setObject(i, arguments[i]);
                 }
                 statement.execute();
@@ -159,7 +163,7 @@ var $undertow = {
             }
         }
 
-        this.select = function() {
+        this.select = function () {
             var conn = null;
             var statement = null;
             var rs = null;
@@ -167,7 +171,7 @@ var $undertow = {
                 conn = $underlying.getConnection();
                 conn.setAutoCommit(true); //TODO: how to deal with transactions?
                 statement = conn.prepareStatement(arguments[0]);
-                for(var i = 1; i < arguments.length; ++i) {
+                for (var i = 1; i < arguments.length; ++i) {
                     statement.setObject(i, arguments[i]);
                 }
 
@@ -177,13 +181,13 @@ var $undertow = {
                 var columnCount = md.getColumnCount();
                 var types = {};
                 var names = {};
-                for(var i = 1; i <= columnCount; ++i) {
+                for (var i = 1; i <= columnCount; ++i) {
                     types[i] = md.getColumnClassName(i);
                     names[i] = md.getColumnName(i);
                 }
-                while(rs.next()) {
+                while (rs.next()) {
                     var rec = {};
-                    for(var j = 1; j <= columnCount; ++j) {
+                    for (var j = 1; j <= columnCount; ++j) {
                         var name = names[j];
                         var type = types[j];
                         switch (type) {
@@ -240,12 +244,12 @@ var $undertow = {
             }
         };
 
-        this.selectOne = function() {
+        this.selectOne = function () {
 
             var result = this.select.apply(null, arguments);
-            if(result.length == 0) {
+            if (result.length == 0) {
                 return null;
-            } else if(result.length > 1) {
+            } else if (result.length > 1) {
                 throw "More than one result returned";
             } else {
                 return result[0];
@@ -270,13 +274,13 @@ var $undertow = {
             var prefix = p.substr(0, index);
             var suffix = p.substr(index + 1);
             if (prefix == '$entity') {
-                return function(exchange) {
+                return function (exchange) {
                     var data = exchange.$underlying.getAttachment($undertow._java.StringReadHandler.DATA);
-                    if(suffix == null) {
+                    if (suffix == null) {
                         return data;
                     } else {
                         var parser = $undertow.entity_parsers[suffix];
-                        if(parser == null) {
+                        if (parser == null) {
                             return data;
                         } else {
                             return parser(data);
@@ -328,28 +332,40 @@ var $undertow = {
 
                 var paramList = [];
                 paramList.push($exchange);
-                for (var i = 0; i < params.length; ++i) {
-                    var param = params[i];
-                    if (param == null) {
-                        paramList.push(null);
-                    } else {
-                        var toInject = param($exchange);
-                        for (var j = 0; j < $undertow.injection_wrappers.length; ++j) {
-                            toInject = $undertow.injection_wrappers[j](toInject);
-                        }
-                        paramList.push(toInject);
-                    }
-                }
-
+                $undertow._create_injected_parameter_list(params, paramList, $exchange);
                 handler.apply(null, paramList);
             }
         });
-        for(var i in $undertow_support.handlerWrappers) {
+        for(var i in $undertow._wrappers) {
+            httpHandler = $undertow._wrappers[i].wrap(httpHandler);
+        }
+        for (var i in $undertow_support.handlerWrappers) {
             httpHandler = $undertow_support.handlerWrappers[i].wrap(httpHandler);
         }
         return new $undertow._java.StringReadHandler(httpHandler);
     },
 
+    /**
+     *
+     * @param params The list of injection provider functions
+     * @param paramList The array of actual values to inject
+     * @param $exchange The current exchange wrapper
+     * @private
+     */
+    _create_injected_parameter_list: function (params, paramList, $exchange) {
+        for (var i = 0; i < params.length; ++i) {
+            var param = params[i];
+            if (param == null) {
+                paramList.push(null);
+            } else {
+                var toInject = param($exchange);
+                for (var j = 0; j < $undertow.injection_wrappers.length; ++j) {
+                    toInject = $undertow.injection_wrappers[j](toInject);
+                }
+                paramList.push(toInject);
+            }
+        }
+    },
 
     onGet: function () {
         var args = ["GET"];
@@ -397,19 +413,61 @@ var $undertow = {
         return $undertow;
     },
 
-    filter: function() {
+
+    wrapper: function () {
         var predicate = null;
-        var method = null;
-        if(arguments.length == 1) {
-            method = arguments[0];
+        var userHandler = null;
+        if (arguments.length == 1) {
+            userHandler = arguments[0];
         } else {
             predicate = arguments[0];
-            method = arguments[1];
+            userHandler = arguments[1];
         }
-        _filters.push(new $undertow._java.HandlerWrapper() {
+        if (predicate != null) {
+            predicate = $undertow._java.PredicateParser.parse(predicate, $undertow_support.classLoader);
+        }
 
-        });
+        var handler = userHandler;
+        var params = [];
+        if (userHandler.constructor === Array) {
+            handler = userHandler[userHandler.length - 1];
+            for (var i = 0; i < userHandler.length - 1; ++i) {
+                params.push($undertow._create_injection_function(userHandler[i]));
+            }
+        }
+        $undertow._wrappers.push(new $undertow._java.HandlerWrapper({
 
+            wrap: function (next) {
+
+                var filterHttpHandler = new $undertow._java.HttpHandler({
+                    handleRequest: function (underlyingExchange) {
+
+                        if (underlyingExchange.inIoThread) {
+                            underlyingExchange.dispatch(filterHttpHandler);
+                            return;
+                        }
+                        //TODO: re-use this between filters and handlers
+                        var $exchange = new $undertow.Exchange(underlyingExchange);
+
+                        var paramList = [];
+                        paramList.push($exchange);
+                        paramList.push(function () {
+                            next.handleRequest(underlyingExchange);
+                        });
+                        $undertow._create_injected_parameter_list(params, paramList, $exchange);
+                        handler.apply(null, paramList);
+                    }
+
+                });
+                if (predicate == null) {
+                    return  filterHttpHandler;
+                } else {
+                    return new $undertow._java.PredicateHandler(predicate, filterHttpHandler, next);
+                }
+            }
+
+        }));
+        return $undertow;
     },
 
     alias: function (alias, injection) {
@@ -417,21 +475,22 @@ var $undertow = {
         return $undertow;
     },
 
-    toJava: function(type, val) {
+    toJava: function (type, val) {
         var m = new type();
-        for(var n in val) {
+        for (var n in val) {
             //todo: complex graphs
             m[n] = val[n];
         }
+        return m;
     }
 };
 
 
 //setup the JSON stringifyer to handle java object
 $undertow._oldStringify = JSON.stringify;
-JSON.stringify = function(value,replacer,space) {
-    var newReplacer = function(name, value) {
-        if(value == null) {
+JSON.stringify = function (value, replacer, space) {
+    var newReplacer = function (name, value) {
+        if (value == null) {
             return replacer == null ? null : replacer(name, null);
         }
         if (value instanceof Object) {
@@ -440,7 +499,7 @@ JSON.stringify = function(value,replacer,space) {
         if (typeof value != 'object') {
             return replacer == null ? value : replacer(name, value);
         }
-        if(value instanceof java.util.Collection) {
+        if (value instanceof java.util.Collection) {
             return replacer == null ? Java.from(value) : replacer(name, Java.from(value));
         }
         var ret = {};
