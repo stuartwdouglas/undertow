@@ -395,4 +395,7 @@ public interface UndertowMessages {
 
     @Message(id = 122, value = "CONNECT attempt failed as target proxy returned %s")
     IOException proxyConnectionFailed(int responseCode);
+
+    @Message(id = 123, value = "pool is closed")
+    IllegalStateException poolIsClosed();
 }
