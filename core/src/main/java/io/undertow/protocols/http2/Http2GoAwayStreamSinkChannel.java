@@ -53,7 +53,7 @@ class Http2GoAwayStreamSinkChannel extends Http2NoDataStreamSinkChannel {
         Http2ProtocolUtils.putInt(buf, lastGoodStreamId);
         Http2ProtocolUtils.putInt(buf, status);
         buf.flip();
-        return new SendFrameHeader(new ImmediatePooled<>(buf));
+        return new SendFrameHeader(new ImmediatePooled(buf));
     }
 
     @Override

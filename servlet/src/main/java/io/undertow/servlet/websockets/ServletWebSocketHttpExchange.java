@@ -27,7 +27,7 @@ import org.xnio.FinishedIoFuture;
 import org.xnio.FutureResult;
 import org.xnio.IoFuture;
 import org.xnio.IoUtils;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
@@ -191,7 +191,7 @@ public class ServletWebSocketHttpExchange implements WebSocketHttpExchange {
     }
 
     @Override
-    public Pool<ByteBuffer> getBufferPool() {
+    public ByteBufferPool getBufferPool() {
         return exchange.getConnection().getBufferPool();
     }
 

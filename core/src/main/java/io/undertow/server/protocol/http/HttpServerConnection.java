@@ -36,8 +36,8 @@ import io.undertow.util.HttpString;
 import io.undertow.util.ImmediatePooled;
 import io.undertow.util.Methods;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.StreamConnection;
 import org.xnio.channels.SslChannel;
 import org.xnio.conduits.StreamSinkConduit;
@@ -65,7 +65,7 @@ public final class HttpServerConnection extends AbstractServerConnection {
     private HttpUpgradeListener upgradeListener;
     private boolean connectHandled;
 
-    public HttpServerConnection(StreamConnection channel, final Pool<ByteBuffer> bufferPool, final HttpHandler rootHandler, final OptionMap undertowOptions, final int bufferSize) {
+    public HttpServerConnection(StreamConnection channel, final ByteBufferPool bufferPool, final HttpHandler rootHandler, final OptionMap undertowOptions, final int bufferSize) {
         super(channel, bufferPool, rootHandler, undertowOptions, bufferSize);
         if (channel instanceof SslChannel) {
             sslSessionInfo = new ConnectionSSLSessionInfo(((SslChannel) channel), this);
@@ -140,20 +140,20 @@ public final class HttpServerConnection extends AbstractServerConnection {
      *
      * @param unget The buffer to push back
      */
-    public void ungetRequestBytes(final Pooled<ByteBuffer> unget) {
+    public void ungetRequestBytes(final PooledBuffer unget) {
         if (getExtraBytes() == null) {
             setExtraBytes(unget);
         } else {
-            Pooled<ByteBuffer> eb = getExtraBytes();
-            ByteBuffer buf = eb.getResource();
-            final ByteBuffer ugBuffer = unget.getResource();
+            PooledBuffer eb = getExtraBytes();
+            ByteBuffer buf = eb.buffer();
+            final ByteBuffer ugBuffer = unget.buffer();
 
             if (ugBuffer.limit() - ugBuffer.remaining() > buf.remaining()) {
                 //stuff the existing data after the data we are ungetting
                 ugBuffer.compact();
                 ugBuffer.put(buf);
                 ugBuffer.flip();
-                eb.free();
+                eb.close();
                 setExtraBytes(unget);
             } else {
                 //TODO: this is horrible, but should not happen often
@@ -161,10 +161,10 @@ public final class HttpServerConnection extends AbstractServerConnection {
                 int first = ugBuffer.remaining();
                 ugBuffer.get(data, 0, ugBuffer.remaining());
                 buf.get(data, first, buf.remaining());
-                eb.free();
-                unget.free();
+                eb.close();
+                unget.close();
                 final ByteBuffer newBuffer = ByteBuffer.wrap(data);
-                setExtraBytes(new ImmediatePooled<>(newBuffer));
+                setExtraBytes(new ImmediatePooled(newBuffer));
             }
         }
     }

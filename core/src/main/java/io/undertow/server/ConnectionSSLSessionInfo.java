@@ -22,7 +22,7 @@ import io.undertow.UndertowOptions;
 import io.undertow.server.protocol.http.HttpServerConnection;
 import org.xnio.ChannelListener;
 import org.xnio.Options;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.SslClientAuthMode;
 import org.xnio.channels.Channels;
 import org.xnio.channels.SslChannel;
@@ -101,18 +101,18 @@ public class ConnectionSSLSessionInfo implements SSLSessionInfo {
             requestResetRequired = true;
         }
 
-        Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
+        PooledBuffer pooled = exchange.getConnection().getBufferPool().allocate();
         boolean free = true; //if the pooled buffer should be freed
         int usedBuffers = 0;
-        Pooled<ByteBuffer>[] poolArray = null;
-        final int bufferSize = pooled.getResource().remaining();
+        PooledBuffer[] poolArray = null;
+        final int bufferSize = pooled.buffer().remaining();
         int allowedBuffers = ((maxSize + bufferSize - 1) / bufferSize);
-        poolArray = new Pooled[allowedBuffers];
+        poolArray = new PooledBuffer[allowedBuffers];
         poolArray[usedBuffers++] = pooled;
         try {
             int res;
             do {
-                final ByteBuffer buf = pooled.getResource();
+                final ByteBuffer buf = pooled.buffer();
                 res = Channels.readBlocking(requestChannel, buf);
                 if (!buf.hasRemaining()) {
                     if (usedBuffers == allowedBuffers) {
@@ -125,14 +125,14 @@ public class ConnectionSSLSessionInfo implements SSLSessionInfo {
                 }
             } while (res != -1);
             free = false;
-            pooled.getResource().flip();
+            pooled.buffer().flip();
             Connectors.ungetRequestBytes(exchange, poolArray);
             renegotiateNoRequest(exchange, newAuthMode);
         } finally {
             if (free) {
-                for(Pooled<ByteBuffer> buf : poolArray) {
+                for(PooledBuffer buf : poolArray) {
                     if(buf != null) {
-                        buf.free();
+                        buf.close();
                     }
                 }
             }

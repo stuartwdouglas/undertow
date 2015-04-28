@@ -18,7 +18,6 @@
 
 package io.undertow.server.handlers.proxy.mod_cluster;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,7 +35,7 @@ import io.undertow.server.handlers.proxy.ProxyClient;
 import io.undertow.util.CopyOnWriteMap;
 import io.undertow.util.Headers;
 import io.undertow.util.PathMatcher;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.XnioExecutor;
 import org.xnio.XnioIoThread;
 import org.xnio.ssl.XnioSsl;
@@ -154,7 +153,7 @@ class ModClusterContainer {
      * @param bufferPool        the buffer pool
      * @return whether the node could be created or not
      */
-    public synchronized boolean addNode(final NodeConfig config, final Balancer.BalancerBuilder balancerConfig, final XnioIoThread ioThread, final Pool<ByteBuffer> bufferPool) {
+    public synchronized boolean addNode(final NodeConfig config, final Balancer.BalancerBuilder balancerConfig, final XnioIoThread ioThread, final ByteBufferPool bufferPool) {
 
         final String jvmRoute = config.getJvmRoute();
         final Node existing = nodes.get(jvmRoute);

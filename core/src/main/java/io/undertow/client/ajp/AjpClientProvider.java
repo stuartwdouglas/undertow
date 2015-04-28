@@ -26,7 +26,7 @@ import io.undertow.protocols.ajp.AjpClientChannel;
 import org.xnio.ChannelListener;
 import org.xnio.IoFuture;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
@@ -34,7 +34,6 @@ import org.xnio.ssl.XnioSsl;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -50,17 +49,17 @@ public class AjpClientProvider implements ClientProvider {
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioWorker worker, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioWorker worker, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         connect(listener, null, uri, worker, ssl, bufferPool, options);
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         connect(listener, null, uri, ioThread, ssl, bufferPool, options);
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioWorker worker, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioWorker worker, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         ChannelListener<StreamConnection> openListener = new ChannelListener<StreamConnection>() {
             @Override
             public void handleEvent(StreamConnection connection) {
@@ -83,7 +82,7 @@ public class AjpClientProvider implements ClientProvider {
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress,final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress,final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         ChannelListener<StreamConnection> openListener = new ChannelListener<StreamConnection>() {
             @Override
             public void handleEvent(StreamConnection connection) {
@@ -105,7 +104,7 @@ public class AjpClientProvider implements ClientProvider {
         }
     }
 
-    private void handleConnected(StreamConnection connection, ClientCallback<ClientConnection> listener, URI uri, XnioSsl ssl, Pool<ByteBuffer> bufferPool, OptionMap options) {
+    private void handleConnected(StreamConnection connection, ClientCallback<ClientConnection> listener, URI uri, XnioSsl ssl, ByteBufferPool bufferPool, OptionMap options) {
         listener.completed(new AjpClientConnection(new AjpClientChannel(connection, bufferPool) , options, bufferPool));
     }
 

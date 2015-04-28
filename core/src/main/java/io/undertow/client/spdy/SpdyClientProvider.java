@@ -30,20 +30,19 @@ import java.util.List;
 import java.util.Set;
 import javax.net.ssl.SSLEngine;
 
+import io.undertow.buffers.DefaultByteBufferPool;
+import io.undertow.conduits.PushBackStreamSourceConduit;
 import io.undertow.protocols.ssl.UndertowXnioSsl;
 import org.eclipse.jetty.alpn.ALPN;
-import org.xnio.BufferAllocator;
-import org.xnio.ByteBufferSlicePool;
 import org.xnio.ChannelListener;
 import org.xnio.IoFuture;
 import org.xnio.OptionMap;
 import org.xnio.Options;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
 import org.xnio.channels.StreamSourceChannel;
-import org.xnio.conduits.PushBackStreamSourceConduit;
 import org.xnio.ssl.SslConnection;
 import org.xnio.ssl.XnioSsl;
 
@@ -86,12 +85,12 @@ public class SpdyClientProvider implements ClientProvider {
 
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioWorker worker, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioWorker worker, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         connect(listener, null, uri, worker, ssl, bufferPool, options);
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         connect(listener, null, uri, ioThread, ssl, bufferPool, options);
     }
 
@@ -101,7 +100,7 @@ public class SpdyClientProvider implements ClientProvider {
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioWorker worker, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioWorker worker, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         if(uri.getScheme().equals("spdy-plain")) {
 
             if(bindAddress == null) {
@@ -131,7 +130,7 @@ public class SpdyClientProvider implements ClientProvider {
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         if(uri.getScheme().equals("spdy-plain")) {
 
             if(bindAddress == null) {
@@ -170,7 +169,7 @@ public class SpdyClientProvider implements ClientProvider {
         };
     }
 
-    private ChannelListener<StreamConnection> createOpenListener(final ClientCallback<ClientConnection> listener, final URI uri, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    private ChannelListener<StreamConnection> createOpenListener(final ClientCallback<ClientConnection> listener, final URI uri, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         return new ChannelListener<StreamConnection>() {
             @Override
             public void handleEvent(StreamConnection connection) {
@@ -179,7 +178,7 @@ public class SpdyClientProvider implements ClientProvider {
         };
     }
 
-    private void handleConnected(StreamConnection connection, final ClientCallback<ClientConnection> listener, URI uri, XnioSsl ssl, Pool<ByteBuffer> bufferPool, OptionMap options) {
+    private void handleConnected(StreamConnection connection, final ClientCallback<ClientConnection> listener, URI uri, XnioSsl ssl, ByteBufferPool bufferPool, OptionMap options) {
         if(connection instanceof SslConnection) {
             handlePotentialSpdyConnection(connection, listener, bufferPool, options, new ChannelListener<SslConnection>() {
                 @Override
@@ -199,7 +198,7 @@ public class SpdyClientProvider implements ClientProvider {
     /**
      * Not really part of the public API, but is used by the HTTP client to initiate a SPDY connection for HTTPS requests.
      */
-    public static void handlePotentialSpdyConnection(final StreamConnection connection, final ClientCallback<ClientConnection> listener, final Pool<ByteBuffer> bufferPool, final OptionMap options, final ChannelListener<SslConnection> spdyFailedListener) {
+    public static void handlePotentialSpdyConnection(final StreamConnection connection, final ClientCallback<ClientConnection> listener, final ByteBufferPool bufferPool, final OptionMap options, final ChannelListener<SslConnection> spdyFailedListener) {
 
         final SslConnection sslConnection = (SslConnection) connection;
         final SSLEngine sslEngine = UndertowXnioSsl.getSslEngine(sslConnection);
@@ -233,7 +232,7 @@ public class SpdyClientProvider implements ClientProvider {
                             if (read > 0) {
                                 buf.flip();
                                 PushBackStreamSourceConduit pb = new PushBackStreamSourceConduit(connection.getSourceChannel().getConduit());
-                                pb.pushBack(new ImmediatePooled<>(buf));
+                                pb.pushBack(new ImmediatePooled(buf));
                                 connection.getSourceChannel().setConduit(pb);
                             }
                             if(spdySelectionProvider.selected == null) {
@@ -264,8 +263,8 @@ public class SpdyClientProvider implements ClientProvider {
 
     }
 
-    private static SpdyClientConnection createSpdyChannel(StreamConnection connection, Pool<ByteBuffer> bufferPool) {
-        SpdyChannel spdyChannel = new SpdyChannel(connection, bufferPool, null, new ByteBufferSlicePool(BufferAllocator.BYTE_BUFFER_ALLOCATOR, 8192, 8192), true);
+    private static SpdyClientConnection createSpdyChannel(StreamConnection connection, ByteBufferPool bufferPool) {
+        SpdyChannel spdyChannel = new SpdyChannel(connection, bufferPool, null, new DefaultByteBufferPool(false, 8192, 100, 1), true);
         return new SpdyClientConnection(spdyChannel);
     }
 

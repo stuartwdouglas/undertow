@@ -34,7 +34,7 @@ import static io.undertow.protocols.ajp.AjpUtils.putString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.xnio.ChannelListener;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
 import io.undertow.UndertowMessages;
 import io.undertow.client.ProxiedRequestAttachments;
@@ -88,10 +88,10 @@ public class AjpClientRequestClientStreamSinkChannel extends AbstractAjpClientSt
         if(discardMode) {
             getBuffer().clear();
             getBuffer().flip();
-            return new SendFrameHeader(new ImmediatePooled<>(ByteBuffer.wrap(new byte[0])));
+            return new SendFrameHeader(new ImmediatePooled(ByteBuffer.wrap(new byte[0])));
         }
-        Pooled<ByteBuffer> pooledHeaderBuffer = getChannel().getBufferPool().allocate();
-        final ByteBuffer buffer = pooledHeaderBuffer.getResource();
+        PooledBuffer pooledHeaderBuffer = getChannel().getBufferPool().allocate();
+        final ByteBuffer buffer = pooledHeaderBuffer.buffer();
         ByteBuffer dataBuffer = getBuffer();
         int dataInBuffer = dataBuffer.remaining();
         if (!firstFrameWritten && requestedChunkSize == 0) {
@@ -267,7 +267,7 @@ public class AjpClientRequestClientStreamSinkChannel extends AbstractAjpClientSt
             //they need to send us a read body chunk in order to get any data
             buffer.flip();
             if(buffer.remaining() == 0) {
-                pooledHeaderBuffer.free();
+                pooledHeaderBuffer.close();
                 return new SendFrameHeader(dataInBuffer, null, true);
             }
             dataBuffer.limit(dataBuffer.position());

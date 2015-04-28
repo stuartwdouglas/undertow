@@ -33,7 +33,7 @@ import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import org.xnio.ChannelListener;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.StreamConnection;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
@@ -106,10 +106,10 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel> {
             channel.suspendReads();
             return;
         }
-        Pooled<ByteBuffer> existing = connection.getExtraBytes();
+        PooledBuffer existing = connection.getExtraBytes();
 
-        final Pooled<ByteBuffer> pooled = existing == null ? connection.getBufferPool().allocate() : existing;
-        final ByteBuffer buffer = pooled.getResource();
+        final PooledBuffer pooled = existing == null ? connection.getBufferPool().allocate() : existing;
+        final ByteBuffer buffer = pooled.buffer();
         boolean free = true;
         boolean bytesRead = false;
         try {
@@ -243,7 +243,7 @@ final class AjpReadListener implements ChannelListener<StreamSourceChannel> {
             UndertowLogger.REQUEST_LOGGER.exceptionProcessingRequest(e);
             safeClose(connection);
         } finally {
-            if (free) pooled.free();
+            if (free) pooled.close();
         }
     }
 

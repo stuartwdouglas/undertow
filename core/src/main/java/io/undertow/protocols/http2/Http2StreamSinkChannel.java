@@ -21,7 +21,7 @@ package io.undertow.protocols.http2;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.xnio.IoUtils;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
 import io.undertow.server.protocol.framed.SendFrameHeader;
 
@@ -131,21 +131,21 @@ public abstract class Http2StreamSinkChannel extends AbstractHttp2StreamSinkChan
     }
 
 
-    protected Pooled<ByteBuffer>[] allocateAll(Pooled<ByteBuffer>[] allHeaderBuffers, Pooled<ByteBuffer> currentBuffer) {
-        Pooled<ByteBuffer>[] ret;
+    protected PooledBuffer[] allocateAll(PooledBuffer[] allHeaderBuffers, PooledBuffer currentBuffer) {
+        PooledBuffer[] ret;
         if (allHeaderBuffers == null) {
-            ret = new Pooled[2];
+            ret = new PooledBuffer[2];
             ret[0] = currentBuffer;
             ret[1] = getChannel().getBufferPool().allocate();
-            ByteBuffer newBuffer = ret[1].getResource();
+            ByteBuffer newBuffer = ret[1].buffer();
             if(newBuffer.remaining() > getChannel().getSendMaxFrameSize()) {
                 newBuffer.limit(newBuffer.position() + getChannel().getSendMaxFrameSize()); //make sure the buffers are not too large to go over the max frame size
             }
         } else {
-            ret = new Pooled[allHeaderBuffers.length + 1];
+            ret = new PooledBuffer[allHeaderBuffers.length + 1];
             System.arraycopy(allHeaderBuffers, 0, ret, 0, allHeaderBuffers.length);
             ret[ret.length - 1] = getChannel().getBufferPool().allocate();
-            ByteBuffer newBuffer = ret[ret.length - 1].getResource();
+            ByteBuffer newBuffer = ret[ret.length - 1].buffer();
             if(newBuffer.remaining() > getChannel().getSendMaxFrameSize()) {
                 newBuffer.limit(newBuffer.position() + getChannel().getSendMaxFrameSize());
             }

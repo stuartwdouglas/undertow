@@ -23,7 +23,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.HeaderValues;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.channels.StreamSinkChannel;
 
 import java.io.IOException;
@@ -43,7 +43,7 @@ public class SpdyStreamStreamSourceChannel extends SpdyStreamSourceChannel {
     private int flowControlWindow;
     private ChannelListener<SpdyStreamStreamSourceChannel> completionListener;
 
-    SpdyStreamStreamSourceChannel(SpdyChannel framedChannel, Pooled<ByteBuffer> data, long frameDataRemaining, HeaderMap headers, int streamId) {
+    SpdyStreamStreamSourceChannel(SpdyChannel framedChannel, PooledBuffer data, long frameDataRemaining, HeaderMap headers, int streamId) {
         super(framedChannel, data, frameDataRemaining);
         this.headers = headers;
         this.streamId = streamId;

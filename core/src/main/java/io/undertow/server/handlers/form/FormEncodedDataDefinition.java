@@ -31,7 +31,7 @@ import io.undertow.util.Headers;
 import io.undertow.util.SameThreadExecutor;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 
 /**
@@ -125,9 +125,9 @@ public class FormEncodedDataDefinition implements FormParserFactory.ParserDefini
 
         private void doParse(final StreamSourceChannel channel) throws IOException {
             int c = 0;
-            final Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
+            final PooledBuffer pooled = exchange.getConnection().getBufferPool().allocate();
             try {
-                final ByteBuffer buffer = pooled.getResource();
+                final ByteBuffer buffer = pooled.buffer();
                 do {
                     buffer.clear();
                     c = channel.read(buffer);
@@ -210,7 +210,7 @@ public class FormEncodedDataDefinition implements FormParserFactory.ParserDefini
                     exchange.putAttachment(FORM_DATA, data);
                 }
             } finally {
-                pooled.free();
+                pooled.close();
             }
         }
 

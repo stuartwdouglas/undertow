@@ -32,7 +32,7 @@ import org.xnio.ChannelExceptionHandler;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.channels.StreamSinkChannel;
 
 /**
@@ -43,7 +43,7 @@ public class AsyncSenderImpl implements Sender {
     private StreamSinkChannel channel;
     private final HttpServerExchange exchange;
     private ByteBuffer[] buffer;
-    private Pooled[] pooledBuffers = null;
+    private PooledBuffer[] pooledBuffers = null;
     private FileChannel fileChannel;
     private IoCallback callback;
     private boolean inCallback;
@@ -269,16 +269,16 @@ public class AsyncSenderImpl implements Sender {
             int i = 0;
             ByteBuffer[] bufs = null;
             while (bytes.hasRemaining()) {
-                Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
+                PooledBuffer pooled = exchange.getConnection().getBufferPool().allocate();
                 if (bufs == null) {
-                    int noBufs = (bytes.remaining() + pooled.getResource().remaining() - 1) / pooled.getResource().remaining(); //round up division trick
-                    pooledBuffers = new Pooled[noBufs];
+                    int noBufs = (bytes.remaining() + pooled.buffer().remaining() - 1) / pooled.buffer().remaining(); //round up division trick
+                    pooledBuffers = new PooledBuffer[noBufs];
                     bufs = new ByteBuffer[noBufs];
                 }
                 pooledBuffers[i] = pooled;
-                bufs[i] = pooled.getResource();
-                Buffers.copy(pooled.getResource(), bytes);
-                pooled.getResource().flip();
+                bufs[i] = pooled.buffer();
+                Buffers.copy(pooled.buffer(), bytes);
+                pooled.buffer().flip();
                 ++i;
             }
             send(bufs, callback);
@@ -356,8 +356,8 @@ public class AsyncSenderImpl implements Sender {
     private void invokeOnComplete() {
         for (; ; ) {
             if (pooledBuffers != null) {
-                for (Pooled buffer : pooledBuffers) {
-                    buffer.free();
+                for (PooledBuffer buffer : pooledBuffers) {
+                    buffer.close();
                 }
                 pooledBuffers = null;
             }
@@ -413,8 +413,8 @@ public class AsyncSenderImpl implements Sender {
     private void invokeOnException(IoCallback callback, IOException e) {
 
         if (pooledBuffers != null) {
-            for (Pooled buffer : pooledBuffers) {
-                buffer.free();
+            for (PooledBuffer buffer : pooledBuffers) {
+                buffer.close();
             }
             pooledBuffers = null;
         }

@@ -24,7 +24,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 import org.xnio.Option;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
@@ -35,7 +35,6 @@ import org.xnio.conduits.StreamSinkConduit;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 
 /**
  * A server connection.
@@ -48,7 +47,7 @@ public abstract class ServerConnection extends AbstractAttachable implements Con
      *
      * @return The connections buffer pool
      */
-    public abstract Pool<ByteBuffer> getBufferPool();
+    public abstract ByteBufferPool getBufferPool();
 
     /**
      *

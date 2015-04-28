@@ -32,7 +32,7 @@ import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.jsr.annotated.AnnotatedEndpointFactory;
 import org.xnio.IoFuture;
 import org.xnio.IoUtils;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.XnioWorker;
 import org.xnio.http.UpgradeFailedException;
 import org.xnio.ssl.XnioSsl;
@@ -53,7 +53,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -92,7 +91,7 @@ public class ServerWebSocketContainer implements ServerContainer, Closeable {
     private final TreeSet<PathTemplate> seenPaths = new TreeSet<>();
 
     private final XnioWorker xnioWorker;
-    private final Pool<ByteBuffer> bufferPool;
+    private final ByteBufferPool bufferPool;
     private final ThreadSetupAction threadSetupAction;
     private final boolean dispatchToWorker;
     private final InetSocketAddress clientBindAddress;
@@ -108,15 +107,15 @@ public class ServerWebSocketContainer implements ServerContainer, Closeable {
 
     private final List<WebsocketClientSslProvider> clientSslProviders;
 
-    public ServerWebSocketContainer(final ClassIntrospecter classIntrospecter, final XnioWorker xnioWorker, Pool<ByteBuffer> bufferPool, ThreadSetupAction threadSetupAction, boolean dispatchToWorker, boolean clientMode) {
+    public ServerWebSocketContainer(final ClassIntrospecter classIntrospecter, final XnioWorker xnioWorker, ByteBufferPool bufferPool, ThreadSetupAction threadSetupAction, boolean dispatchToWorker, boolean clientMode) {
         this(classIntrospecter, ServerWebSocketContainer.class.getClassLoader(), xnioWorker, bufferPool, threadSetupAction, dispatchToWorker, null, null);
     }
 
-    public ServerWebSocketContainer(final ClassIntrospecter classIntrospecter, final ClassLoader classLoader, XnioWorker xnioWorker, Pool<ByteBuffer> bufferPool, ThreadSetupAction threadSetupAction, boolean dispatchToWorker) {
+    public ServerWebSocketContainer(final ClassIntrospecter classIntrospecter, final ClassLoader classLoader, XnioWorker xnioWorker, ByteBufferPool bufferPool, ThreadSetupAction threadSetupAction, boolean dispatchToWorker) {
         this(classIntrospecter, classLoader, xnioWorker, bufferPool, threadSetupAction, dispatchToWorker, null, null);
     }
 
-    public ServerWebSocketContainer(final ClassIntrospecter classIntrospecter, final ClassLoader classLoader, XnioWorker xnioWorker, Pool<ByteBuffer> bufferPool, ThreadSetupAction threadSetupAction, boolean dispatchToWorker, InetSocketAddress clientBindAddress, WebSocketReconnectHandler reconnectHandler) {
+    public ServerWebSocketContainer(final ClassIntrospecter classIntrospecter, final ClassLoader classLoader, XnioWorker xnioWorker, ByteBufferPool bufferPool, ThreadSetupAction threadSetupAction, boolean dispatchToWorker, InetSocketAddress clientBindAddress, WebSocketReconnectHandler reconnectHandler) {
         this.classIntrospecter = classIntrospecter;
         this.bufferPool = bufferPool;
         this.xnioWorker = xnioWorker;
@@ -616,7 +615,7 @@ public class ServerWebSocketContainer implements ServerContainer, Closeable {
         }
     }
 
-    public Pool<ByteBuffer> getBufferPool() {
+    public ByteBufferPool getBufferPool() {
         return bufferPool;
     }
 

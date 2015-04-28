@@ -21,6 +21,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.undertow.buffers.PooledBuffer;
+import io.undertow.buffers.PooledBuffers;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.util.NetworkUtils;
 import io.undertow.websockets.WebSocketConnectionCallback;
@@ -35,7 +37,6 @@ import io.undertow.websockets.utils.FrameChecker;
 import io.undertow.websockets.utils.WebSocketTestClient;
 import org.junit.Test;
 import org.xnio.FutureResult;
-import org.xnio.Pooled;
 
 import java.io.IOException;
 import java.net.URI;
@@ -61,16 +62,17 @@ public class WebSocket07ServerTest extends AbstractWebSocketServerTest {
                 channel.getReceiveSetter().set(new AbstractReceiveListener() {
                     @Override
                     protected void onFullPingMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
-                        final Pooled<ByteBuffer[]> data = message.getData();
-                        WebSockets.sendPong(data.getResource(), channel, new WebSocketCallback<Void>() {
+                        final PooledBuffer[] pooled = message.getData();
+                        final ByteBuffer[] data = PooledBuffers.toBufferArray(pooled);
+                        WebSockets.sendPong(data, channel, new WebSocketCallback<Void>() {
                             @Override
                             public void complete(WebSocketChannel channel, Void context) {
-                                data.free();
+                                PooledBuffers.close(pooled);
                             }
 
                             @Override
                             public void onError(WebSocketChannel channel, Void context, Throwable throwable) {
-                                data.free();
+                                PooledBuffers.close(pooled);
                             }
                         });
                     }

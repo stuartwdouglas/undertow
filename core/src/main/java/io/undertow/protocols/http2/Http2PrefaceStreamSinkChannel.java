@@ -35,6 +35,6 @@ class Http2PrefaceStreamSinkChannel extends Http2StreamSinkChannel {
 
     @Override
     protected SendFrameHeader createFrameHeaderImpl() {
-        return new SendFrameHeader(new ImmediatePooled<>(ByteBuffer.wrap(Http2Channel.PREFACE_BYTES)));
+        return new SendFrameHeader(new ImmediatePooled(ByteBuffer.wrap(Http2Channel.PREFACE_BYTES)));
     }
 }

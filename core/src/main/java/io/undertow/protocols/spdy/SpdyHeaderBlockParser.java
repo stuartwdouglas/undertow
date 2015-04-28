@@ -20,8 +20,8 @@ package io.undertow.protocols.spdy;
 
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -53,7 +53,7 @@ abstract class SpdyHeaderBlockParser extends SpdyPushBackParser {
     private byte[] dataOverflow;
 
 
-    public SpdyHeaderBlockParser(Pool<ByteBuffer> bufferPool, SpdyChannel channel, int frameLength, Inflater inflater) {
+    public SpdyHeaderBlockParser(ByteBufferPool bufferPool, SpdyChannel channel, int frameLength, Inflater inflater) {
         super(frameLength);
         this.channel = channel;
         this.inflater = inflater;
@@ -67,13 +67,13 @@ abstract class SpdyHeaderBlockParser extends SpdyPushBackParser {
             }
         }
         beforeHeadersHandled = true;
-        Pooled<ByteBuffer> outPooled = channel.getHeapBufferPool().allocate();
-        Pooled<ByteBuffer> inPooled = channel.getHeapBufferPool().allocate();
+        PooledBuffer outPooled = channel.getHeapBufferPool().allocate();
+        PooledBuffer inPooled = channel.getHeapBufferPool().allocate();
 
         boolean extraOutput = false;
         try {
-            ByteBuffer outputBuffer = outPooled.getResource();
-            ByteBuffer inPooledResource = inPooled.getResource();
+            ByteBuffer outputBuffer = outPooled.buffer();
+            ByteBuffer inPooledResource = inPooled.buffer();
             if(dataOverflow != null) {
                 outputBuffer.put(dataOverflow);
                 dataOverflow = null;
@@ -113,12 +113,12 @@ abstract class SpdyHeaderBlockParser extends SpdyPushBackParser {
             }
         } finally {
             if(extraOutput) {
-                outPooled.getResource().flip();
-                dataOverflow = new byte[outPooled.getResource().remaining()];
-                outPooled.getResource().get(dataOverflow);
+                outPooled.buffer().flip();
+                dataOverflow = new byte[outPooled.buffer().remaining()];
+                outPooled.buffer().get(dataOverflow);
             }
-            inPooled.free();
-            outPooled.free();
+            inPooled.close();
+            outPooled.close();
         }
     }
 

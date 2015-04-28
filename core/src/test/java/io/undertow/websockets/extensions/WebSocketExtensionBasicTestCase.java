@@ -19,7 +19,6 @@ package io.undertow.websockets.extensions;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -48,11 +47,8 @@ import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.xnio.BufferAllocator;
-import org.xnio.ByteBufferSlicePool;
 import org.xnio.OptionMap;
 import org.xnio.Options;
-import org.xnio.Pool;
 import org.xnio.Xnio;
 import org.xnio.XnioWorker;
 
@@ -82,8 +78,6 @@ public class WebSocketExtensionBasicTestCase {
     @Test
     public void testLongTextMessage() throws Exception {
 
-        final Pool<ByteBuffer> buffer = new ByteBufferSlicePool(BufferAllocator.BYTE_BUFFER_ALLOCATOR, 8192, 8192 * 8192);
-
         XnioWorker client;
 
         Xnio xnio = Xnio.getInstance(WebSocketExtensionBasicTestCase.class.getClassLoader());
@@ -112,7 +106,7 @@ public class WebSocketExtensionBasicTestCase {
         Set<ExtensionHandshake> extensionHandshakes = new HashSet<>();
         extensionHandshakes.add(new PerMessageDeflateHandshake(true));
 
-        final WebSocketChannel clientChannel = WebSocketClient.connect(client, null, buffer, OptionMap.EMPTY, new URI(DefaultServer.getDefaultServerURL()), WebSocketVersion.V13, negotiation, extensionHandshakes).get();
+        final WebSocketChannel clientChannel = WebSocketClient.connect(client, null, DefaultServer.getBufferPool(), OptionMap.EMPTY, new URI(DefaultServer.getDefaultServerURL()), WebSocketVersion.V13, negotiation, extensionHandshakes).get();
 
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<String> result = new AtomicReference<>();
@@ -128,7 +122,7 @@ public class WebSocketExtensionBasicTestCase {
 
             @Override
             protected void onFullCloseMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
-                message.getData().free();
+                message.close();
                 WebSocketLogger.ROOT_LOGGER.info("onFullCloseMessage");
             }
 
@@ -164,8 +158,6 @@ public class WebSocketExtensionBasicTestCase {
     @Ignore
     public void testLongMessageWithoutExtensions() throws Exception {
 
-        final Pool<ByteBuffer> buffer = new ByteBufferSlicePool(BufferAllocator.BYTE_BUFFER_ALLOCATOR, 8192, 8192 * 8192);
-
         XnioWorker client;
 
         Xnio xnio = Xnio.getInstance(WebSocketExtensionBasicTestCase.class.getClassLoader());
@@ -189,7 +181,7 @@ public class WebSocketExtensionBasicTestCase {
 
         final WebSocketClientNegotiation negotiation = null;
 
-        final WebSocketChannel clientChannel = WebSocketClient.connect(client, buffer, OptionMap.EMPTY, new URI("http://localhost:8080"), WebSocketVersion.V13, negotiation).get();
+        final WebSocketChannel clientChannel = WebSocketClient.connect(client, DefaultServer.getBufferPool(), OptionMap.EMPTY, new URI("http://localhost:8080"), WebSocketVersion.V13, negotiation).get();
 
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<String> result = new AtomicReference<>();
@@ -205,7 +197,7 @@ public class WebSocketExtensionBasicTestCase {
 
             @Override
             protected void onFullCloseMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
-                message.getData().free();
+                message.close();
                 WebSocketLogger.ROOT_LOGGER.info("onFullCloseMessage");
             }
 
@@ -260,8 +252,6 @@ public class WebSocketExtensionBasicTestCase {
     @Test
     public void testExtensionsHeaders() throws Exception {
 
-        final Pool<ByteBuffer> buffer = new ByteBufferSlicePool(BufferAllocator.BYTE_BUFFER_ALLOCATOR, 1024, 1024 * 1024);
-
         XnioWorker client;
 
         Xnio xnio = Xnio.getInstance(WebSocketExtensionBasicTestCase.class.getClassLoader());
@@ -291,7 +281,7 @@ public class WebSocketExtensionBasicTestCase {
         Set<ExtensionHandshake> extensionHandshakes = new HashSet<>();
         extensionHandshakes.add(new PerMessageDeflateHandshake(true));
 
-        final WebSocketChannel clientChannel = WebSocketClient.connect(client, null, buffer, OptionMap.EMPTY, new URI(DefaultServer.getDefaultServerURL()), WebSocketVersion.V13, negotiation, extensionHandshakes).get();
+        final WebSocketChannel clientChannel = WebSocketClient.connect(client, null, DefaultServer.getBufferPool(), OptionMap.EMPTY, new URI(DefaultServer.getDefaultServerURL()), WebSocketVersion.V13, negotiation, extensionHandshakes).get();
 
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<String> result = new AtomicReference<>();
@@ -307,7 +297,7 @@ public class WebSocketExtensionBasicTestCase {
 
             @Override
             protected void onFullCloseMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
-                message.getData().free();
+                message.close();
                 WebSocketLogger.ROOT_LOGGER.info("onFullCloseMessage");
             }
 

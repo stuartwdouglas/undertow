@@ -20,20 +20,19 @@ package io.undertow.websockets.core.protocol.version07;
 import io.undertow.websockets.core.StreamSourceFrameChannel;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketFrameType;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
-import java.nio.ByteBuffer;
 
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>
  */
 class WebSocket07PongFrameSourceChannel extends StreamSourceFrameChannel {
-    WebSocket07PongFrameSourceChannel(WebSocketChannel wsChannel, int rsv, final Masker masker, Pooled<ByteBuffer> pooled, long frameLength) {
+    WebSocket07PongFrameSourceChannel(WebSocketChannel wsChannel, int rsv, final Masker masker, PooledBuffer pooled, long frameLength) {
         // can not be fragmented
         super(wsChannel, WebSocketFrameType.PONG, rsv, true, pooled, frameLength, masker);
     }
 
-    WebSocket07PongFrameSourceChannel(WebSocketChannel wsChannel, int rsv, Pooled<ByteBuffer> pooled, long frameLength) {
+    WebSocket07PongFrameSourceChannel(WebSocketChannel wsChannel, int rsv, PooledBuffer pooled, long frameLength) {
         // can not be fragmented
         super(wsChannel, WebSocketFrameType.PONG, rsv, true, pooled, frameLength, null);
     }

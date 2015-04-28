@@ -48,7 +48,7 @@ import org.xnio.ByteBufferSlicePool;
 import org.xnio.ChannelListener;
 import org.xnio.Option;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
@@ -65,7 +65,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.util.Map;
@@ -337,15 +336,15 @@ public class ServletInitialHandler implements HttpHandler, ServletDispatcher {
     }
 
     private static class MockServerConnection extends ServerConnection {
-        private final Pool<ByteBuffer> bufferPool;
+        private final ByteBufferPool bufferPool;
         private SSLSessionInfo sslSessionInfo;
 
-        private MockServerConnection(Pool<ByteBuffer> bufferPool) {
+        private MockServerConnection(ByteBufferPool bufferPool) {
             this.bufferPool = bufferPool;
         }
 
         @Override
-        public Pool<ByteBuffer> getBufferPool() {
+        public ByteBufferPool getBufferPool() {
             return bufferPool;
         }
 

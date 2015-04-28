@@ -24,7 +24,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.HeaderValues;
 
 import org.xnio.IoUtils;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -96,14 +96,14 @@ public abstract class SpdyStreamStreamSinkChannel extends SpdyStreamSinkChannel 
         }
     }
 
-    protected Pooled<ByteBuffer>[] createHeaderBlock(Pooled<ByteBuffer> firstHeaderBuffer, Pooled<ByteBuffer>[] allHeaderBuffers, ByteBuffer firstBuffer, HeaderMap headers, boolean unidirectional) {
-        Pooled<ByteBuffer> outPooled = getChannel().getHeapBufferPool().allocate();
-        Pooled<ByteBuffer> inPooled = getChannel().getHeapBufferPool().allocate();
+    protected PooledBuffer[] createHeaderBlock(PooledBuffer firstHeaderBuffer, PooledBuffer[] allHeaderBuffers, ByteBuffer firstBuffer, HeaderMap headers, boolean unidirectional) {
+        PooledBuffer outPooled = getChannel().getHeapBufferPool().allocate();
+        PooledBuffer inPooled = getChannel().getHeapBufferPool().allocate();
         try {
 
-            Pooled<ByteBuffer> currentPooled = firstHeaderBuffer;
-            ByteBuffer inputBuffer = inPooled.getResource();
-            ByteBuffer outputBuffer = outPooled.getResource();
+            PooledBuffer currentPooled = firstHeaderBuffer;
+            ByteBuffer inputBuffer = inPooled.buffer();
+            ByteBuffer outputBuffer = outPooled.buffer();
 
             SpdyProtocolUtils.putInt(inputBuffer, headers.size());
 
@@ -153,8 +153,8 @@ public abstract class SpdyStreamStreamSinkChannel extends SpdyStreamSinkChannel 
             int totalLength;
             if (allHeaderBuffers != null) {
                 totalLength = -8;
-                for (Pooled<ByteBuffer> b : allHeaderBuffers) {
-                    totalLength += b.getResource().position();
+                for (PooledBuffer b : allHeaderBuffers) {
+                    totalLength += b.buffer().position();
                 }
             } else {
                 totalLength = firstBuffer.position() - 8;
@@ -163,8 +163,8 @@ public abstract class SpdyStreamStreamSinkChannel extends SpdyStreamSinkChannel 
             SpdyProtocolUtils.putInt(firstBuffer, ((isWritesShutdown() && !getBuffer().hasRemaining() ? SpdyChannel.FLAG_FIN : 0) << 24) | (unidirectional ? SpdyChannel.FLAG_UNIDIRECTIONAL : 0) << 24 | totalLength, 4);
 
         } finally {
-            inPooled.free();
-            outPooled.free();
+            inPooled.close();
+            outPooled.close();
         }
         return allHeaderBuffers;
     }
@@ -210,19 +210,19 @@ public abstract class SpdyStreamStreamSinkChannel extends SpdyStreamSinkChannel 
     }
 
 
-    private Pooled[] doDeflate(ByteBuffer inputBuffer, ByteBuffer outputBuffer, Pooled<ByteBuffer> currentPooled, Pooled<ByteBuffer>[] allHeaderBuffers) {
+    private PooledBuffer[] doDeflate(ByteBuffer inputBuffer, ByteBuffer outputBuffer, PooledBuffer currentPooled, PooledBuffer[] allHeaderBuffers) {
         Deflater deflater = getDeflater();
         deflater.setInput(inputBuffer.array(), inputBuffer.arrayOffset(), inputBuffer.position());
 
         int deflated;
         do {
             deflated = deflater.deflate(outputBuffer.array(), outputBuffer.arrayOffset(), outputBuffer.remaining(), Deflater.SYNC_FLUSH);
-            if (deflated <= currentPooled.getResource().remaining()) {
-                currentPooled.getResource().put(outputBuffer.array(), outputBuffer.arrayOffset(), deflated);
+            if (deflated <= currentPooled.buffer().remaining()) {
+                currentPooled.buffer().put(outputBuffer.array(), outputBuffer.arrayOffset(), deflated);
             } else {
                 int pos = outputBuffer.arrayOffset();
                 int remaining = deflated;
-                ByteBuffer current = currentPooled.getResource();
+                ByteBuffer current = currentPooled.buffer();
                 do {
                     int toPut = Math.min(current.remaining(), remaining);
                     current.put(outputBuffer.array(), pos, toPut);
@@ -231,7 +231,7 @@ public abstract class SpdyStreamStreamSinkChannel extends SpdyStreamSinkChannel 
                     if (remaining > 0) {
                         allHeaderBuffers = allocateAll(allHeaderBuffers, currentPooled);
                         currentPooled = allHeaderBuffers[allHeaderBuffers.length - 1];
-                        current = currentPooled.getResource();
+                        current = currentPooled.buffer();
                     }
                 } while (remaining > 0);
             }
@@ -241,14 +241,14 @@ public abstract class SpdyStreamStreamSinkChannel extends SpdyStreamSinkChannel 
 
     protected abstract Deflater getDeflater();
 
-    protected Pooled<ByteBuffer>[] allocateAll(Pooled<ByteBuffer>[] allHeaderBuffers, Pooled<ByteBuffer> currentBuffer) {
-        Pooled<ByteBuffer>[] ret;
+    protected PooledBuffer[] allocateAll(PooledBuffer[] allHeaderBuffers, PooledBuffer currentBuffer) {
+        PooledBuffer[] ret;
         if (allHeaderBuffers == null) {
-            ret = new Pooled[2];
+            ret = new PooledBuffer[2];
             ret[0] = currentBuffer;
             ret[1] = getChannel().getBufferPool().allocate();
         } else {
-            ret = new Pooled[allHeaderBuffers.length + 1];
+            ret = new PooledBuffer[allHeaderBuffers.length + 1];
             System.arraycopy(allHeaderBuffers, 0, ret, 0, allHeaderBuffers.length);
             ret[ret.length - 1] = getChannel().getBufferPool().allocate();
         }

@@ -29,11 +29,9 @@ import io.undertow.server.DelegateOpenListener;
 import io.undertow.server.HttpHandler;
 import org.xnio.ChannelListener;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.StreamConnection;
-
-import java.nio.ByteBuffer;
 
 
 /**
@@ -45,8 +43,8 @@ public final class SpdyOpenListener implements ChannelListener<StreamConnection>
 
     public static final String SPDY_3_1 = "spdy/3.1";
 
-    private final Pool<ByteBuffer> bufferPool;
-    private final Pool<ByteBuffer> heapBufferPool;
+    private final ByteBufferPool bufferPool;
+    private final ByteBufferPool heapBufferPool;
     private final int bufferSize;
 
     private volatile HttpHandler rootHandler;
@@ -55,24 +53,24 @@ public final class SpdyOpenListener implements ChannelListener<StreamConnection>
     private volatile boolean statisticsEnabled;
     private final ConnectorStatisticsImpl connectorStatistics;
 
-    public SpdyOpenListener(final Pool<ByteBuffer> pool, final Pool<ByteBuffer> heapBufferPool) {
+    public SpdyOpenListener(final ByteBufferPool pool, final ByteBufferPool heapBufferPool) {
         this(pool, heapBufferPool, OptionMap.EMPTY);
     }
 
-    public SpdyOpenListener(final Pool<ByteBuffer> pool, final Pool<ByteBuffer> heapBufferPool, final OptionMap undertowOptions) {
+    public SpdyOpenListener(final ByteBufferPool pool, final ByteBufferPool heapBufferPool, final OptionMap undertowOptions) {
         this.undertowOptions = undertowOptions;
         this.bufferPool = pool;
-        Pooled<ByteBuffer> buf = pool.allocate();
-        this.bufferSize = buf.getResource().remaining();
-        buf.free();
+        PooledBuffer buf = pool.allocate();
+        this.bufferSize = buf.buffer().remaining();
+        buf.close();
         this.heapBufferPool = heapBufferPool;
-        Pooled<ByteBuffer> buff = heapBufferPool.allocate();
+        PooledBuffer buff = heapBufferPool.allocate();
         try {
-            if (!buff.getResource().hasArray()) {
+            if (!buff.buffer().hasArray()) {
                 throw UndertowMessages.MESSAGES.mustProvideHeapBuffer();
             }
         } finally {
-            buff.free();
+            buff.close();
         }
         connectorStatistics = new ConnectorStatisticsImpl();
         statisticsEnabled = undertowOptions.get(UndertowOptions.ENABLE_CONNECTOR_STATISTICS, false);
@@ -83,7 +81,7 @@ public final class SpdyOpenListener implements ChannelListener<StreamConnection>
         handleEvent(channel, null);
     }
 
-    public void handleEvent(final StreamConnection channel, Pooled<ByteBuffer> buffer) {
+    public void handleEvent(final StreamConnection channel, PooledBuffer buffer) {
 
         //cool, we have a spdy connection.
         SpdyChannel spdyChannel = new SpdyChannel(channel, bufferPool, buffer, heapBufferPool, false);
@@ -125,7 +123,7 @@ public final class SpdyOpenListener implements ChannelListener<StreamConnection>
     }
 
     @Override
-    public Pool<ByteBuffer> getBufferPool() {
+    public ByteBufferPool getBufferPool() {
         return bufferPool;
     }
 

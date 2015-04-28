@@ -30,7 +30,7 @@ import io.undertow.websockets.core.protocol.version07.Masker;
 import io.undertow.websockets.core.protocol.version07.UTF8Checker;
 import io.undertow.websockets.extensions.ExtensionByteBuffer;
 import io.undertow.websockets.extensions.ExtensionFunction;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.channels.StreamSinkChannel;
 
 import io.undertow.server.protocol.framed.AbstractFramedStreamSourceChannel;
@@ -53,11 +53,11 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
     private Masker masker;
     private UTF8Checker checker;
 
-    protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type, Pooled<ByteBuffer> pooled, long frameLength) {
+    protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type, PooledBuffer pooled, long frameLength) {
         this(wsChannel, type, 0, true, pooled, frameLength, null);
     }
 
-    protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type, int rsv, boolean finalFragment, Pooled<ByteBuffer> pooled, long frameLength, Masker masker, ChannelFunction... functions) {
+    protected StreamSourceFrameChannel(WebSocketChannel wsChannel, WebSocketFrameType type, int rsv, boolean finalFragment, PooledBuffer pooled, long frameLength, Masker masker, ChannelFunction... functions) {
         super(wsChannel, pooled, frameLength);
         this.type = type;
         this.finalFragment = finalFragment;
@@ -256,9 +256,9 @@ public abstract class StreamSourceFrameChannel extends AbstractFramedStreamSourc
     }
 
     @Override
-    protected long handleFrameData(Pooled<ByteBuffer> frameData, long frameDataRemaining) {
+    protected long handleFrameData(PooledBuffer frameData, long frameDataRemaining) {
         if(masker != null) {
-            masker.afterRead(frameData.getResource(), frameData.getResource().position(), frameData.getResource().remaining());
+            masker.afterRead(frameData.buffer(), frameData.buffer().position(), frameData.buffer().remaining());
         }
         return frameDataRemaining;
     }

@@ -19,9 +19,9 @@
 package io.undertow.protocols.ajp;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
+
 import org.xnio.ChannelListener;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
 import io.undertow.server.protocol.framed.FrameHeaderData;
 import io.undertow.util.HeaderMap;
@@ -37,7 +37,7 @@ public class AjpClientResponseStreamSourceChannel extends AbstractAjpClientStrea
     private final int statusCode;
     private final String reasonPhrase;
 
-    public AjpClientResponseStreamSourceChannel(AjpClientChannel framedChannel, HeaderMap headers, int statusCode, String reasonPhrase, Pooled<ByteBuffer> frameData, int remaining) {
+    public AjpClientResponseStreamSourceChannel(AjpClientChannel framedChannel, HeaderMap headers, int statusCode, String reasonPhrase, PooledBuffer frameData, int remaining) {
         super(framedChannel, frameData, remaining);
         this.headers = headers;
         this.statusCode = statusCode;
@@ -66,10 +66,10 @@ public class AjpClientResponseStreamSourceChannel extends AbstractAjpClientStrea
             lastFrame();
         }
     }
-    protected long handleFrameData(Pooled<ByteBuffer> frameData, long frameDataRemaining) {
-        if(frameDataRemaining > 0  && frameData.getResource().remaining() == frameDataRemaining) {
+    protected long handleFrameData(PooledBuffer frameData, long frameDataRemaining) {
+        if(frameDataRemaining > 0  && frameData.buffer().remaining() == frameDataRemaining) {
             //there is a null terminator on the end
-            frameData.getResource().limit(frameData.getResource().limit() - 1);
+            frameData.buffer().limit(frameData.buffer().limit() - 1);
             return frameDataRemaining - 1;
         }
         return frameDataRemaining;

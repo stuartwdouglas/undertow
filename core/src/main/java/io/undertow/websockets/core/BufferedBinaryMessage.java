@@ -18,14 +18,13 @@
 
 package io.undertow.websockets.core;
 
-import io.undertow.util.ImmediatePooled;
 import org.xnio.ChannelListener;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -33,11 +32,11 @@ import java.util.List;
  *
  * @author Stuart Douglas
  */
-public class BufferedBinaryMessage {
+public class BufferedBinaryMessage implements Closeable {
 
     private final boolean bufferFullMessage;
-    private List<Pooled<ByteBuffer>> data = new ArrayList<>(1);
-    private Pooled<ByteBuffer> current;
+    private List<PooledBuffer> data = new ArrayList<>(1);
+    private PooledBuffer current;
     private final long maxMessageSize;
     private long currentSize;
     private boolean complete;
@@ -58,7 +57,7 @@ public class BufferedBinaryMessage {
             current = channel.getWebSocketChannel().getBufferPool().allocate();
         }
         for (; ; ) {
-            int res = channel.read(current.getResource());
+            int res = channel.read(current.buffer());
             if (res == -1) {
                 complete = true;
                 return;
@@ -68,15 +67,15 @@ public class BufferedBinaryMessage {
             checkMaxSize(channel, res);
             if (bufferFullMessage) {
                 dealWithFullBuffer(channel);
-            } else if (!current.getResource().hasRemaining()) {
+            } else if (!current.buffer().hasRemaining()) {
                 return;
             }
         }
     }
 
     private void dealWithFullBuffer(StreamSourceFrameChannel channel) {
-        if (!current.getResource().hasRemaining()) {
-            current.getResource().flip();
+        if (!current.buffer().hasRemaining()) {
+            current.buffer().flip();
             data.add(current);
             current = channel.getWebSocketChannel().getBufferPool().allocate();
         }
@@ -88,7 +87,7 @@ public class BufferedBinaryMessage {
                 if (current == null) {
                     current = channel.getWebSocketChannel().getBufferPool().allocate();
                 }
-                int res = channel.read(current.getResource());
+                int res = channel.read(current.buffer());
                 if (res == -1) {
                     this.complete = true;
                     callback.complete(channel.getWebSocketChannel(), this);
@@ -105,7 +104,7 @@ public class BufferedBinaryMessage {
                                     if (current == null) {
                                         current = channel.getWebSocketChannel().getBufferPool().allocate();
                                     }
-                                    int res = channel.read(current.getResource());
+                                    int res = channel.read(current.buffer());
                                     if (res == -1) {
                                         complete = true;
                                         channel.suspendReads();
@@ -118,7 +117,7 @@ public class BufferedBinaryMessage {
                                     checkMaxSize(channel, res);
                                     if (bufferFullMessage) {
                                         dealWithFullBuffer(channel);
-                                    } else if (!current.getResource().hasRemaining()) {
+                                    } else if (!current.buffer().hasRemaining()) {
                                         callback.complete(channel.getWebSocketChannel(), BufferedBinaryMessage.this);
                                     } else {
                                         handleNewFrame(channel, callback);
@@ -137,7 +136,7 @@ public class BufferedBinaryMessage {
                 checkMaxSize(channel, res);
                 if (bufferFullMessage) {
                     dealWithFullBuffer(channel);
-                } else if (!current.getResource().hasRemaining()) {
+                } else if (!current.buffer().hasRemaining()) {
                     callback.complete(channel.getWebSocketChannel(), BufferedBinaryMessage.this);
                 } else {
                     handleNewFrame(channel, callback);
@@ -168,66 +167,39 @@ public class BufferedBinaryMessage {
         }
     }
 
-    public Pooled<ByteBuffer[]> getData() {
+    public PooledBuffer[] getData() {
         if (current == null) {
-            return new ImmediatePooled<>(new ByteBuffer[0]);
+            return new PooledBuffer[]{};
         }
         if (data.isEmpty()) {
-            final Pooled<ByteBuffer> current = this.current;
-            current.getResource().flip();
+            final PooledBuffer current = this.current;
+            current.buffer().flip();
             this.current = null;
-            final ByteBuffer[] data = new ByteBuffer[]{current.getResource()};
-            return new PooledByteBufferArray(Collections.singletonList(current), data);
+            return new PooledBuffer[]{current};
         }
-        current.getResource().flip();
+        current.buffer().flip();
         data.add(current);
         current = null;
         ByteBuffer[] ret = new ByteBuffer[data.size()];
         for (int i = 0; i < data.size(); ++i) {
-            ret[i] = data.get(i).getResource();
+            ret[i] = data.get(i).buffer();
         }
-        List<Pooled<ByteBuffer>> data = this.data;
+        List<PooledBuffer> data = this.data;
         this.data = new ArrayList<>();
 
-        return new PooledByteBufferArray(data, ret);
+        return data.toArray(new PooledBuffer[data.size()]);
     }
 
     public boolean isComplete() {
         return complete;
     }
 
-    private static final class PooledByteBufferArray implements Pooled<ByteBuffer[]> {
-
-        private final List<Pooled<ByteBuffer>> pooled;
-        private final ByteBuffer[] data;
-
-        private PooledByteBufferArray(List<Pooled<ByteBuffer>> pooled, ByteBuffer[] data) {
-            this.pooled = pooled;
-            this.data = data;
-        }
-
-        @Override
-        public void discard() {
-            for (Pooled<ByteBuffer> item : pooled) {
-                item.discard();
+    @Override
+    public void close() {
+        if(data != null) {
+            for(PooledBuffer i : data) {
+                i.close();
             }
-        }
-
-        @Override
-        public void free() {
-            for (Pooled<ByteBuffer> item : pooled) {
-                item.free();
-            }
-        }
-
-        @Override
-        public ByteBuffer[] getResource() throws IllegalStateException {
-            return data;
-        }
-
-        @Override
-        public void close() {
-            free();
         }
     }
 }

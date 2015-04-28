@@ -18,6 +18,8 @@
 package io.undertow.websockets.core.protocol;
 
 import io.netty.buffer.Unpooled;
+import io.undertow.buffers.PooledBuffer;
+import io.undertow.buffers.PooledBuffers;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpOneOnly;
 import io.undertow.util.NetworkUtils;
@@ -41,11 +43,9 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.xnio.FutureResult;
-import org.xnio.Pooled;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -105,16 +105,17 @@ public class AbstractWebSocketServerTest {
 
                     @Override
                     protected void onFullBinaryMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
-                        final Pooled<ByteBuffer[]> data = message.getData();
-                        WebSockets.sendBinary(data.getResource(), channel, new WebSocketCallback<Void>() {
+                        final PooledBuffer[] data = message.getData();
+                        WebSockets.sendBinary(PooledBuffers.toBufferArray(data), channel, new WebSocketCallback<Void>() {
                             @Override
                             public void complete(WebSocketChannel channel, Void context) {
-                                data.free();
+                                PooledBuffers.close(data);
                             }
 
                             @Override
                             public void onError(WebSocketChannel channel, Void context, Throwable throwable) {
-                                data.free();
+
+                                PooledBuffers.close(data);
                             }
                         });
                     }
@@ -148,7 +149,7 @@ public class AbstractWebSocketServerTest {
                 channel.getReceiveSetter().set(new AbstractReceiveListener() {
                     @Override
                     protected void onFullCloseMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
-                        message.getData().free();
+                        message.close();
                         channel.sendClose();
                     }
                 });

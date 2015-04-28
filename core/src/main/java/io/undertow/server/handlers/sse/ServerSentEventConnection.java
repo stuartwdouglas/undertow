@@ -25,7 +25,7 @@ import io.undertow.util.HeaderMap;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.XnioExecutor;
 import org.xnio.channels.StreamSinkChannel;
 
@@ -55,7 +55,7 @@ public class ServerSentEventConnection implements Channel {
     private final StreamSinkChannel sink;
     private final SseWriteListener writeListener = new SseWriteListener();
 
-    private Pooled<ByteBuffer> pooled;
+    private PooledBuffer pooled;
 
     private final Queue<SSEData> queue = new ConcurrentLinkedDeque<>();
     private final List<SSEData> buffered = new ArrayList<>();
@@ -221,8 +221,8 @@ public class ServerSentEventConnection implements Channel {
                 }
                 if(pooled == null) {
                     pooled = exchange.getConnection().getBufferPool().allocate();
-                    pooled.getResource().put(":\n".getBytes(StandardCharsets.UTF_8));
-                    pooled.getResource().flip();
+                    pooled.buffer().put(":\n".getBytes(StandardCharsets.UTF_8));
+                    pooled.buffer().flip();
                     writeListener.handleEvent(sink);
                 }
             }
@@ -232,7 +232,7 @@ public class ServerSentEventConnection implements Channel {
     private void fillBuffer() {
         if (queue.isEmpty()) {
             if(pooled != null) {
-                pooled.free();
+                pooled.close();
                 pooled = null;
                 sink.suspendWrites();
             }
@@ -242,9 +242,9 @@ public class ServerSentEventConnection implements Channel {
         if (pooled == null) {
             pooled = exchange.getConnection().getBufferPool().allocate();
         } else {
-            pooled.getResource().clear();
+            pooled.buffer().clear();
         }
-        ByteBuffer buffer = pooled.getResource();
+        ByteBuffer buffer = pooled.buffer();
 
         while (!queue.isEmpty() && buffer.hasRemaining()) {
             SSEData data = queue.poll();
@@ -326,7 +326,7 @@ public class ServerSentEventConnection implements Channel {
     public void close() throws IOException {
         if (openUpdater.compareAndSet(this, 1, 0)) {
             if (pooled != null) {
-                pooled.free();
+                pooled.close();
                 pooled = null;
             }
             queue.clear();
@@ -370,7 +370,7 @@ public class ServerSentEventConnection implements Channel {
                 return;
             }
             try {
-                ByteBuffer buffer = pooled.getResource();
+                ByteBuffer buffer = pooled.buffer();
                 int res;
                 do {
                     res = channel.write(buffer);

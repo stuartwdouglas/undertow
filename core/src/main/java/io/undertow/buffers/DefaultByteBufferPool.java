@@ -128,8 +128,11 @@ public class DefaultByteBufferPool implements ByteBufferPool {
 
         private final DefaultByteBufferPool pool;
         private ByteBuffer buffer;
+
         private volatile int referenceCount = 1;
         private static final AtomicIntegerFieldUpdater<DefaultPooledBuffer> referenceCountUpdater = AtomicIntegerFieldUpdater.newUpdater(DefaultPooledBuffer.class, "referenceCount");
+
+
 
         public DefaultPooledBuffer(DefaultByteBufferPool pool, ByteBuffer buffer) {
             this.pool = pool;
@@ -137,8 +140,8 @@ public class DefaultByteBufferPool implements ByteBufferPool {
         }
 
         @Override
-        public ByteBuffer get() {
-            if (referenceCount == 0) {
+        public ByteBuffer buffer() {
+            if(referenceCount == 0) {
                 throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
             }
             return buffer;
@@ -146,6 +149,9 @@ public class DefaultByteBufferPool implements ByteBufferPool {
 
         @Override
         public PooledBuffer aquire() {
+            if(referenceCount == 0) {
+                throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
+            }
             int ref;
             do {
                 ref = referenceCount;
@@ -157,12 +163,52 @@ public class DefaultByteBufferPool implements ByteBufferPool {
         }
 
         @Override
+        public PooledBuffer duplicate() {
+            if(referenceCount == 0) {
+                throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
+            }
+            aquire();
+            final ByteBuffer duplicate = buffer.duplicate();
+            return new PooledBuffer() {
+                @Override
+                public ByteBuffer buffer() {
+                    return duplicate;
+                }
+
+                @Override
+                public PooledBuffer aquire() {
+                    return DefaultPooledBuffer.this.aquire();
+                }
+
+                @Override
+                public PooledBuffer duplicate() {
+                    return DefaultPooledBuffer.this.duplicate();
+                }
+
+                @Override
+                public void close() {
+                    DefaultPooledBuffer.this.close();
+                }
+
+                @Override
+                public boolean isOpen() {
+                    return DefaultPooledBuffer.this.isOpen();
+                }
+            };
+        }
+
+        @Override
         public void close() {
             int count = referenceCountUpdater.decrementAndGet(this);
             if (count == 0) {
                 pool.freeInternal(buffer);
                 this.buffer = null;
             }
+        }
+
+        @Override
+        public boolean isOpen() {
+            return referenceCount > 0;
         }
     }
 

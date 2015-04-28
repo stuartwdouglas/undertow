@@ -21,6 +21,8 @@ package io.undertow.websockets.extensions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import io.undertow.buffers.PooledBuffer;
+import io.undertow.buffers.PooledBuffers;
 import io.undertow.websockets.core.AbstractReceiveListener;
 import io.undertow.websockets.core.BufferedBinaryMessage;
 import io.undertow.websockets.core.BufferedTextMessage;
@@ -28,7 +30,6 @@ import io.undertow.websockets.core.CloseMessage;
 import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketLogger;
 import io.undertow.websockets.core.WebSockets;
-import org.xnio.Pooled;
 
 /**
  * A {@link AbstractReceiveListener} implementation used as echo server in Autobahn tests.
@@ -53,7 +54,7 @@ public class DebugExtensionsListener extends AbstractReceiveListener {
     @Override
     protected void onFullBinaryMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
         binMsgs++;
-        ByteBuffer[] data = message.getData().getResource();
+        ByteBuffer[] data = PooledBuffers.toBufferArray(message.getData());
         int total = 0;
         for (int i =0; i < data.length; i++) {
             total += data[i].remaining();
@@ -70,9 +71,9 @@ public class DebugExtensionsListener extends AbstractReceiveListener {
     @Override
     protected void onFullPingMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
         WebSocketLogger.EXTENSION_LOGGER.info("onFullPingMessage() ");
-        ByteBuffer[] data = message.getData().getResource();
+        PooledBuffer[] data = message.getData();
         for (WebSocketChannel peerChannel : channel.getPeerConnections()) {
-            WebSockets.sendPong(data, peerChannel, null);
+            WebSockets.sendPong(PooledBuffers.toBufferArray(data), peerChannel, null);
         }
     }
 
@@ -84,9 +85,9 @@ public class DebugExtensionsListener extends AbstractReceiveListener {
     @Override
     protected void onFullCloseMessage(WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
         WebSocketLogger.EXTENSION_LOGGER.info("onFullCloseMessage() ");
-        Pooled<ByteBuffer[]> pooled = message.getData();
+        PooledBuffer[] pooled = message.getData();
         try {
-            ByteBuffer[] data = pooled.getResource();
+            ByteBuffer[] data = PooledBuffers.toBufferArray(pooled);
         /*
             Empty messages should be closed as NORMAL_CLOSURE.
          */
@@ -100,7 +101,7 @@ public class DebugExtensionsListener extends AbstractReceiveListener {
                 }
             }
         } finally {
-            pooled.free();
+            PooledBuffers.close(pooled);
         }
     }
 

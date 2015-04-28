@@ -27,7 +27,6 @@ import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSockets;
 import io.undertow.websockets.jsr.util.ClassUtils;
 import org.xnio.Buffers;
-import org.xnio.Pooled;
 
 import javax.websocket.CloseReason;
 import javax.websocket.Endpoint;

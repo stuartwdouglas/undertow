@@ -29,6 +29,7 @@ import io.undertow.conduits.ChunkedStreamSinkConduit;
 import io.undertow.conduits.ChunkedStreamSourceConduit;
 import io.undertow.conduits.ConduitListener;
 import io.undertow.conduits.FixedLengthStreamSourceConduit;
+import io.undertow.conduits.PushBackStreamSourceConduit;
 import io.undertow.server.protocol.http.HttpContinue;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.Headers;
@@ -41,15 +42,14 @@ import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.Option;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
 import org.xnio.channels.StreamSourceChannel;
 import org.xnio.conduits.ConduitStreamSinkChannel;
 import org.xnio.conduits.ConduitStreamSourceChannel;
-import org.xnio.conduits.PushBackStreamSourceConduit;
 import org.xnio.conduits.StreamSinkConduit;
 import org.xnio.conduits.StreamSourceConduit;
 
@@ -99,8 +99,8 @@ class HttpClientConnection extends AbstractAttachable implements Closeable, Clie
     private final PushBackStreamSourceConduit pushBackStreamSourceConduit;
     private final ClientReadListener clientReadListener = new ClientReadListener();
 
-    private final Pool<ByteBuffer> bufferPool;
-    private Pooled<ByteBuffer> pooledBuffer;
+    private final ByteBufferPool bufferPool;
+    private PooledBuffer pooledBuffer;
     private final StreamSinkConduit originalSinkConduit;
 
     private static final int UPGRADED = 1 << 28;
@@ -113,7 +113,7 @@ class HttpClientConnection extends AbstractAttachable implements Closeable, Clie
 
     private final ChannelListener.SimpleSetter<HttpClientConnection> closeSetter = new ChannelListener.SimpleSetter<>();
 
-    HttpClientConnection(final StreamConnection connection, final OptionMap options, final Pool<ByteBuffer> bufferPool) {
+    HttpClientConnection(final StreamConnection connection, final OptionMap options, final ByteBufferPool bufferPool) {
         this.options = options;
         this.connection = connection;
         this.pushBackStreamSourceConduit = new PushBackStreamSourceConduit(connection.getSourceChannel().getConduit());
@@ -128,7 +128,7 @@ class HttpClientConnection extends AbstractAttachable implements Closeable, Clie
                 ChannelListeners.invokeChannelListener(HttpClientConnection.this, closeSetter.get());
                 try {
                     if (pooledBuffer != null) {
-                        pooledBuffer.free();
+                        pooledBuffer.close();
                     }
                 } catch (Throwable ignored){}
             }
@@ -136,7 +136,7 @@ class HttpClientConnection extends AbstractAttachable implements Closeable, Clie
     }
 
     @Override
-    public Pool<ByteBuffer> getBufferPool() {
+    public ByteBufferPool getBufferPool() {
         return bufferPool;
     }
 
@@ -374,8 +374,8 @@ class HttpClientConnection extends AbstractAttachable implements Closeable, Clie
         public void handleEvent(StreamSourceChannel channel) {
 
             HttpResponseBuilder builder = pendingResponse;
-            final Pooled<ByteBuffer> pooled = bufferPool.allocate();
-            final ByteBuffer buffer = pooled.getResource();
+            final PooledBuffer pooled = bufferPool.allocate();
+            final ByteBuffer buffer = pooled.buffer();
             boolean free = true;
 
             try {
@@ -490,7 +490,7 @@ class HttpClientConnection extends AbstractAttachable implements Closeable, Clie
                 currentRequest.setFailed(new IOException(e));
             } finally {
                 if (free) {
-                    pooled.free();
+                    pooled.close();
                     pooledBuffer = null;
                 } else {
                     pooledBuffer = pooled;

@@ -16,30 +16,28 @@
  *  limitations under the License.
  */
 
-package io.undertow.protocols.spdy;
-
-import io.undertow.buffers.ByteBufferPool;
+package io.undertow.buffers;
 
 import java.nio.ByteBuffer;
-import java.util.zip.Inflater;
 
 /**
- * Parser for SPDY syn reply frames.
- *
  * @author Stuart Douglas
  */
-class SpdySynReplyParser extends SpdyHeaderBlockParser {
+public class PooledBuffers {
 
-    public SpdySynReplyParser(ByteBufferPool bufferPool, SpdyChannel channel, int frameLength, Inflater inflater) {
-        super(bufferPool, channel, frameLength, inflater);
-    }
-
-    @Override
-    protected boolean handleBeforeHeader(ByteBuffer resource) {
-        if (resource.remaining() < 4) {
-            return false;
+    public static ByteBuffer[] toBufferArray(PooledBuffer... bufs) {
+        ByteBuffer[] ret = new ByteBuffer[bufs.length];
+        for(int i = 0; i < ret.length; ++i) {
+            ret[i] = bufs[i].buffer();
         }
-        streamId = SpdyProtocolUtils.readInt(resource);
-        return true;
+        return ret;
     }
+
+    public static void close(PooledBuffer... bufs) {
+        for(PooledBuffer i : bufs) {
+            i.close();
+        }
+    }
+
+    private PooledBuffers() {}
 }

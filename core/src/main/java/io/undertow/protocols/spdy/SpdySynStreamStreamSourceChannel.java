@@ -19,9 +19,8 @@
 package io.undertow.protocols.spdy;
 
 import io.undertow.util.HeaderMap;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
-import java.nio.ByteBuffer;
 import java.util.zip.Deflater;
 
 /**
@@ -32,7 +31,7 @@ public class SpdySynStreamStreamSourceChannel extends SpdyStreamStreamSourceChan
     private SpdySynReplyStreamSinkChannel synResponse;
     private final Deflater deflater;
 
-    SpdySynStreamStreamSourceChannel(SpdyChannel framedChannel, Pooled<ByteBuffer> data, long frameDataRemaining, Deflater deflater, HeaderMap headers, int streamId) {
+    SpdySynStreamStreamSourceChannel(SpdyChannel framedChannel, PooledBuffer data, long frameDataRemaining, Deflater deflater, HeaderMap headers, int streamId) {
         super(framedChannel, data, frameDataRemaining, headers, streamId);
         this.deflater = deflater;
     }

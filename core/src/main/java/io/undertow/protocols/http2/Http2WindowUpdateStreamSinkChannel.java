@@ -49,7 +49,7 @@ class Http2WindowUpdateStreamSinkChannel extends Http2NoDataStreamSinkChannel {
         Http2ProtocolUtils.putInt(buf, streamId);
         Http2ProtocolUtils.putInt(buf, deltaWindowSize);
         buf.flip();
-        return new SendFrameHeader(new ImmediatePooled<>(buf));
+        return new SendFrameHeader(new ImmediatePooled(buf));
     }
 
 }

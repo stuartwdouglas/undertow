@@ -18,9 +18,7 @@
 
 package io.undertow.protocols.spdy;
 
-import org.xnio.Pooled;
-
-import java.nio.ByteBuffer;
+import io.undertow.buffers.PooledBuffer;
 
 /**
  * A SPDY Ping frame
@@ -31,7 +29,7 @@ public class SpdyPingStreamSourceChannel extends SpdyStreamSourceChannel {
 
     private final int id;
 
-    SpdyPingStreamSourceChannel(SpdyChannel framedChannel, Pooled<ByteBuffer> data, long frameDataRemaining, int id) {
+    SpdyPingStreamSourceChannel(SpdyChannel framedChannel, PooledBuffer data, long frameDataRemaining, int id) {
         super(framedChannel, data, frameDataRemaining);
         this.id = id;
         lastFrame();

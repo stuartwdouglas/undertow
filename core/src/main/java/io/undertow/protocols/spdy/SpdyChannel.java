@@ -33,8 +33,8 @@ import org.xnio.ChannelExceptionHandler;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.StreamConnection;
 import org.xnio.ssl.SslConnection;
 
@@ -106,7 +106,7 @@ public class SpdyChannel extends AbstractFramedChannel<SpdyChannel, SpdyStreamSo
      */
     private volatile int sendWindowSize = initialWindowSize;
 
-    private final Pool<ByteBuffer> heapBufferPool;
+    private final ByteBufferPool heapBufferPool;
 
     private boolean thisGoneAway = false;
     private boolean peerGoneAway = false;
@@ -117,7 +117,7 @@ public class SpdyChannel extends AbstractFramedChannel<SpdyChannel, SpdyStreamSo
 
     private final Map<AttachmentKey<?>, Object> attachments = Collections.synchronizedMap(new HashMap<AttachmentKey<?>, Object>());
 
-    public SpdyChannel(StreamConnection connectedStreamChannel, Pool<ByteBuffer> bufferPool, Pooled<ByteBuffer> data, Pool<ByteBuffer> heapBufferPool, boolean clientSide) {
+    public SpdyChannel(StreamConnection connectedStreamChannel, ByteBufferPool bufferPool, PooledBuffer data, ByteBufferPool heapBufferPool, boolean clientSide) {
         super(connectedStreamChannel, bufferPool, SpdyFramePriority.INSTANCE, data);
         this.heapBufferPool = heapBufferPool;
         this.deflater.setDictionary(SpdyProtocolUtils.SPDY_DICT);
@@ -125,7 +125,7 @@ public class SpdyChannel extends AbstractFramedChannel<SpdyChannel, SpdyStreamSo
     }
 
     @Override
-    protected SpdyStreamSourceChannel createChannel(FrameHeaderData frameHeaderData, Pooled<ByteBuffer> frameData) throws IOException {
+    protected SpdyStreamSourceChannel createChannel(FrameHeaderData frameHeaderData, PooledBuffer frameData) throws IOException {
         SpdyFrameParser frameParser = (SpdyFrameParser) frameHeaderData;
         SpdyStreamSourceChannel channel;
         if(!frameParser.control) {
@@ -179,7 +179,7 @@ public class SpdyChannel extends AbstractFramedChannel<SpdyChannel, SpdyStreamSo
             case WINDOW_UPDATE: {
                 SpdyWindowUpdateParser parser = (SpdyWindowUpdateParser) frameParser.parser;
                 handleWindowUpdate(parser.getStreamId(), parser.getDeltaWindowSize());
-                frameData.free();
+                frameData.close();
                 //we don't return window update notifications, they are handled internally
                 return null;
             }
@@ -295,7 +295,7 @@ public class SpdyChannel extends AbstractFramedChannel<SpdyChannel, SpdyStreamSo
         return 3;
     }
 
-    Pool<ByteBuffer> getHeapBufferPool() {
+    ByteBufferPool getHeapBufferPool() {
         return heapBufferPool;
     }
 

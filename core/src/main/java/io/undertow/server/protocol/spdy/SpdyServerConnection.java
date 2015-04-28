@@ -42,7 +42,7 @@ import io.undertow.util.StatusCodes;
 import org.xnio.ChannelListener;
 import org.xnio.Option;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
@@ -56,7 +56,6 @@ import org.xnio.conduits.StreamSourceConduit;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -116,7 +115,7 @@ public class SpdyServerConnection extends ServerConnection {
     }
 
     @Override
-    public Pool<ByteBuffer> getBufferPool() {
+    public ByteBufferPool getBufferPool() {
         return channel.getBufferPool();
     }
 

@@ -28,15 +28,31 @@ import java.nio.ByteBuffer;
  */
 public interface PooledBuffer extends Closeable, AutoCloseable {
 
-    ByteBuffer get();
+    ByteBuffer buffer();
 
     /**
-     * Increments the reference count by one
+     * Increments the reference count by one, and returns the current buffer.
      */
     PooledBuffer aquire();
 
     /**
-     * decrements the reference count by one
+     * Returns a duplicate of this buffer, that shares the same underling storage, however
+     * with a different ByteBuffer instance. This is equivalent to {@link java.nio.ByteBuffer#duplicate()}.
+     *
+     * The new PooledBuffer must be released using close(), as calling this method increases the reference count.
+     *
+     * @return a duplicate of this pooled buffer
+     */
+    PooledBuffer duplicate();
+
+    /**
+     * Frees this buffer.
      */
     void close();
+
+    /**
+     *
+     * @return true if this buffer has not been freed
+     */
+    boolean isOpen();
 }

@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.spdy;
 
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 
 import java.nio.ByteBuffer;
 
@@ -31,7 +31,7 @@ class SpdyRstStreamParser extends SpdyPushBackParser {
 
     private int statusCode;
 
-    public SpdyRstStreamParser(Pool<ByteBuffer> bufferPool, int frameLength) {
+    public SpdyRstStreamParser(ByteBufferPool bufferPool, int frameLength) {
         super(frameLength);
     }
 

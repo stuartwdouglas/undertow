@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.spdy;
 
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 
 import java.nio.ByteBuffer;
 
@@ -32,7 +32,7 @@ public class SpdyGoAwayParser extends SpdyPushBackParser {
     private int statusCode;
     private int lastGoodStreamId;
 
-    public SpdyGoAwayParser(Pool<ByteBuffer> bufferPool, int frameLength) {
+    public SpdyGoAwayParser(ByteBufferPool bufferPool, int frameLength) {
         super(frameLength);
     }
 

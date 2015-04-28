@@ -21,7 +21,7 @@ package io.undertow.websockets.extensions;
 import java.nio.ByteBuffer;
 
 import io.undertow.websockets.core.WebSocketChannel;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
 /**
  * A wrapper for {@link ByteBuffer} class used in extensions context.
@@ -30,7 +30,7 @@ import org.xnio.Pooled;
  * <p>
  * This wrapper is a mechanism to allocate extra buffers in an automatic way.
  * <p>
- * {@code ExtensionByteBuffer} stores an internal array of {@link Pooled} buffer to manage an overflow of input {@link ByteBuffer} .
+ * {@code ExtensionByteBuffer} stores an internal array of {@link PooledBuffer} buffer to manage an overflow of input {@link ByteBuffer} .
  *
  * @author Lucas Ponce
  */
@@ -41,7 +41,7 @@ public class ExtensionByteBuffer {
     private int currentPosition;
 
     private int extraBuffers;
-    private Pooled<ByteBuffer>[] extraPools;
+    private PooledBuffer[] extraPools;
 
     private int filled;
 
@@ -146,7 +146,7 @@ public class ExtensionByteBuffer {
         if (extraBuffers == 0 || buffer < 0 || buffer >= extraBuffers) {
             return null;
         }
-        return extraPools[buffer].getResource();
+        return extraPools[buffer].buffer();
     }
 
     /**
@@ -161,7 +161,7 @@ public class ExtensionByteBuffer {
             return false;
         } else {
             for (int i = 0; i < extraBuffers; i++) {
-                if (extraPools[i].getResource().hasRemaining()) {
+                if (extraPools[i].buffer().hasRemaining()) {
                     return true;
                 }
             }
@@ -180,8 +180,8 @@ public class ExtensionByteBuffer {
             return null;
         } else {
             for (int i = 0; i < extraBuffers; i++) {
-                if (extraPools[i].getResource().hasRemaining()) {
-                    return extraPools[i].getResource();
+                if (extraPools[i].buffer().hasRemaining()) {
+                    return extraPools[i].buffer();
                 }
             }
             return null;
@@ -196,7 +196,7 @@ public class ExtensionByteBuffer {
             return;
         } else {
             for (int i = 0; i < extraBuffers; i++) {
-                extraPools[i].getResource().flip();
+                extraPools[i].buffer().flip();
             }
         }
     }
@@ -216,9 +216,9 @@ public class ExtensionByteBuffer {
         int count = 0;
         int maxPosition = 0;
         for ( ; flushedBuffer < extraBuffers; flushedBuffer++) {
-            maxPosition =  ((flushedBuffer + 1) == extraBuffers) ? currentPosition : extraPools[flushedBuffer].getResource().capacity();
+            maxPosition =  ((flushedBuffer + 1) == extraBuffers) ? currentPosition : extraPools[flushedBuffer].buffer().capacity();
             for ( ; flushedPosition < maxPosition; flushedPosition++) {
-                dst.put(extraPools[flushedBuffer].getResource().get(flushedPosition));
+                dst.put(extraPools[flushedBuffer].buffer().get(flushedPosition));
                 count++;
                 if (!dst.hasRemaining()) {
                     /*
@@ -254,19 +254,19 @@ public class ExtensionByteBuffer {
     public void free() {
         if (extraPools != null) {
             for (int i = 0; i < extraPools.length; i++) {
-                extraPools[i].free();
+                extraPools[i].close();
             }
         }
     }
 
     private void extraBuffer() {
-        Pooled<ByteBuffer> extraBuffer = channel.getBufferPool().allocate();
+        PooledBuffer extraBuffer = channel.getBufferPool().allocate();
         if (extraPools == null) {
-            extraPools = new Pooled[1];
+            extraPools = new PooledBuffer[1];
             extraPools[0] = extraBuffer;
             extraBuffers = 1;
         } else {
-            Pooled<ByteBuffer>[] newExtraPools = new Pooled[extraBuffers + 1];
+            PooledBuffer[] newExtraPools = new PooledBuffer[extraBuffers + 1];
             for (int i = 0; i < extraBuffers; i++) {
                 newExtraPools[i] = extraPools[i];
             }
@@ -290,7 +290,7 @@ public class ExtensionByteBuffer {
         if (extraBuffers == 0) {
             return input;
         } else {
-            return extraPools[extraBuffers - 1].getResource();
+            return extraPools[extraBuffers - 1].buffer();
         }
     }
 
@@ -303,11 +303,11 @@ public class ExtensionByteBuffer {
             } else {
                 int offset = input.capacity();
                 for (int i = 0; i < extraPools.length; i++) {
-                    if (position < (offset + extraPools[i].getResource().capacity()) ) {
-                        return extraPools[i].getResource();
+                    if (position < (offset + extraPools[i].buffer().capacity()) ) {
+                        return extraPools[i].buffer();
                     }
                 }
-                return extraPools[extraBuffers -1].getResource();
+                return extraPools[extraBuffers -1].buffer();
             }
         }
     }
@@ -321,10 +321,10 @@ public class ExtensionByteBuffer {
             } else {
                 int offset = input.capacity();
                 for (int i = 0; i < extraPools.length; i++) {
-                    if (position < (offset + extraPools[i].getResource().capacity()) ) {
+                    if (position < (offset + extraPools[i].buffer().capacity()) ) {
                         return (position - offset);
                     }
-                    offset += extraPools[i].getResource().capacity();
+                    offset += extraPools[i].buffer().capacity();
                 }
                 return position;
             }

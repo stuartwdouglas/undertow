@@ -30,7 +30,7 @@ import org.xnio.BufferAllocator;
 import org.xnio.ByteBufferSlicePool;
 import org.xnio.IoUtils;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.Xnio;
 import org.xnio.XnioWorker;
 import org.xnio.ssl.JsseXnioSsl;
@@ -73,7 +73,7 @@ public class Http2TestRunner extends BlockJUnit4ClassRunner {
     private static SSLContext clientSslContext;
     private static Xnio xnio;
     private static XnioSsl xnioSsl;
-    private static Pool<ByteBuffer> bufferPool = new ByteBufferSlicePool(BufferAllocator.DIRECT_BYTE_BUFFER_ALLOCATOR, BUFFER_SIZE, BUFFER_SIZE);
+    private static ByteBufferPool bufferPool = new ByteBufferSlicePool(BufferAllocator.DIRECT_BYTE_BUFFER_ALLOCATOR, BUFFER_SIZE, BUFFER_SIZE);
 
     private static ServerController serverController;
 
@@ -91,7 +91,7 @@ public class Http2TestRunner extends BlockJUnit4ClassRunner {
         super(klass);
     }
 
-    public static Pool<ByteBuffer> getBufferPool() {
+    public static ByteBufferPool getBufferPool() {
         return bufferPool;
     }
 

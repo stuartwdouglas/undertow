@@ -30,8 +30,8 @@ import io.undertow.util.StatusCodes;
 import org.jboss.logging.Logger;
 import org.xnio.Buffers;
 import org.xnio.IoUtils;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 import org.xnio.conduits.ConduitWritableByteChannel;
 import org.xnio.conduits.StreamSinkConduit;
@@ -106,7 +106,7 @@ final class AjpServerResponseConduit extends AbstractFramedStreamSinkConduit {
     }
 
 
-    private final Pool<ByteBuffer> pool;
+    private final ByteBufferPool pool;
 
     /**
      * State flags
@@ -119,7 +119,7 @@ final class AjpServerResponseConduit extends AbstractFramedStreamSinkConduit {
 
     private final boolean headRequest;
 
-    AjpServerResponseConduit(final StreamSinkConduit next, final Pool<ByteBuffer> pool, final HttpServerExchange exchange, ConduitListener<? super AjpServerResponseConduit> finishListener, boolean headRequest) {
+    AjpServerResponseConduit(final StreamSinkConduit next, final ByteBufferPool pool, final HttpServerExchange exchange, ConduitListener<? super AjpServerResponseConduit> finishListener, boolean headRequest) {
         super(next);
         this.pool = pool;
         this.exchange = exchange;
@@ -158,13 +158,13 @@ final class AjpServerResponseConduit extends AbstractFramedStreamSinkConduit {
         int oldState = this.state;
         if (anyAreSet(oldState, FLAG_START)) {
 
-            Pooled<ByteBuffer>[] byteBuffers = null;
+            PooledBuffer[] byteBuffers = null;
 
             //merge the cookies into the header map
             Connectors.flattenCookies(exchange);
 
-            Pooled<ByteBuffer> pooled = pool.allocate();
-            ByteBuffer buffer = pooled.getResource();
+            PooledBuffer pooled = pool.allocate();
+            ByteBuffer buffer = pooled.buffer();
             buffer.put((byte) 'A');
             buffer.put((byte) 'B');
             buffer.put((byte) 0); //we fill the size in later
@@ -189,16 +189,16 @@ final class AjpServerResponseConduit extends AbstractFramedStreamSinkConduit {
                         //if there is not enough room in the buffer we need to allocate more
                         buffer.flip();
                         if(byteBuffers == null) {
-                            byteBuffers = new Pooled[2];
+                            byteBuffers = new PooledBuffer[2];
                             byteBuffers[0] = pooled;
                         } else {
-                            Pooled<ByteBuffer>[] old = byteBuffers;
-                            byteBuffers = new Pooled[old.length + 1];
+                            PooledBuffer[] old = byteBuffers;
+                            byteBuffers = new PooledBuffer[old.length + 1];
                             System.arraycopy(old, 0, byteBuffers, 0, old.length);
                         }
                         pooled = pool.allocate();
                         byteBuffers[byteBuffers.length - 1] = pooled;
-                        buffer = pooled.getResource();
+                        buffer = pooled.buffer();
                     }
 
                     Integer headerCode = HEADER_MAP.get(header);
@@ -219,7 +219,7 @@ final class AjpServerResponseConduit extends AbstractFramedStreamSinkConduit {
             } else {
                 ByteBuffer[] bufs = new ByteBuffer[byteBuffers.length];
                 for(int i = 0; i < bufs.length; ++i) {
-                    bufs[i] = byteBuffers[i].getResource();
+                    bufs[i] = byteBuffers[i].buffer();
                 }
                 int dataLength = (int) (Buffers.remaining(bufs) - 4);
                 bufs[0].put(2, (byte) ((dataLength >> 8) & 0xFF));
@@ -274,14 +274,14 @@ final class AjpServerResponseConduit extends AbstractFramedStreamSinkConduit {
                 } else if (r == 0) {
                     //we need to copy all the remaining bytes
                     //TODO: this assumes the buffer is big enough
-                    Pooled<ByteBuffer> newPooledBuffer = pool.allocate();
+                    PooledBuffer newPooledBuffer = pool.allocate();
                     while (src.hasRemaining()) {
-                        newPooledBuffer.getResource().put(src);
+                        newPooledBuffer.buffer().put(src);
                     }
-                    newPooledBuffer.getResource().flip();
+                    newPooledBuffer.buffer().flip();
                     ByteBuffer[] savedBuffers = new ByteBuffer[3];
                     savedBuffers[0] = buffers[0];
-                    savedBuffers[1] = newPooledBuffer.getResource();
+                    savedBuffers[1] = newPooledBuffer.buffer();
                     savedBuffers[2] = buffers[2];
                     queueFrame(new PooledBufferFrameCallback(newPooledBuffer), savedBuffers);
                     return originalPayloadSize;

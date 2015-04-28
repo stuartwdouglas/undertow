@@ -27,8 +27,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.StreamConnection;
 
 import io.undertow.UndertowLogger;
@@ -66,13 +66,13 @@ public class AjpClientChannel extends AbstractFramedChannel<AjpClientChannel, Ab
      *                               Be aware that it already must be "upgraded".
      * @param bufferPool             The {@link org.xnio.Pool} which will be used to acquire {@link java.nio.ByteBuffer}'s from.
      */
-    public AjpClientChannel(StreamConnection connectedStreamChannel, Pool<ByteBuffer> bufferPool) {
+    public AjpClientChannel(StreamConnection connectedStreamChannel, ByteBufferPool bufferPool) {
         super(connectedStreamChannel, bufferPool, AjpClientFramePriority.INSTANCE, null);
         ajpParser = new AjpResponseParser();
     }
 
     @Override
-    protected AbstractAjpClientStreamSourceChannel createChannel(FrameHeaderData frameHeaderData, Pooled<ByteBuffer> frameData) throws IOException {
+    protected AbstractAjpClientStreamSourceChannel createChannel(FrameHeaderData frameHeaderData, PooledBuffer frameData) throws IOException {
         if (frameHeaderData instanceof SendHeadersResponse) {
             SendHeadersResponse h = (SendHeadersResponse) frameHeaderData;
             AjpClientResponseStreamSourceChannel sourceChannel = new AjpClientResponseStreamSourceChannel(this, h.headers, h.statusCode, h.reasonPhrase, frameData, (int) frameHeaderData.getFrameLength());
@@ -81,10 +81,10 @@ public class AjpClientChannel extends AbstractFramedChannel<AjpClientChannel, Ab
         } else if (frameHeaderData instanceof RequestBodyChunk) {
             RequestBodyChunk r = (RequestBodyChunk) frameHeaderData;
             this.sink.chunkRequested(r.getLength());
-            frameData.free();
+            frameData.close();
             return null;
         } else {
-            frameData.free();
+            frameData.close();
             throw new RuntimeException("TODO: unknown frame");
         }
 

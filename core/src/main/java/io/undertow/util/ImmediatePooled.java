@@ -18,35 +18,44 @@
 
 package io.undertow.util;
 
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
+
+import java.nio.ByteBuffer;
 
 /**
  * Wrapper that allows you to use a non-pooed item as a pooled value
  *
  * @author Stuart Douglas
  */
-public class ImmediatePooled<T> implements Pooled<T> {
+public class ImmediatePooled implements PooledBuffer {
 
-    private final T value;
+    private final ByteBuffer value;
 
-    public ImmediatePooled(T value) {
+    public ImmediatePooled(ByteBuffer value) {
         this.value = value;
     }
 
     @Override
-    public void discard() {
-    }
-
-    @Override
-    public void free() {
-    }
-
-    @Override
-    public T getResource() throws IllegalStateException {
+    public ByteBuffer buffer() throws IllegalStateException {
         return value;
     }
 
     @Override
+    public PooledBuffer aquire() {
+        return null;
+    }
+
+    @Override
+    public PooledBuffer duplicate() {
+        return new ImmediatePooled(value.duplicate());
+    }
+
+    @Override
     public void close() {
+    }
+
+    @Override
+    public boolean isOpen() {
+        return true;
     }
 }

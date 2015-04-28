@@ -46,7 +46,7 @@ class Http2RstStreamSinkChannel extends Http2NoDataStreamSinkChannel {
         Http2ProtocolUtils.putInt(buf, streamId);
         Http2ProtocolUtils.putInt(buf, errorCode);
         buf.flip();
-        return new SendFrameHeader(new ImmediatePooled<>(buf));
+        return new SendFrameHeader(new ImmediatePooled(buf));
     }
 
 }

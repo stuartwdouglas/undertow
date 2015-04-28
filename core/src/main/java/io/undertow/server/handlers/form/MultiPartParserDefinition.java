@@ -33,7 +33,7 @@ import io.undertow.util.StatusCodes;
 import org.xnio.ChannelListener;
 import org.xnio.FileAccess;
 import org.xnio.IoUtils;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 
 import java.io.ByteArrayOutputStream;
@@ -329,10 +329,10 @@ public class MultiPartParserDefinition implements FormParserFactory.ParserDefini
                         exchange.dispatch(SameThreadExecutor.INSTANCE, handler);
                         return;
                     }
-                    Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
+                    PooledBuffer pooled = exchange.getConnection().getBufferPool().allocate();
                     try {
                         while (true) {
-                            int c = requestChannel.read(pooled.getResource());
+                            int c = requestChannel.read(pooled.buffer());
                             if(c == 0) {
                                 requestChannel.getReadSetter().set(new ChannelListener<StreamSourceChannel>() {
                                     @Override
@@ -354,9 +354,9 @@ public class MultiPartParserDefinition implements FormParserFactory.ParserDefini
                                 }
                                 return;
                             } else {
-                                pooled.getResource().flip();
-                                parser.parse(pooled.getResource());
-                                pooled.getResource().compact();
+                                pooled.buffer().flip();
+                                parser.parse(pooled.buffer());
+                                pooled.buffer().compact();
                             }
                         }
                     } catch (MalformedMessageException e) {
@@ -364,7 +364,7 @@ public class MultiPartParserDefinition implements FormParserFactory.ParserDefini
                         exchange.setResponseCode(StatusCodes.INTERNAL_SERVER_ERROR);
                         exchange.endExchange();
                     } finally {
-                        pooled.free();
+                        pooled.close();
                     }
 
                 } catch (Throwable e) {

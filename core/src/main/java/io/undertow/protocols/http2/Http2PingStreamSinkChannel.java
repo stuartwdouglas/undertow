@@ -54,7 +54,7 @@ class Http2PingStreamSinkChannel extends Http2NoDataStreamSinkChannel {
             buf.put(data[i]);
         }
         buf.flip();
-        return new SendFrameHeader(new ImmediatePooled<>(buf));
+        return new SendFrameHeader(new ImmediatePooled(buf));
     }
 
 }

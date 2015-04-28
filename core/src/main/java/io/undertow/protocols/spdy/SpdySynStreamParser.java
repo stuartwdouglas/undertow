@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.spdy;
 
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 
 import java.nio.ByteBuffer;
 import java.util.zip.Inflater;
@@ -34,7 +34,7 @@ class SpdySynStreamParser extends SpdyHeaderBlockParser {
     private int associatedToStreamId = -1;
     private int priority = -1;
 
-    public SpdySynStreamParser(Pool<ByteBuffer> bufferPool, SpdyChannel channel, int frameLength, Inflater inflater) {
+    public SpdySynStreamParser(ByteBufferPool bufferPool, SpdyChannel channel, int frameLength, Inflater inflater) {
         super(bufferPool, channel, frameLength, inflater);
     }
 

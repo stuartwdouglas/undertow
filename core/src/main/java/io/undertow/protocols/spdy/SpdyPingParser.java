@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.spdy;
 
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 
 import java.nio.ByteBuffer;
 
@@ -31,7 +31,7 @@ class SpdyPingParser extends SpdyPushBackParser {
 
     private int id;
 
-    public SpdyPingParser(Pool<ByteBuffer> bufferPool, int frameLength) {
+    public SpdyPingParser(ByteBufferPool bufferPool, int frameLength) {
         super(frameLength);
     }
 

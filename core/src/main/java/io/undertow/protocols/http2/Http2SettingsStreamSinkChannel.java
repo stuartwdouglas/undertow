@@ -20,7 +20,7 @@ package io.undertow.protocols.http2;
 
 import java.nio.ByteBuffer;
 import java.util.List;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
 import io.undertow.server.protocol.framed.SendFrameHeader;
 
@@ -50,8 +50,8 @@ public class Http2SettingsStreamSinkChannel extends Http2StreamSinkChannel {
 
     @Override
     protected SendFrameHeader createFrameHeaderImpl() {
-        Pooled<ByteBuffer> pooled = getChannel().getBufferPool().allocate();
-        ByteBuffer currentBuffer = pooled.getResource();
+        PooledBuffer pooled = getChannel().getBufferPool().allocate();
+        ByteBuffer currentBuffer = pooled.buffer();
         if (settings != null) {
             int size = settings.size() * 6;
             currentBuffer.put((byte) ((size >> 16) & 0xFF));

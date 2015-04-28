@@ -36,8 +36,8 @@ import org.xnio.FinishedIoFuture;
 import org.xnio.FutureResult;
 import org.xnio.IoFuture;
 import org.xnio.IoUtils;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 
 import java.io.ByteArrayOutputStream;
@@ -150,8 +150,8 @@ public class AsyncWebSocketHttpServerExchange implements WebSocketHttpExchange {
     @Override
     public IoFuture<byte[]> readRequestData() {
         final ByteArrayOutputStream data = new ByteArrayOutputStream();
-        final Pooled<ByteBuffer> pooled = exchange.getConnection().getBufferPool().allocate();
-        final ByteBuffer buffer = pooled.getResource();
+        final PooledBuffer pooled = exchange.getConnection().getBufferPool().allocate();
+        final ByteBuffer buffer = pooled.buffer();
         final StreamSourceChannel channel = exchange.getRequestChannel();
         int res;
         for (; ; ) {
@@ -237,7 +237,7 @@ public class AsyncWebSocketHttpServerExchange implements WebSocketHttpExchange {
     }
 
     @Override
-    public Pool<ByteBuffer> getBufferPool() {
+    public ByteBufferPool getBufferPool() {
         return exchange.getConnection().getBufferPool();
     }
 

@@ -23,7 +23,7 @@ import org.xnio.ChannelListeners;
 import org.xnio.Option;
 import org.xnio.OptionMap;
 import org.xnio.Options;
-import org.xnio.Pool;
+import io.undertow.buffers.ByteBufferPool;
 import org.xnio.Sequence;
 import org.xnio.SslClientAuthMode;
 import org.xnio.StreamConnection;
@@ -40,7 +40,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -79,10 +78,10 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
     private final ChannelListener.Setter<AcceptingChannel<SslConnection>> closeSetter;
     private final ChannelListener.Setter<AcceptingChannel<SslConnection>> acceptSetter;
     protected final boolean startTls;
-    protected final Pool<ByteBuffer> applicationBufferPool;
+    protected final ByteBufferPool applicationBufferPool;
 
 
-    public UndertowAcceptingSslChannel(final SSLContext sslContext, final AcceptingChannel<? extends StreamConnection> tcpServer, final OptionMap optionMap, final Pool<ByteBuffer> applicationBufferPool, final boolean startTls) {
+    public UndertowAcceptingSslChannel(final SSLContext sslContext, final AcceptingChannel<? extends StreamConnection> tcpServer, final OptionMap optionMap, final ByteBufferPool applicationBufferPool, final boolean startTls) {
         this.tcpServer = tcpServer;
         this.sslContext = sslContext;
         this.applicationBufferPool = applicationBufferPool;

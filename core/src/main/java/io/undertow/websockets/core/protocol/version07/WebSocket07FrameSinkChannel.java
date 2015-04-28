@@ -24,7 +24,7 @@ import io.undertow.websockets.core.WebSocketMessages;
 import io.undertow.websockets.extensions.ExtensionByteBuffer;
 import io.undertow.websockets.extensions.ExtensionFunction;
 import org.xnio.Buffers;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -47,7 +47,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
     protected boolean overflow = false;
     protected final int LAST_OVERFLOW = -13;
     protected ByteBuffer bufOverflow = null;
-    protected Pooled<ByteBuffer> pooledOverflow = null;
+    protected PooledBuffer pooledOverflow = null;
     protected ExtensionByteBuffer extensionResult = null;
 
     protected WebSocket07FrameSinkChannel(WebSocket07Channel wsChannel, WebSocketFrameType type,
@@ -134,7 +134,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
             payloadSize = getBuffer().remaining();
         }
 
-        Pooled<ByteBuffer> start = getChannel().getBufferPool().allocate();
+        PooledBuffer start = getChannel().getBufferPool().allocate();
         byte b0 = 0;
         //if writes are shutdown this is the final fragment
         if (isFinalFrameQueued() || (getRsv() == 0 && payloadSize >= 0)) {
@@ -147,7 +147,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
         b0 |= (rsv & 7) << 4;
         b0 |= opCode() & 0xf;
 
-        final ByteBuffer header = start.getResource();
+        final ByteBuffer header = start.buffer();
         //int maskLength = 0; // handle masking for clients but we are currently only
         // support servers this is not a priority by now
         byte maskKey = 0;
@@ -228,13 +228,13 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
 
     private int writeExtensions(final ByteBuffer src) throws IOException {
         if (!overflow) {
-            final Pooled<ByteBuffer> buffer = getChannel().getBufferPool().allocate();
+            final PooledBuffer buffer = getChannel().getBufferPool().allocate();
             try {
                 ByteBuffer copy = src.duplicate();
-                Buffers.copy(buffer.getResource(), copy);
-                buffer.getResource().flip();
+                Buffers.copy(buffer.buffer(), copy);
+                buffer.buffer().flip();
 
-                int remainingBeforeExtension = buffer.getResource().remaining();
+                int remainingBeforeExtension = buffer.buffer().remaining();
                 /*
                     Case:
                     - Extension present.
@@ -244,8 +244,8 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                       We can have remotely scenarios where we can have buffer expanded, for example, we can write a 10K
                       buffer but an extension can expand it internally to 20K but we should return that we write 10K.
                  */
-                extensionResult = applyExtensions(buffer.getResource(), 0, buffer.getResource().remaining());
-                int written = super.write(buffer.getResource());
+                extensionResult = applyExtensions(buffer.buffer(), 0, buffer.buffer().remaining());
+                int written = super.write(buffer.buffer());
                 if (written == 0) {
                     /*
                         Case:
@@ -253,7 +253,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                      */
                     return written;
                 }
-                if (buffer.getResource().hasRemaining()) {
+                if (buffer.buffer().hasRemaining()) {
                     /*
                         Case:
                         - After a write() operation there are pending bytes to write.
@@ -262,7 +262,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                           overflow buffer to write transformed data.
                      */
                     overflow = true;
-                    bufOverflow = buffer.getResource();
+                    bufOverflow = buffer.buffer();
                     pooledOverflow = buffer;
                 }
 
@@ -313,7 +313,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                 return remainingBeforeExtension;
             } finally {
                 if (!overflow) {
-                    buffer.free();
+                    buffer.close();
                 }
             }
         } else {
@@ -346,7 +346,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                     return writtenOverflow;
                 } finally {
                     if (bufOverflow == null && pooledOverflow != null) {
-                        pooledOverflow.free();
+                        pooledOverflow.close();
                     }
                 }
             } else {
@@ -386,16 +386,16 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
 
     private long writeExtensions(final ByteBuffer[] srcs, final int offset, final int length) throws IOException {
         if (!overflow) {
-            final Pooled<ByteBuffer> buffer = getChannel().getBufferPool().allocate();
+            final PooledBuffer buffer = getChannel().getBufferPool().allocate();
             try {
                 ByteBuffer[] copy = new ByteBuffer[length];
                 for (int i = 0; i < length; ++i) {
                     copy[i] = srcs[offset + i].duplicate();
                 }
-                Buffers.copy(buffer.getResource(), copy, 0, length);
-                buffer.getResource().flip();
+                Buffers.copy(buffer.buffer(), copy, 0, length);
+                buffer.buffer().flip();
 
-                int remainingBeforeExtension = buffer.getResource().remaining();
+                int remainingBeforeExtension = buffer.buffer().remaining();
 
                 /*
                     Case:
@@ -406,9 +406,9 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                       We can have remotely scenarios where we can have buffer expanded, for example, we can write a 10K
                       buffer but an extension can expand it internally to 20K but we should return that we write 10K.
                  */
-                extensionResult = applyExtensions(buffer.getResource(), 0, buffer.getResource().remaining());
+                extensionResult = applyExtensions(buffer.buffer(), 0, buffer.buffer().remaining());
 
-                long written = super.write(buffer.getResource());
+                long written = super.write(buffer.buffer());
                 if (written == 0) {
                     /*
                         Case:
@@ -417,7 +417,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                     return 0;
                 }
 
-                if (buffer.getResource().hasRemaining()) {
+                if (buffer.buffer().hasRemaining()) {
                     /*
                         Case:
                         - After a write() operation there are pending bytes to write.
@@ -426,7 +426,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                           overflow buffer to write transformed data.
                      */
                     overflow = true;
-                    bufOverflow = buffer.getResource();
+                    bufOverflow = buffer.buffer();
                     pooledOverflow = buffer;
                 }
 
@@ -477,7 +477,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                 return toAllocate;
             } finally {
                 if (!overflow) {
-                    buffer.free();
+                    buffer.close();
                 }
             }
 
@@ -512,7 +512,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                     return writtenOverflow;
                 } finally {
                     if (bufOverflow == null && pooledOverflow != null) {
-                        pooledOverflow.free();
+                        pooledOverflow.close();
                     }
                 }
 
@@ -625,8 +625,8 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
     @Override
     public void shutdownWrites() throws IOException {
         if (getRsv() > 0 && isOpen()) {
-            Pooled<ByteBuffer> pooledPadding = this.getChannel().getBufferPool().allocate();
-            ByteBuffer buffer = pooledPadding.getResource();
+            PooledBuffer pooledPadding = this.getChannel().getBufferPool().allocate();
+            ByteBuffer buffer = pooledPadding.buffer();
             ExtensionByteBuffer extPadding = applyExtensionsFlush(buffer, 0, buffer.remaining());
             try {
                 while (buffer.hasRemaining()) {
@@ -638,7 +638,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
                     }
                 }
             } finally {
-                pooledPadding.free();
+                pooledPadding.close();
                 if (extPadding != null && extPadding.hasExtra()) {
                     extPadding.free();
                 }

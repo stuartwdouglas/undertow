@@ -18,12 +18,12 @@
 
 package io.undertow.websockets.core;
 
+import io.undertow.buffers.PooledBuffers;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
-import org.xnio.Pooled;
+import io.undertow.buffers.PooledBuffer;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 /**
  * A receive listener that performs a callback when it receives a message
@@ -142,7 +142,9 @@ public abstract class AbstractReceiveListener implements ChannelListener<WebSock
 
             @Override
             public void onError(WebSocketChannel channel, BufferedBinaryMessage context, Throwable throwable) {
-                context.getData().free();
+                for(PooledBuffer i : context.getData()) {
+                    i.close();
+                }
                 AbstractReceiveListener.this.onError(channel, throwable);
             }
         });
@@ -175,23 +177,25 @@ public abstract class AbstractReceiveListener implements ChannelListener<WebSock
     }
 
     protected void onFullPingMessage(final WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
-        final Pooled<ByteBuffer[]> data = message.getData();
-        WebSockets.sendPong(data.getResource(), channel, new FreeDataCallback(data));
+        final PooledBuffer[] data = message.getData();
+        WebSockets.sendPong(PooledBuffers.toBufferArray(data), channel, new FreeDataCallback(data));
     }
 
     protected void onFullPongMessage(final WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
     }
 
     protected void onFullCloseMessage(final WebSocketChannel channel, BufferedBinaryMessage message) throws IOException {
-        Pooled<ByteBuffer[]> data = message.getData();
+        PooledBuffer[] data = message.getData();
         try {
-            CloseMessage cm = new CloseMessage(data.getResource());
+            CloseMessage cm = new CloseMessage(PooledBuffers.toBufferArray(data));
             onCloseMessage(cm, channel);
             if (!channel.isCloseFrameSent()) {
                 WebSockets.sendClose(cm, channel, null);
             }
         } finally {
-            data.free();
+            for(PooledBuffer i : data) {
+                i.close();
+            }
         }
     }
 
@@ -200,20 +204,24 @@ public abstract class AbstractReceiveListener implements ChannelListener<WebSock
     }
 
     private static class FreeDataCallback implements WebSocketCallback<Void> {
-        private final Pooled<ByteBuffer[]> data;
+        private final PooledBuffer[] data;
 
-        public FreeDataCallback(Pooled<ByteBuffer[]> data) {
+        public FreeDataCallback(PooledBuffer[] data) {
             this.data = data;
         }
 
         @Override
         public void complete(WebSocketChannel channel, Void context) {
-            data.free();
+            for(PooledBuffer i : data) {
+                i.close();
+            }
         }
 
         @Override
         public void onError(WebSocketChannel channel, Void context, Throwable throwable) {
-            data.free();
+            for(PooledBuffer i : data) {
+                i.close();
+            }
         }
     }
 }

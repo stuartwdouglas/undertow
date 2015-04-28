@@ -31,8 +31,8 @@ import java.util.Set;
 import org.xnio.ChannelListener;
 import org.xnio.IoFuture;
 import org.xnio.OptionMap;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
@@ -57,12 +57,12 @@ import io.undertow.util.Headers;
 public class Http2ClearClientProvider implements ClientProvider {
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioWorker worker, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioWorker worker, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         connect(listener, null, uri, worker, ssl, bufferPool, options);
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         connect(listener, null, uri, ioThread, ssl, bufferPool, options);
     }
 
@@ -72,7 +72,7 @@ public class Http2ClearClientProvider implements ClientProvider {
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioWorker worker, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioWorker worker, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         final URI upgradeUri;
         try {
             upgradeUri = new URI("http", uri.getUserInfo(), uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(), uri.getFragment());
@@ -85,7 +85,7 @@ public class Http2ClearClientProvider implements ClientProvider {
     }
 
     @Override
-    public void connect(final ClientCallback<ClientConnection> listener, final InetSocketAddress bindAddress, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final Pool<ByteBuffer> bufferPool, final OptionMap options) {
+    public void connect(final ClientCallback<ClientConnection> listener, final InetSocketAddress bindAddress, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
         final URI upgradeUri;
         try {
             upgradeUri = new URI("http", uri.getUserInfo(), uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(), uri.getFragment());
@@ -124,7 +124,7 @@ public class Http2ClearClientProvider implements ClientProvider {
 
     }
 
-    private Map<String, String> createHeaders(OptionMap options, Pool<ByteBuffer> bufferPool, URI uri) {
+    private Map<String, String> createHeaders(OptionMap options, ByteBufferPool bufferPool, URI uri) {
         Map<String, String> headers = new HashMap<>();
         headers.put("HTTP2-Settings", createSettingsFrame(options, bufferPool));
         headers.put(Headers.UPGRADE_STRING, Http2Channel.CLEARTEXT_UPGRADE_STRING);
@@ -135,10 +135,10 @@ public class Http2ClearClientProvider implements ClientProvider {
     }
 
 
-    private String createSettingsFrame(OptionMap options, Pool<ByteBuffer> bufferPool) {
-        Pooled<ByteBuffer> b = bufferPool.allocate();
+    private String createSettingsFrame(OptionMap options, ByteBufferPool bufferPool) {
+        PooledBuffer b = bufferPool.allocate();
         try {
-            ByteBuffer currentBuffer = b.getResource();
+            ByteBuffer currentBuffer = b.buffer();
 
             if (options.contains(UndertowOptions.HTTP2_SETTINGS_HEADER_TABLE_SIZE)) {
                 pushOption(currentBuffer, Http2Setting.SETTINGS_HEADER_TABLE_SIZE, options.get(UndertowOptions.HTTP2_SETTINGS_HEADER_TABLE_SIZE));
@@ -165,7 +165,7 @@ public class Http2ClearClientProvider implements ClientProvider {
             currentBuffer.flip();
             return FlexBase64.encodeString(currentBuffer, false);
         } finally {
-            b.free();
+            b.close();
         }
     }
 
@@ -179,11 +179,11 @@ public class Http2ClearClientProvider implements ClientProvider {
     }
 
     private static class Http2ClearOpenListener implements ChannelListener<StreamConnection> {
-        private final Pool<ByteBuffer> bufferPool;
+        private final ByteBufferPool bufferPool;
         private final OptionMap options;
         private final ClientCallback<ClientConnection> listener;
 
-        public Http2ClearOpenListener(Pool<ByteBuffer> bufferPool, OptionMap options, ClientCallback<ClientConnection> listener) {
+        public Http2ClearOpenListener(ByteBufferPool bufferPool, OptionMap options, ClientCallback<ClientConnection> listener) {
             this.bufferPool = bufferPool;
             this.options = options;
             this.listener = listener;

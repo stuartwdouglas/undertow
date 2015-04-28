@@ -47,7 +47,7 @@ class SpdyRstStreamSinkChannel extends SpdyControlFrameStreamSinkChannel {
         SpdyProtocolUtils.putInt(buf, streamId);
         SpdyProtocolUtils.putInt(buf, statusCode);
         buf.flip();
-        return new SendFrameHeader(new ImmediatePooled<>(buf));
+        return new SendFrameHeader(new ImmediatePooled(buf));
     }
 
 }

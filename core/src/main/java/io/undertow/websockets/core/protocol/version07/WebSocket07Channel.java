@@ -32,8 +32,8 @@ import io.undertow.websockets.core.function.ChannelFunction;
 
 import io.undertow.websockets.extensions.ExtensionFunction;
 import org.xnio.IoUtils;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.StreamConnection;
 
 import java.nio.ByteBuffer;
@@ -88,7 +88,7 @@ public class WebSocket07Channel extends WebSocketChannel {
      * @param bufferPool The {@link Pool} which will be used to acquire {@link ByteBuffer}'s from.
      * @param wsUrl      The url for which the {@link WebSocket07Channel} was created.
      */
-    public WebSocket07Channel(StreamConnection channel, Pool<ByteBuffer> bufferPool,
+    public WebSocket07Channel(StreamConnection channel, ByteBufferPool bufferPool,
                               String wsUrl, String subProtocol, final boolean client, boolean allowExtensions, final List<ExtensionFunction> extensions, Set<WebSocketChannel> openConnections) {
         super(channel, bufferPool, WebSocketVersion.V08, wsUrl, subProtocol, client, allowExtensions, extensions, openConnections);
     }
@@ -139,7 +139,7 @@ public class WebSocket07Channel extends WebSocketChannel {
         private boolean done = false;
 
         @Override
-        public StreamSourceFrameChannel getChannel(Pooled<ByteBuffer> pooled) {
+        public StreamSourceFrameChannel getChannel(PooledBuffer pooled) {
             StreamSourceFrameChannel channel = createChannel(pooled);
             if (frameFinalFlag) {
                 channel.finalFrame();
@@ -149,7 +149,7 @@ public class WebSocket07Channel extends WebSocketChannel {
             return channel;
         }
 
-        public StreamSourceFrameChannel createChannel(Pooled<ByteBuffer> pooled) {
+        public StreamSourceFrameChannel createChannel(PooledBuffer pooled) {
 
 
             // Processing ping/pong/close frames because they cannot be

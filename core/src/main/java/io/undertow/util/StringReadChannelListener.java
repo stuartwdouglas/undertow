@@ -24,8 +24,8 @@ import java.nio.ByteBuffer;
 import io.undertow.websockets.core.UTF8Output;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
-import org.xnio.Pool;
-import org.xnio.Pooled;
+import io.undertow.buffers.ByteBufferPool;
+import io.undertow.buffers.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 
 /**
@@ -38,15 +38,15 @@ import org.xnio.channels.StreamSourceChannel;
 public abstract class StringReadChannelListener implements ChannelListener<StreamSourceChannel> {
 
     private final UTF8Output string = new UTF8Output();
-    private final Pool<ByteBuffer> bufferPool;
+    private final ByteBufferPool bufferPool;
 
-    public StringReadChannelListener(final Pool<ByteBuffer> bufferPool) {
+    public StringReadChannelListener(final ByteBufferPool bufferPool) {
         this.bufferPool = bufferPool;
     }
 
     public void setup(final StreamSourceChannel channel) {
-        Pooled<ByteBuffer> resource = bufferPool.allocate();
-        ByteBuffer buffer = resource.getResource();
+        PooledBuffer resource = bufferPool.allocate();
+        ByteBuffer buffer = resource.buffer();
         try {
             int r = 0;
             do {
@@ -65,14 +65,14 @@ public abstract class StringReadChannelListener implements ChannelListener<Strea
         } catch (IOException e) {
             error(e);
         } finally {
-            resource.free();
+            resource.close();
         }
     }
 
     @Override
     public void handleEvent(final StreamSourceChannel channel) {
-        Pooled<ByteBuffer> resource = bufferPool.allocate();
-        ByteBuffer buffer = resource.getResource();
+        PooledBuffer resource = bufferPool.allocate();
+        ByteBuffer buffer = resource.buffer();
         try {
             int r = 0;
             do {
@@ -90,7 +90,7 @@ public abstract class StringReadChannelListener implements ChannelListener<Strea
         } catch (IOException e) {
             error(e);
         } finally {
-            resource.free();
+            resource.close();
         }
     }
 
