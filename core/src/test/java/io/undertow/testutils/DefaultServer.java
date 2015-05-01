@@ -137,7 +137,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
 
     private static final Logger log = Logger.getLogger(DefaultServer.class);
 
-    private static final ByteBufferPool pool = new DebuggingSlicePool(new DefaultByteBufferPool(true, BUFFER_SIZE, 100 , 1));
+    private static final ByteBufferPool pool = new DebuggingSlicePool(new DefaultByteBufferPool(true, BUFFER_SIZE, 1000 , 10));
 
     private static KeyStore loadKeyStore(final String name) throws IOException {
         final InputStream stream = DefaultServer.class.getClassLoader().getResourceAsStream(name);

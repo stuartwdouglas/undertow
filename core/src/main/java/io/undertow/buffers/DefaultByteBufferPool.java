@@ -76,8 +76,6 @@ public class DefaultByteBufferPool implements ByteBufferPool {
         } else {
             threadLocalCache.set(local = new ThreadLocalData());
         }
-
-        local.allocationDepth++;
         if (buffer == null) {
             buffer = queue.poll();
         }
@@ -102,8 +100,10 @@ public class DefaultByteBufferPool implements ByteBufferPool {
         if(local != null) {
             if(local.allocationDepth > 0) {
                 local.allocationDepth--;
-                local.buffers.add(buffer);
-                return;
+                if (local.buffers.size() < threadLocalCacheSize) {
+                    local.buffers.add(buffer);
+                    return;
+                }
             }
         }
         int size;
@@ -128,6 +128,7 @@ public class DefaultByteBufferPool implements ByteBufferPool {
     private static class DefaultPooledBuffer implements PooledBuffer {
 
         private final DefaultByteBufferPool pool;
+        private final LeakDetector leakDetector;
         private ByteBuffer buffer;
 
         /**
@@ -147,6 +148,7 @@ public class DefaultByteBufferPool implements ByteBufferPool {
         public DefaultPooledBuffer(DefaultByteBufferPool pool, ByteBuffer buffer) {
             this.pool = pool;
             this.buffer = buffer;
+            this.leakDetector = null;
         }
 
         @Override
@@ -194,6 +196,9 @@ public class DefaultByteBufferPool implements ByteBufferPool {
                 }
             } while (!referenceCountUpdater.compareAndSet(this, ref, (ref - 1) | PRIMARY_BUFFER_CLOSED));
             if (ref == 1) {
+                if(leakDetector != null) {
+                    leakDetector.closed = true;
+                }
                 pool.freeInternal(buffer);
                 this.buffer = null;
             }
@@ -216,6 +221,9 @@ public class DefaultByteBufferPool implements ByteBufferPool {
                 }
             } while (!referenceCountUpdater.compareAndSet(this, ref, newRef));
             if (close) {
+                if(leakDetector != null) {
+                    leakDetector.closed = true;
+                }
                 pool.freeInternal(buffer);
                 this.buffer = null;
             }
@@ -237,7 +245,6 @@ public class DefaultByteBufferPool implements ByteBufferPool {
                 this.duplicate = duplicate;
                 this.parent = parent;
             }
-
 
             @Override
             public ByteBuffer buffer() {
@@ -273,6 +280,24 @@ public class DefaultByteBufferPool implements ByteBufferPool {
     private class ThreadLocalData {
         ArrayDeque<ByteBuffer> buffers = new ArrayDeque<>(threadLocalCacheSize);
         int allocationDepth = 0;
+    }
+
+    private static class LeakDetector {
+
+        volatile boolean closed = false;
+        private final Throwable allocationPoint;
+
+        private LeakDetector() {
+            this.allocationPoint = new Throwable("Buffer leak detected");
+        }
+
+        @Override
+        protected void finalize() throws Throwable {
+            super.finalize();
+            if(!closed) {
+                allocationPoint.printStackTrace();
+            }
+        }
     }
 
 }
