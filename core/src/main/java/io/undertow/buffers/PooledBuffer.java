@@ -31,11 +31,6 @@ public interface PooledBuffer extends Closeable, AutoCloseable {
     ByteBuffer buffer();
 
     /**
-     * Increments the reference count by one, and returns the current buffer.
-     */
-    PooledBuffer aquire();
-
-    /**
      * Returns a duplicate of this buffer, that shares the same underling storage, however
      * with a different ByteBuffer instance. This is equivalent to {@link java.nio.ByteBuffer#duplicate()}.
      *

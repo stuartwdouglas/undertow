@@ -196,6 +196,9 @@ public class BufferedBinaryMessage implements Closeable {
 
     @Override
     public void close() {
+        if(current != null) {
+            current.close();
+        }
         if(data != null) {
             for(PooledBuffer i : data) {
                 i.close();

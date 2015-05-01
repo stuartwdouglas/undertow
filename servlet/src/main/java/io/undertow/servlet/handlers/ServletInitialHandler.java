@@ -20,6 +20,7 @@ package io.undertow.servlet.handlers;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
+import io.undertow.buffers.DefaultByteBufferPool;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.HttpUpgradeListener;
@@ -43,8 +44,6 @@ import io.undertow.util.Methods;
 import io.undertow.util.Protocols;
 import io.undertow.util.RedirectBuilder;
 import io.undertow.util.StatusCodes;
-import org.xnio.BufferAllocator;
-import org.xnio.ByteBufferSlicePool;
 import org.xnio.ChannelListener;
 import org.xnio.Option;
 import org.xnio.OptionMap;
@@ -206,7 +205,7 @@ public class ServletInitialHandler implements HttpHandler, ServletDispatcher {
     @Override
     public void dispatchMockRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException {
 
-        final ByteBufferSlicePool bufferPool = new ByteBufferSlicePool(BufferAllocator.BYTE_BUFFER_ALLOCATOR, 1024, 1024);
+        final DefaultByteBufferPool bufferPool = new DefaultByteBufferPool(false, 1024, 1, 0);
         MockServerConnection connection = new MockServerConnection(bufferPool);
         HttpServerExchange exchange = new HttpServerExchange(connection);
         exchange.setRequestScheme(request.getScheme());

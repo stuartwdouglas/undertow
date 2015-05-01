@@ -34,7 +34,6 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.xnio.ByteBufferSlicePool;
 
 import javax.websocket.CloseReason;
 import javax.websocket.Session;
@@ -63,7 +62,7 @@ public class ClientEndpointReconnectTestCase {
                 .setClassIntrospecter(TestClassIntrospector.INSTANCE)
                 .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME,
                         new WebSocketDeploymentInfo()
-                                .setBuffers(new ByteBufferSlicePool(100, 1000))
+                                .setBuffers(DefaultServer.getBufferPool())
                                 .setWorker(DefaultServer.getWorker())
                                 .addEndpoint(DisconnectServerEndpoint.class)
                                 .addEndpoint(AnnotatedClientReconnectEndpoint.class)

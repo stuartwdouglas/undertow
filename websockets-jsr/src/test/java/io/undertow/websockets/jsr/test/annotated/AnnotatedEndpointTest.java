@@ -39,7 +39,6 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.xnio.ByteBufferSlicePool;
 import org.xnio.FutureResult;
 
 import javax.websocket.ClientEndpoint;
@@ -69,7 +68,7 @@ public class AnnotatedEndpointTest {
                 .setClassIntrospecter(TestClassIntrospector.INSTANCE)
                 .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME,
                         new WebSocketDeploymentInfo()
-                                .setBuffers(new ByteBufferSlicePool(100, 1000))
+                                .setBuffers(DefaultServer.getBufferPool())
                                 .setWorker(DefaultServer.getWorker())
                                 .addEndpoint(MessageEndpoint.class)
                                 .addEndpoint(AnnotatedClientEndpoint.class)

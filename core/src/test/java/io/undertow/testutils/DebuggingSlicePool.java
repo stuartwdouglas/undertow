@@ -100,14 +100,8 @@ public class DebuggingSlicePool implements ByteBufferPool{
         }
 
         @Override
-        public PooledBuffer aquire() {
-            referenceCount.incrementAndGet();
-            delegate.aquire();
-            return this;
-        }
-
-        @Override
         public PooledBuffer duplicate() {
+
             referenceCount.incrementAndGet();
             final PooledBuffer duplicate = delegate.duplicate();
             return new PooledBuffer() {
@@ -117,18 +111,14 @@ public class DebuggingSlicePool implements ByteBufferPool{
                 }
 
                 @Override
-                public PooledBuffer aquire() {
-                    return duplicate.aquire();
-                }
-
-                @Override
                 public PooledBuffer duplicate() {
                     return DebuggingBuffer.this.duplicate();
                 }
 
                 @Override
                 public void close() {
-                    delegate.close();
+                    DebuggingBuffer.this.close();
+                    duplicate.close();
                 }
 
                 @Override

@@ -154,7 +154,7 @@ public class ServletOutputStreamImpl extends ServletOutputStream implements Buff
                 }
                 final ByteBufferPool bufferPool = servletRequestContext.getExchange().getConnection().getBufferPool();
                 ByteBuffer[] buffers = new ByteBuffer[MAX_BUFFERS_TO_ALLOCATE + 1];
-                Pooled[] pooledBuffers = new Pooled[MAX_BUFFERS_TO_ALLOCATE];
+                PooledBuffer[] pooledBuffers = new PooledBuffer[MAX_BUFFERS_TO_ALLOCATE];
                 try {
                     buffers[0] = buffer;
                     int bytesWritten = 0;
@@ -207,11 +207,11 @@ public class ServletOutputStreamImpl extends ServletOutputStream implements Buff
                     buffer.clear();
                 } finally {
                     for (int i = 0; i < pooledBuffers.length; ++i) {
-                        Pooled p = pooledBuffers[i];
+                        PooledBuffer p = pooledBuffers[i];
                         if (p == null) {
                             break;
                         }
-                        p.free();
+                        p.close();
                     }
                 }
             } else {

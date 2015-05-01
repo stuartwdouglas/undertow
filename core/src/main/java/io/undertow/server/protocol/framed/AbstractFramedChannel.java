@@ -335,10 +335,9 @@ public abstract class AbstractFramedChannel<C extends AbstractFramedChannel<C, R
                     frameData = pooled.duplicate();
                     pooled.buffer().position(pooled.buffer().limit());
                 } else {
-                    ByteBuffer buf = pooled.buffer().duplicate();
-                    buf.limit((int) (buf.position() + data.getFrameLength()));
-                    pooled.buffer().position((int) (pooled.buffer().position() + data.getFrameLength()));
                     frameData = pooled.duplicate();
+                    frameData.buffer().limit((int) (frameData.buffer().position() + data.getFrameLength()));
+                    pooled.buffer().position((int) (pooled.buffer().position() + data.getFrameLength()));
                 }
                 AbstractFramedStreamSourceChannel<?, ?, ?> existing = data.getExistingChannel();
                 if (existing != null) {

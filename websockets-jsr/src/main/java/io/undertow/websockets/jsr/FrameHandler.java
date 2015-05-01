@@ -17,6 +17,8 @@
  */
 package io.undertow.websockets.jsr;
 
+import io.undertow.buffers.PooledBuffer;
+import io.undertow.buffers.PooledBuffers;
 import io.undertow.websockets.core.AbstractReceiveListener;
 import io.undertow.websockets.core.BufferedBinaryMessage;
 import io.undertow.websockets.core.BufferedTextMessage;
@@ -74,8 +76,8 @@ class FrameHandler extends AbstractReceiveListener {
 
     @Override
     protected void onFullCloseMessage(final WebSocketChannel channel, final BufferedBinaryMessage message) {
-        final Pooled<ByteBuffer[]> pooled = message.getData();
-        final ByteBuffer singleBuffer = toBuffer(pooled.getResource());
+        final PooledBuffer[] pooled = message.getData();
+        final ByteBuffer singleBuffer = toBuffer(PooledBuffers.toBufferArray(pooled));
         final ByteBuffer toSend = singleBuffer.duplicate();
         //send the close immediatly
         WebSockets.sendClose(toSend, channel, null);
@@ -94,7 +96,7 @@ class FrameHandler extends AbstractReceiveListener {
                 } catch (IOException e) {
                     invokeOnError(e);
                 } finally {
-                    pooled.free();
+                    PooledBuffers.close(pooled);
                 }
             }
         });
@@ -113,8 +115,8 @@ class FrameHandler extends AbstractReceiveListener {
     protected void onFullPongMessage(final WebSocketChannel webSocketChannel, BufferedBinaryMessage bufferedBinaryMessage) {
         final HandlerWrapper handler = getHandler(FrameType.PONG);
         if (handler != null) {
-            final Pooled<ByteBuffer[]> pooled = bufferedBinaryMessage.getData();
-            final PongMessage message = DefaultPongMessage.create(toBuffer(pooled.getResource()));
+            final PooledBuffer[] pooled = bufferedBinaryMessage.getData();
+            final PongMessage message = DefaultPongMessage.create(toBuffer(PooledBuffers.toBufferArray(pooled)));
 
             session.getContainer().invokeEndpointMethod(executor, new Runnable() {
                 @Override
@@ -124,7 +126,7 @@ class FrameHandler extends AbstractReceiveListener {
                     } catch (Exception e) {
                         invokeOnError(e);
                     } finally {
-                        pooled.free();
+                        PooledBuffers.close(pooled);
                     }
                 }
             });
@@ -177,14 +179,14 @@ class FrameHandler extends AbstractReceiveListener {
 
     private void invokeBinaryHandler(final BufferedBinaryMessage context, final HandlerWrapper handler, final boolean finalFragment) {
 
-        final Pooled<ByteBuffer[]> pooled = context.getData();
+        final PooledBuffer[] pooled = context.getData();
         session.getContainer().invokeEndpointMethod(executor, new Runnable() {
             @Override
             public void run() {
                 try {
                     if (handler.isPartialHandler()) {
                         MessageHandler.Partial mHandler = (MessageHandler.Partial) handler.getHandler();
-                        ByteBuffer[] payload = pooled.getResource();
+                        ByteBuffer[] payload = PooledBuffers.toBufferArray(pooled);
                         if(handler.decodingNeeded) {
                             Object object = getSession().getEncoding().decodeBinary(handler.getMessageType(), toArray(payload));
                             mHandler.onMessage(object, finalFragment);
@@ -199,7 +201,7 @@ class FrameHandler extends AbstractReceiveListener {
                         }
                     } else {
                         MessageHandler.Whole mHandler = (MessageHandler.Whole) handler.getHandler();
-                        ByteBuffer[] payload = pooled.getResource();
+                        ByteBuffer[] payload = PooledBuffers.toBufferArray(pooled);
                         if(handler.decodingNeeded) {
                             Object object = getSession().getEncoding().decodeBinary(handler.getMessageType(), toArray(payload));
                             mHandler.onMessage(object);
@@ -216,7 +218,7 @@ class FrameHandler extends AbstractReceiveListener {
                 } catch (Exception e) {
                     invokeOnError(e);
                 } finally {
-                    pooled.free();
+                    PooledBuffers.close(pooled);
                 }
             }
         });
@@ -280,7 +282,7 @@ class FrameHandler extends AbstractReceiveListener {
         if (handler != null) {
             invokeBinaryHandler(message, handler, true);
         } else {
-            message.getData().free();
+            PooledBuffers.close(message.getData());
         }
     }
 

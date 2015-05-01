@@ -41,11 +41,6 @@ public class ImmediatePooled implements PooledBuffer {
     }
 
     @Override
-    public PooledBuffer aquire() {
-        return null;
-    }
-
-    @Override
     public PooledBuffer duplicate() {
         return new ImmediatePooled(value.duplicate());
     }

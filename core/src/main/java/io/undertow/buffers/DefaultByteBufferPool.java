@@ -19,6 +19,7 @@
 package io.undertow.buffers;
 
 import io.undertow.UndertowMessages;
+import org.xnio.Bits;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
@@ -129,6 +130,15 @@ public class DefaultByteBufferPool implements ByteBufferPool {
         private final DefaultByteBufferPool pool;
         private ByteBuffer buffer;
 
+        /**
+         * Mask that indicates that the primary buffer has been freed. As in most cases buffers are not duplicated
+         * we do not introduce another volatile variable, instead we set a flag in the high bits of the reference
+         * count to indicate that the the primary buffer has been freed.
+         *
+         * The protects against double freeing a primary buffer also freeing a duplicated buffer.
+         */
+        private static final int PRIMARY_BUFFER_CLOSED = 1 << 31;
+        private static final int PRIMARY_BUFFER_CLOSED_MASK = ~PRIMARY_BUFFER_CLOSED;
         private volatile int referenceCount = 1;
         private static final AtomicIntegerFieldUpdater<DefaultPooledBuffer> referenceCountUpdater = AtomicIntegerFieldUpdater.newUpdater(DefaultPooledBuffer.class, "referenceCount");
 
@@ -141,14 +151,13 @@ public class DefaultByteBufferPool implements ByteBufferPool {
 
         @Override
         public ByteBuffer buffer() {
-            if(referenceCount == 0) {
+            if(Bits.anyAreSet(referenceCount, PRIMARY_BUFFER_CLOSED)) {
                 throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
             }
             return buffer;
         }
 
-        @Override
-        public PooledBuffer aquire() {
+        private PooledBuffer acquire() {
             if(referenceCount == 0) {
                 throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
             }
@@ -164,43 +173,49 @@ public class DefaultByteBufferPool implements ByteBufferPool {
 
         @Override
         public PooledBuffer duplicate() {
-            if(referenceCount == 0) {
+            if(Bits.anyAreSet(referenceCount, PRIMARY_BUFFER_CLOSED)) {
                 throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
             }
-            aquire();
+            acquire();
             final ByteBuffer duplicate = buffer.duplicate();
-            return new PooledBuffer() {
-                @Override
-                public ByteBuffer buffer() {
-                    return duplicate;
-                }
-
-                @Override
-                public PooledBuffer aquire() {
-                    return DefaultPooledBuffer.this.aquire();
-                }
-
-                @Override
-                public PooledBuffer duplicate() {
-                    return DefaultPooledBuffer.this.duplicate();
-                }
-
-                @Override
-                public void close() {
-                    DefaultPooledBuffer.this.close();
-                }
-
-                @Override
-                public boolean isOpen() {
-                    return DefaultPooledBuffer.this.isOpen();
-                }
-            };
+            return new DuplicatedPooledBuffer(duplicate, this);
         }
 
         @Override
         public void close() {
-            int count = referenceCountUpdater.decrementAndGet(this);
-            if (count == 0) {
+            if(Bits.anyAreSet(referenceCount, PRIMARY_BUFFER_CLOSED)) {
+                return;
+            }
+            int ref;
+            do {
+                ref = referenceCount;
+                if (Bits.anyAreSet(ref, PRIMARY_BUFFER_CLOSED)) {
+                    return;
+                }
+            } while (!referenceCountUpdater.compareAndSet(this, ref, (ref - 1) | PRIMARY_BUFFER_CLOSED));
+            if (ref == 1) {
+                pool.freeInternal(buffer);
+                this.buffer = null;
+            }
+        }
+
+        private void closeDuplicate() {
+            int ref;
+            int newRef;
+            boolean close;
+            do {
+                ref = referenceCount;
+                if(Bits.anyAreSet(ref, PRIMARY_BUFFER_CLOSED)) {
+                    int count = (ref & PRIMARY_BUFFER_CLOSED_MASK) - 1;
+                    close = (count == 0);
+                    newRef = count | PRIMARY_BUFFER_CLOSED;
+                } else {
+                    newRef = ref - 1;
+                    close = (newRef == 0);
+
+                }
+            } while (!referenceCountUpdater.compareAndSet(this, ref, newRef));
+            if (close) {
                 pool.freeInternal(buffer);
                 this.buffer = null;
             }
@@ -208,7 +223,50 @@ public class DefaultByteBufferPool implements ByteBufferPool {
 
         @Override
         public boolean isOpen() {
-            return referenceCount > 0;
+            return Bits.anyAreClear(referenceCount, PRIMARY_BUFFER_CLOSED);
+        }
+
+        private static class DuplicatedPooledBuffer implements PooledBuffer {
+
+            private static final AtomicIntegerFieldUpdater<DuplicatedPooledBuffer> freeUpdater = AtomicIntegerFieldUpdater.newUpdater(DuplicatedPooledBuffer.class, "free");
+            private final ByteBuffer duplicate;
+            private final DefaultPooledBuffer parent;
+            private volatile int free = 0;
+
+            public DuplicatedPooledBuffer(ByteBuffer duplicate, DefaultPooledBuffer parent) {
+                this.duplicate = duplicate;
+                this.parent = parent;
+            }
+
+
+            @Override
+            public ByteBuffer buffer() {
+                if(free == 1) {
+                    throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
+                }
+                return duplicate;
+            }
+
+            @Override
+            public PooledBuffer duplicate() {
+                if(free == 1) {
+                    throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
+                }
+                return parent.duplicate();
+            }
+
+            @Override
+            public void close() {
+                if(!freeUpdater.compareAndSet(this, 0, 1)) {
+                    return;
+                }
+                parent.closeDuplicate();
+            }
+
+            @Override
+            public boolean isOpen() {
+                return free == 0;
+            }
         }
     }
 
