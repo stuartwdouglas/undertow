@@ -73,6 +73,10 @@ public class DefaultByteBufferPool implements ByteBufferPool {
         ByteBuffer buffer = null;
         if (local != null) {
             buffer = local.buffers.poll();
+            if(buffer != null) {
+                currentQueueLengthUpdater.decrementAndGet(this);
+            }
+
         } else {
             threadLocalCache.set(local = new ThreadLocalData());
         }
@@ -112,7 +116,7 @@ public class DefaultByteBufferPool implements ByteBufferPool {
             if(size > maximumPoolSize) {
                 return;
             }
-        } while (!currentQueueLengthUpdater.compareAndSet(this, size, currentQueueLength));
+        } while (!currentQueueLengthUpdater.compareAndSet(this, size, currentQueueLength + 1));
         queue.add(buffer);
     }
 
