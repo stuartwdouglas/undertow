@@ -84,6 +84,10 @@ public class Http2Server {
                         .setDirectoryListingEnabled(true), new HttpHandler() {
                     @Override
                     public void handleRequest(HttpServerExchange exchange) throws Exception {
+                        if(exchange.getRequestPath().contains("ObXB4SHT.html")) {
+                            exchange.getResponseSender().send("ObXB4SHT");
+                            return;
+                        }
                         exchange.getResponseHeaders().add(Headers.LOCATION, "https://" + exchange.getHostName() + ":" + (exchange.getHostPort() + 363) + exchange.getRelativePath());
                         exchange.setResponseCode(StatusCodes.TEMPORARY_REDIRECT);
                     }

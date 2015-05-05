@@ -46,6 +46,11 @@ public class ImmediatePooled implements PooledBuffer {
     }
 
     @Override
+    public PooledBuffer reference() {
+        return null;
+    }
+
+    @Override
     public void close() {
     }
 

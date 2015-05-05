@@ -147,7 +147,7 @@ public abstract class WebSocket07FrameSinkChannel extends StreamSinkFrameChannel
         b0 |= (rsv & 7) << 4;
         b0 |= opCode() & 0xf;
 
-        final ByteBuffer header = ByteBuffer.allocate(10);
+        final ByteBuffer header = ByteBuffer.allocate(14);
         //int maskLength = 0; // handle masking for clients but we are currently only
         // support servers this is not a priority by now
         byte maskKey = 0;

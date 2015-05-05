@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * @author Stuart Douglas
  */
-public class DebuggingSlicePool implements ByteBufferPool{
+public class DebuggingSlicePool implements ByteBufferPool {
 
     /**
      * context that can be added to allocations to give more information about buffer leaks, useful when debugging buffer leaks
@@ -65,7 +65,7 @@ public class DebuggingSlicePool implements ByteBufferPool{
             this.no = allocationCount.getAndIncrement();
             String ctx = ALLOCATION_CONTEXT.get();
             ALLOCATION_CONTEXT.remove();
-            allocationPoint = new RuntimeException(delegate.buffer()  + " NO: " + no + " " + (ctx == null ? "[NO_CONTEXT]" : ctx));
+            allocationPoint = new RuntimeException(delegate.buffer() + " NO: " + no + " " + (ctx == null ? "[NO_CONTEXT]" : ctx));
             BUFFERS.add(this);
         }
 
@@ -74,11 +74,11 @@ public class DebuggingSlicePool implements ByteBufferPool{
             int ref;
             do {
                 ref = referenceCount.get();
-                if(ref == 0) {
+                if (ref == 0) {
                     return;
                 }
             } while (!referenceCount.compareAndSet(ref, ref - 1));
-            if(ref == 1) {
+            if (ref == 1) {
                 freePoint = new RuntimeException("FREE POINT");
                 free = true;
                 BUFFERS.remove(this);
@@ -93,7 +93,7 @@ public class DebuggingSlicePool implements ByteBufferPool{
 
         @Override
         public ByteBuffer buffer() throws IllegalStateException {
-            if(free) {
+            if (free) {
                 throw new IllegalStateException("Buffer already freed, free point: ", freePoint);
             }
             return delegate.buffer();
@@ -116,6 +116,12 @@ public class DebuggingSlicePool implements ByteBufferPool{
                 }
 
                 @Override
+                public PooledBuffer reference() {
+                    DebuggingBuffer.this.reference();
+                    return this;
+                }
+
+                @Override
                 public void close() {
                     DebuggingBuffer.this.close();
                     duplicate.close();
@@ -126,6 +132,16 @@ public class DebuggingSlicePool implements ByteBufferPool{
                     return DebuggingBuffer.this.isOpen();
                 }
             };
+        }
+
+        @Override
+        public PooledBuffer reference() {
+            if (free) {
+                throw new IllegalStateException("Buffer already freed, free point: ", freePoint);
+            }
+            delegate.reference();
+            referenceCount.incrementAndGet();
+            return this;
         }
 
         RuntimeException getAllocationPoint() {

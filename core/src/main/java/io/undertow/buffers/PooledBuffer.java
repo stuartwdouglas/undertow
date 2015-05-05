@@ -41,7 +41,14 @@ public interface PooledBuffer extends Closeable, AutoCloseable {
     PooledBuffer duplicate();
 
     /**
-     * Frees this buffer.
+     * Increases this buffers reference count.
+     *
+     * @return this buffer
+     */
+    PooledBuffer reference();
+
+    /**
+     * Reduces the buffers reference count by one. If the reference count hits zero then the buffer will be freed.
      */
     void close();
 

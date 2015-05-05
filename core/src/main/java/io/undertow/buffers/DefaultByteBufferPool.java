@@ -188,6 +188,15 @@ public class DefaultByteBufferPool implements ByteBufferPool {
         }
 
         @Override
+        public PooledBuffer reference() {
+            if(Bits.anyAreSet(referenceCount, PRIMARY_BUFFER_CLOSED)) {
+                throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
+            }
+            acquire();
+            return this;
+        }
+
+        @Override
         public void close() {
             if(Bits.anyAreSet(referenceCount, PRIMARY_BUFFER_CLOSED)) {
                 return;
@@ -263,7 +272,17 @@ public class DefaultByteBufferPool implements ByteBufferPool {
                 if(free == 1) {
                     throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
                 }
-                return parent.duplicate();
+                parent.acquire();
+                final ByteBuffer d = duplicate.duplicate();
+                return new DuplicatedPooledBuffer(d, parent);
+            }
+
+            @Override
+            public PooledBuffer reference() {
+                if(free == 1) {
+                    throw UndertowMessages.MESSAGES.bufferAlreadyFreed();
+                }
+                return parent.acquire();
             }
 
             @Override
