@@ -18,11 +18,29 @@
 
 package io.undertow.io;
 
+import io.undertow.buffers.PooledBuffer;
+
+import java.io.Closeable;
+import java.nio.channels.FileChannel;
+
 /**
  * @author Stuart Douglas
  */
-public interface ChannelCallback<C, D> {
+public interface WriteChannel extends Closeable {
 
-    void callback(C channel, D data);
+    boolean write(PooledBuffer buffer);
+
+    boolean write(PooledBuffer[] buffers);
+
+    void writeBlocking(PooledBuffer buffer);
+
+    void writeBlocking(PooledBuffer[] buffers);
+
+    void transferFrom(FileChannel channel, long position, long count);
+
+    boolean isReady();
+
+    void resumeWrites();
+
 
 }

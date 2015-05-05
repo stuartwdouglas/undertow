@@ -29,5 +29,9 @@ public interface ReadChannel {
 
     PooledBuffer readBlocking();
 
-    void addReadCallback(ChannelCallback);
+    void resumeReads(ChannelCallback callback);
+
+    void suspendReads();
+
+    boolean isComplete();
 }
