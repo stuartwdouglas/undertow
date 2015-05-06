@@ -20,6 +20,8 @@ package io.undertow.io;
 
 import io.undertow.buffers.PooledBuffer;
 
+import java.io.IOException;
+
 /**
  * @author Stuart Douglas
  */
@@ -27,6 +29,7 @@ public interface ReadCallback<C, D> {
 
     void dataReady(PooledBuffer data, C channel, D context);
 
+    void complete(C channel, D context);
 
-
+    void error(IOException exception, C channel, D context);
 }

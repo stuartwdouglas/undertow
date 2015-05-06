@@ -27,21 +27,20 @@ import java.nio.channels.FileChannel;
 /**
  * @author Stuart Douglas
  */
-public interface WriteChannel extends Closeable {
+public interface WriteChannel extends IOChannel<WriteChannel> {
 
-    boolean write(PooledBuffer buffer);
+    void write(WriteCallback callback);
 
-    boolean write(PooledBuffer[] buffers);
+    void write(PooledBuffer buffer, WriteCallback callback);
+
+    void write(PooledBuffer[] buffers, WriteCallback callback);
 
     void writeBlocking(PooledBuffer buffer) throws IOException;
 
     void writeBlocking(PooledBuffer[] buffers) throws IOException;
 
-    void transferFrom(FileChannel channel, long position, long count);
+    void transferFrom(FileChannel channel, long position, long count, WriteCallback callback);
 
-    boolean isReady();
-
-    void resumeWrites();
-
-
+    @Override
+    void close() throws IOException;
 }

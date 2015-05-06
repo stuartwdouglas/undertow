@@ -18,21 +18,14 @@
 
 package io.undertow.io;
 
-import io.undertow.buffers.PooledBuffer;
-
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 
 /**
  * @author Stuart Douglas
  */
-public interface ReadChannel extends IOChannel<ReadChannel> {
+public interface IOChannel<SELF> extends AutoCloseable {
 
-    <D> PooledBuffer read(ReadCallback<ReadChannel, D> callback);
-
-    PooledBuffer readBlocking() throws IOException;
-
-    <D> void transferTo(long position, long count, FileChannel target, ReadCallback<ReadChannel, D> callback) throws IOException;
+    void addCloseListener();
 
     @Override
     void close() throws IOException;

@@ -23,10 +23,11 @@ import io.undertow.buffers.PooledBuffer;
 /**
  * @author Stuart Douglas
  */
-public abstract class IOCallbackInterceptor<C> implements ReadCallback<C, Object> {
+public interface IOCallbackInterceptor<C>  {
 
-    @Override
-    public void dataReady(PooledBuffer data, C channel, Object context) {
-        
-    }
+    void init(IOCallbackInterceptor<C> next);
+
+    void dataReady(PooledBuffer data, C channel, Object context, boolean inOriginalCallStack);
+
+    void writeReady(C channel, Object context, boolean inOriginalCallStack);
 }
