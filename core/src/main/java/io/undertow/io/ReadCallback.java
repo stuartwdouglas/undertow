@@ -18,11 +18,15 @@
 
 package io.undertow.io;
 
+import io.undertow.buffers.PooledBuffer;
+
 /**
  * @author Stuart Douglas
  */
-public interface ChannelCallback<C, D> {
+public interface ReadCallback<C, D> {
 
-    void callback(C channel, D data);
+    void dataReady(PooledBuffer data, C channel, D context);
+
+
 
 }

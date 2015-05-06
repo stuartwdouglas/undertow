@@ -21,6 +21,7 @@ package io.undertow.io;
 import io.undertow.buffers.PooledBuffer;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.channels.FileChannel;
 
 /**
@@ -32,9 +33,9 @@ public interface WriteChannel extends Closeable {
 
     boolean write(PooledBuffer[] buffers);
 
-    void writeBlocking(PooledBuffer buffer);
+    void writeBlocking(PooledBuffer buffer) throws IOException;
 
-    void writeBlocking(PooledBuffer[] buffers);
+    void writeBlocking(PooledBuffer[] buffers) throws IOException;
 
     void transferFrom(FileChannel channel, long position, long count);
 
