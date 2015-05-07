@@ -23,6 +23,6 @@ package io.undertow.io;
  */
 public interface IoContext {
 
-    void addCallbackInterceptor();
+    void addCallbackInterceptor(IOCallbackInterceptor interceptor);
 
 }

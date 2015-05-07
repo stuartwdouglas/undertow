@@ -20,7 +20,6 @@ package io.undertow.io;
 
 import io.undertow.buffers.PooledBuffer;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 
