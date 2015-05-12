@@ -16,17 +16,20 @@
  *  limitations under the License.
  */
 
-package io.undertow.io;
+package io.undertow.connector.io;
+
+import io.undertow.buffers.PooledBuffer;
 
 import java.io.IOException;
 
 /**
  * @author Stuart Douglas
  */
-public interface WriteCallback<C, D> {
+public interface ReadCallback<C, D> {
 
-    void writeReady(C channel, D data);
+    void dataReady(PooledBuffer data, C channel, D context);
 
-    void error(IOException e, C channel, D data);
+    void complete(C channel, D context);
 
+    void error(IOException exception, C channel, D context);
 }

@@ -16,13 +16,17 @@
  *  limitations under the License.
  */
 
-package io.undertow.io;
+package io.undertow.connector.io;
+
+import java.io.IOException;
 
 /**
  * @author Stuart Douglas
  */
-public interface IoContext {
+public interface WriteCallback<C, D> {
 
-    void addCallbackInterceptor(IOCallbackInterceptor interceptor);
+    void writeReady(C channel, D data);
+
+    void error();
 
 }

@@ -16,30 +16,18 @@
  *  limitations under the License.
  */
 
-package io.undertow.io;
+package io.undertow.connector.io;
 
 import io.undertow.buffers.PooledBuffer;
-
-import java.io.IOException;
-import java.nio.channels.FileChannel;
 
 /**
  * @author Stuart Douglas
  */
-public interface WriteChannel extends IOChannel<WriteChannel> {
+public interface IOCallbackInterceptor<C>  {
 
-    void write(WriteCallback callback);
+    void init(IOCallbackInterceptor<C> next);
 
-    void write(PooledBuffer buffer, WriteCallback callback);
+    void dataReady(PooledBuffer data, C channel, Object context, boolean inOriginalCallStack);
 
-    void write(PooledBuffer[] buffers, WriteCallback callback);
-
-    void writeBlocking(PooledBuffer buffer) throws IOException;
-
-    void writeBlocking(PooledBuffer[] buffers) throws IOException;
-
-    void transferFrom(FileChannel channel, long position, long count, WriteCallback callback);
-
-    @Override
-    void close() throws IOException;
+    void writeReady(C channel, Object context, boolean inOriginalCallStack);
 }

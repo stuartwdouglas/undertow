@@ -16,17 +16,15 @@
  *  limitations under the License.
  */
 
-package io.undertow.io;
+package io.undertow.connector.io;
 
-import java.io.IOException;
+import io.undertow.connector.io.IOChannel;
 
 /**
  * @author Stuart Douglas
  */
-public interface IOChannel<SELF> extends AutoCloseable {
+public interface CloseListener<C extends IOChannel> {
 
-    void addCloseListener();
+    void closed(C channel);
 
-    @Override
-    void close() throws IOException;
 }
