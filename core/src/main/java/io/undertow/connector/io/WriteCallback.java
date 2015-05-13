@@ -33,7 +33,7 @@ public interface WriteCallback<D> {
      * @param channel The channel
      * @param data Context data
      */
-    void writeReady(WriteChannel channel, D data);
+    void writeReady(IOInterceptorContext<WriteChannel> channel, D data);
 
     /**
      * Invoked if there is an IO error writing out the data

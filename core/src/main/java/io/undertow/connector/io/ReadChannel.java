@@ -30,10 +30,28 @@ import java.nio.channels.FileChannel;
  */
 public interface ReadChannel extends IOChannel<ReadChannel> {
 
-    <D> void read(ReadCallback<ReadChannel, D> callback);
+    /**
+     * Reads from the channel. When data is available the callback will be invoked with the data.
+     * <p/>
+     * If data is already available then the callback will be invoked immediately
+     *
+     * @param callback The callback
+     * @param context  The context data
+     * @param <D>      The type of parameter
+     */
+    <D> void read(ReadCallback<ReadChannel, D> callback, D context);
 
+    /**
+     * Reads from the channel using blocking IO. Returns the data in a pooled buffer, or null
+     * if there is no more data
+     *
+     * @return The read data or null
+     * @throws IOException If the operation failed
+     */
     PooledBuffer readBlocking() throws IOException;
 
-    <D> void transferTo(long position, long count, FileChannel target, ReadCallback<ReadChannel, D> callback) throws IOException;
+    <D> void transferTo(long position, long count, FileChannel target, ReadCallback<ReadChannel, D> callback, D context);
+
+    <D> void transferToBlocking(long position, long count, FileChannel target) throws IOException;
 
 }

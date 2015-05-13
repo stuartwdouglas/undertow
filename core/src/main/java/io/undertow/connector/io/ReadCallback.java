@@ -37,9 +37,9 @@ public interface ReadCallback<C, D> {
      * @param channel The underlying channel
      * @param context Context data that was passed into the callback
      */
-    void dataReady(PooledBuffer data, C channel, D context);
+    void dataReady(PooledBuffer data, IOInterceptorContext<ReadChannel> channel, D context);
 
-    void complete(C channel, D context);
+    void complete(IOInterceptorContext<ReadChannel> channel, D context);
 
     void error(IOException exception, C channel, D context);
 }

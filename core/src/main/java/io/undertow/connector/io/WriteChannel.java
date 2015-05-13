@@ -46,10 +46,25 @@ public interface WriteChannel extends IOChannel<WriteChannel> {
 
     void writeFinalBlocking(PooledBuffer[] buffers) throws IOException;
 
+
     void transferFrom(FileChannel channel, long position, long count, WriteCallback callback);
 
+    void transferFromBlocking(FileChannel channel, long position, long count, WriteCallback callback);
+
+    /**
+     * Flush any remaining data from the channel
+     *
+     * @param callback The callback
+     * @param context The context data
+     * @param <D> The type of the context data
+     */
     <D> void flush(WriteCallback<D> callback, D context);
 
+    void flushBlocking() throws IOException;
+
+    /**
+     * Called when all data is written.
+     */
     void shutdownWrites();
 
     /**

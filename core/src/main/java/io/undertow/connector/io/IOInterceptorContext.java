@@ -19,36 +19,41 @@
 package io.undertow.connector.io;
 
 /**
- * A channel
+ * Context that is passed to an IO callback. This allows
+ * the callback to suspend or resume the underlying IO mechanism.
  *
  * @author Stuart Douglas
  */
-public interface IOChannel<SELF extends IOChannel<SELF>> extends AutoCloseable {
-
-    /**
-     * Adds a listener that will be invoked when this channel is closed.
-     *
-     * @param closeListener the close listener
-     */
-    void addCloseListener(CloseListener<SELF> closeListener);
-
-    /**
-     * Forcibly closes this channel. Note that a forcible close may shut down the underlying channel.
-     * e.g. For HTTP1 forcibly closing the read channel will completely close the underlying connection,
-     * while for stream based protocols such as HTTP2 this will result in the underlying stream being reset.
-     */
-    @Override
-    void close();
+public interface IOInterceptorContext<C extends IOChannel<C>> {
 
     /**
      *
-     * @return The IOConnection for this channel
+     * @return true if this is a blocking operation
      */
-    IOConnection getConnection();
+    boolean isBlocking();
+
+    /**
+     * This can only be invoked for non blocking operations. This tells
+     * the channel that the interceptor is not finished yet, and may have more data
+     * later.
+     *
+     * Any data that is returned from the interceptor will be processed as normal, however
+     * after that no further callback processing will be done until resume() is called.
+     *
+     * If this is called during a flush() then when resume() is called the flush() method
+     * will be invoked again.
+     */
+    void pause();
+
+    /**
+     * Resumes IO
+     */
+    void resume();
 
     /**
      *
-     * @return The IOThread for this channel
+     * @return The channel
      */
-    IOThread getIoThread();
+    C getChannel();
+
 }
