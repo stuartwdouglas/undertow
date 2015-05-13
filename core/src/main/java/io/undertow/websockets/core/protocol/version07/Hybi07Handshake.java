@@ -25,7 +25,7 @@ import io.undertow.websockets.core.WebSocketVersion;
 import io.undertow.websockets.core.protocol.Handshake;
 import io.undertow.websockets.spi.WebSocketHttpExchange;
 import org.xnio.IoUtils;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.StreamConnection;
 
 import java.nio.charset.StandardCharsets;

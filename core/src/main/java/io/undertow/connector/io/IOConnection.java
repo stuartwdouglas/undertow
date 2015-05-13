@@ -18,16 +18,27 @@
 
 package io.undertow.connector.io;
 
-import io.undertow.connector.io.IOCallbackInterceptor;
-
 /**
  * 
- * Represents a 
+ * Represents a connection. This connection will generally have a limited scope (i.e. a single HTTP request).
+ * Using the connection outside of this scope will have undefined results.
  * 
  * @author Stuart Douglas
  */
 public interface IOConnection extends IOChannel<IOConnection> {
 
-    void addCallbackInterceptor(IOCallbackInterceptor interceptor);
+    /**
+     * Adds an interceptor that allows the data that is being written to be
+     * modified.
+     *
+     * @param interceptor The interceptor
+     */
+    void addWriteInterceptor(WriteInterceptor interceptor);
 
+    /**
+     * Adds an interceptor that allows data that has been read to be modified.
+     *
+     * @param interceptor The interceptor
+     */
+    void addReadInterceptor(ReadInterceptor interceptor);
 }

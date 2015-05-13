@@ -27,8 +27,8 @@ import io.undertow.UndertowMessages;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import org.xnio.Buffers;
-import io.undertow.buffers.ByteBufferPool;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.channels.Channels;
 import org.xnio.channels.StreamSinkChannel;
 

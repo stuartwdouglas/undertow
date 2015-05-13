@@ -32,7 +32,7 @@ import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.jsr.annotated.AnnotatedEndpointFactory;
 import org.xnio.IoFuture;
 import org.xnio.IoUtils;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.XnioWorker;
 import org.xnio.http.UpgradeFailedException;
 import org.xnio.ssl.XnioSsl;

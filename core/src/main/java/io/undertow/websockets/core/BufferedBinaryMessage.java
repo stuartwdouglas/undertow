@@ -19,7 +19,7 @@
 package io.undertow.websockets.core;
 
 import org.xnio.ChannelListener;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import java.io.Closeable;
 import java.io.IOException;

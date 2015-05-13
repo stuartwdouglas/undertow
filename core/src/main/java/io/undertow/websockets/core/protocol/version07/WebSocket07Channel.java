@@ -32,8 +32,8 @@ import io.undertow.websockets.core.function.ChannelFunction;
 
 import io.undertow.websockets.extensions.ExtensionFunction;
 import org.xnio.IoUtils;
-import io.undertow.buffers.ByteBufferPool;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.StreamConnection;
 
 import java.nio.ByteBuffer;

@@ -21,7 +21,7 @@ import io.undertow.websockets.core.WebSocketChannel;
 import io.undertow.websockets.core.WebSocketVersion;
 import io.undertow.websockets.core.protocol.version07.WebSocket07Channel;
 import io.undertow.websockets.extensions.ExtensionFunction;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.StreamConnection;
 
 import java.util.List;

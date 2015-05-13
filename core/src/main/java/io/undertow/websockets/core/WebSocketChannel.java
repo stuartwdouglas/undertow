@@ -25,8 +25,8 @@ import org.xnio.ChannelExceptionHandler;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
-import io.undertow.buffers.ByteBufferPool;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.StreamConnection;
 import org.xnio.channels.StreamSinkChannel;
 

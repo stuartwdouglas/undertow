@@ -19,7 +19,7 @@
 package io.undertow.protocols.spdy;
 
 import io.undertow.util.HeaderMap;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import java.util.zip.Deflater;
 

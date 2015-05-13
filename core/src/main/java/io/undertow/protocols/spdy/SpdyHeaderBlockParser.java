@@ -20,8 +20,8 @@ package io.undertow.protocols.spdy;
 
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
-import io.undertow.buffers.ByteBufferPool;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.connector.PooledBuffer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

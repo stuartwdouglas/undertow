@@ -24,7 +24,7 @@ import io.undertow.util.DateUtils;
 import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
 import io.undertow.util.URLUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 
 import java.util.Date;

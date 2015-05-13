@@ -23,7 +23,7 @@ import java.nio.ByteBuffer;
 import io.undertow.util.ImmediatePooled;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import io.undertow.server.protocol.framed.SendFrameHeader;
 import io.undertow.util.HeaderMap;

@@ -18,13 +18,15 @@
 
 package io.undertow.connector.io;
 
-import io.undertow.connector.io.IOChannel;
-
 /**
  * @author Stuart Douglas
  */
 public interface CloseListener<C extends IOChannel> {
 
+    /**
+     * Callback that is invoked when the channel is closed.
+     * @param channel The channel
+     */
     void closed(C channel);
 
 }

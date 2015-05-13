@@ -35,7 +35,7 @@ import io.undertow.server.handlers.proxy.ProxyClient;
 import io.undertow.util.CopyOnWriteMap;
 import io.undertow.util.Headers;
 import io.undertow.util.PathMatcher;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.XnioExecutor;
 import org.xnio.XnioIoThread;
 import org.xnio.ssl.XnioSsl;

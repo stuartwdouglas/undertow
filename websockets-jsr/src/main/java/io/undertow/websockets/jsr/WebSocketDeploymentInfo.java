@@ -19,7 +19,7 @@
 package io.undertow.websockets.jsr;
 
 import io.undertow.websockets.extensions.ExtensionHandshake;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.XnioWorker;
 
 import javax.websocket.server.ServerEndpointConfig;

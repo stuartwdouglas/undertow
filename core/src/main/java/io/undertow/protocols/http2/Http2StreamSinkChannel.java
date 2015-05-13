@@ -21,7 +21,7 @@ package io.undertow.protocols.http2;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.xnio.IoUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import io.undertow.server.protocol.framed.SendFrameHeader;
 

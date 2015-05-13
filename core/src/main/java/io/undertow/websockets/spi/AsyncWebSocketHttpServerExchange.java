@@ -36,8 +36,8 @@ import org.xnio.FinishedIoFuture;
 import org.xnio.FutureResult;
 import org.xnio.IoFuture;
 import org.xnio.IoUtils;
-import io.undertow.buffers.ByteBufferPool;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 
 import java.io.ByteArrayOutputStream;

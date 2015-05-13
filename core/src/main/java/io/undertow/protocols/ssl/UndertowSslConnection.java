@@ -22,7 +22,7 @@ import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.Option;
 import org.xnio.Options;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.SslClientAuthMode;
 import org.xnio.StreamConnection;
 import org.xnio.ssl.SslConnection;

@@ -19,7 +19,7 @@
 package io.undertow.protocols.spdy;
 
 import org.xnio.Bits;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import io.undertow.server.protocol.framed.AbstractFramedStreamSourceChannel;
 import io.undertow.server.protocol.framed.FrameHeaderData;

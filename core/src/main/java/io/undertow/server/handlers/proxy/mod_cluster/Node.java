@@ -33,7 +33,7 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.proxy.ConnectionPoolManager;
 import io.undertow.server.handlers.proxy.ProxyConnectionPool;
 import org.xnio.OptionMap;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.XnioIoThread;
 
 /**

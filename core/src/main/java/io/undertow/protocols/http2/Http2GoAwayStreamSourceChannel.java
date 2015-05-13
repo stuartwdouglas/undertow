@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.http2;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 /**
  * A HTTP2 go away frame

@@ -18,7 +18,7 @@
 
 package io.undertow.util;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import java.nio.ByteBuffer;
 

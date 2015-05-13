@@ -33,7 +33,7 @@ import io.undertow.util.StatusCodes;
 import org.xnio.ChannelListener;
 import org.xnio.FileAccess;
 import org.xnio.IoUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 
 import java.io.ByteArrayOutputStream;

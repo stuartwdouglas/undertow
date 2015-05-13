@@ -23,7 +23,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.HeaderValues;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.channels.StreamSinkChannel;
 
 import java.io.IOException;

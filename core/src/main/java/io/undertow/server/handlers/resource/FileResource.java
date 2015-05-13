@@ -39,7 +39,7 @@ import io.undertow.util.MimeMappings;
 import io.undertow.util.StatusCodes;
 import org.xnio.FileAccess;
 import org.xnio.IoUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 /**
  * A file resource

@@ -22,7 +22,7 @@ import io.undertow.UndertowOptions;
 import io.undertow.server.protocol.http.HttpServerConnection;
 import org.xnio.ChannelListener;
 import org.xnio.Options;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.SslClientAuthMode;
 import org.xnio.channels.Channels;
 import org.xnio.channels.SslChannel;

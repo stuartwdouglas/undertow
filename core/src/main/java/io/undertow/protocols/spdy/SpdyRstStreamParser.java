@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.spdy;
 
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 
 import java.nio.ByteBuffer;
 

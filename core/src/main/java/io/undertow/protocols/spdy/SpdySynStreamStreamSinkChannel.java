@@ -21,7 +21,7 @@ package io.undertow.protocols.spdy;
 import io.undertow.server.protocol.framed.SendFrameHeader;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.Headers;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import io.undertow.util.ImmediatePooled;
 
 import java.nio.ByteBuffer;

@@ -21,7 +21,7 @@ package io.undertow.websockets.extensions;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import io.undertow.buffers.PooledBuffers;
 import io.undertow.websockets.core.AbstractReceiveListener;
 import io.undertow.websockets.core.BufferedBinaryMessage;

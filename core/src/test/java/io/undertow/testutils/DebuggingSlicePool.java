@@ -1,7 +1,7 @@
 package io.undertow.testutils;
 
-import io.undertow.buffers.ByteBufferPool;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.connector.PooledBuffer;
 
 import java.nio.ByteBuffer;
 import java.util.Collections;

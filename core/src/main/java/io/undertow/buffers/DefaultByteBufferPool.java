@@ -19,6 +19,8 @@
 package io.undertow.buffers;
 
 import io.undertow.UndertowMessages;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.Bits;
 
 import java.nio.ByteBuffer;

@@ -18,6 +18,8 @@
 
 package io.undertow.buffers;
 
+import io.undertow.connector.PooledBuffer;
+
 import java.nio.ByteBuffer;
 
 /**

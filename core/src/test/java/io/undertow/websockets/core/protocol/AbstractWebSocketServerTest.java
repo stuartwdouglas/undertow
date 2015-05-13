@@ -18,7 +18,7 @@
 package io.undertow.websockets.core.protocol;
 
 import io.netty.buffer.Unpooled;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import io.undertow.buffers.PooledBuffers;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpOneOnly;

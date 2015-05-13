@@ -23,7 +23,7 @@ import io.undertow.websockets.core.protocol.version13.Hybi13Handshake;
 import io.undertow.websockets.jsr.ConfiguredServerEndpoint;
 import io.undertow.websockets.jsr.ExtensionImpl;
 import io.undertow.websockets.spi.WebSocketHttpExchange;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.StreamConnection;
 
 import javax.websocket.Extension;

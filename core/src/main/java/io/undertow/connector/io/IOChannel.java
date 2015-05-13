@@ -18,15 +18,35 @@
 
 package io.undertow.connector.io;
 
-import java.io.IOException;
-
 /**
+ * A channel
+ *
  * @author Stuart Douglas
  */
 public interface IOChannel<SELF extends IOChannel<SELF>> extends AutoCloseable {
 
+    /**
+     * Adds a listener that will be invoked when this channel is closed.
+     *
+     * @param closeListener the close listener
+     */
     void addCloseListener(CloseListener<SELF> closeListener);
 
+    /**
+     * Forcibly closes this channel
+     */
     @Override
-    void close() throws IOException;
+    void close();
+
+    /**
+     *
+     * @return The IOConnection for this channel
+     */
+    IOConnection getConnection();
+
+    /**
+     *
+     * @return The IOThread for this channel
+     */
+    IOThread getIoThread();
 }

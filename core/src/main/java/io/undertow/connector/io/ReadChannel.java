@@ -18,13 +18,14 @@
 
 package io.undertow.connector.io;
 
-import io.undertow.buffers.PooledBuffer;
-import io.undertow.connector.io.IOChannel;
+import io.undertow.connector.PooledBuffer;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 
 /**
+ * A channel
+ *
  * @author Stuart Douglas
  */
 public interface ReadChannel extends IOChannel<ReadChannel> {
@@ -35,6 +36,4 @@ public interface ReadChannel extends IOChannel<ReadChannel> {
 
     <D> void transferTo(long position, long count, FileChannel target, ReadCallback<ReadChannel, D> callback) throws IOException;
 
-    @Override
-    void close() throws IOException;
 }

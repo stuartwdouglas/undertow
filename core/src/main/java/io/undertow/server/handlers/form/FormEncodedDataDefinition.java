@@ -31,7 +31,7 @@ import io.undertow.util.Headers;
 import io.undertow.util.SameThreadExecutor;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 
 /**

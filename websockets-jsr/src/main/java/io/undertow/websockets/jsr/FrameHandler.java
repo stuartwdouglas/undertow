@@ -17,7 +17,7 @@
  */
 package io.undertow.websockets.jsr;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import io.undertow.buffers.PooledBuffers;
 import io.undertow.websockets.core.AbstractReceiveListener;
 import io.undertow.websockets.core.BufferedBinaryMessage;

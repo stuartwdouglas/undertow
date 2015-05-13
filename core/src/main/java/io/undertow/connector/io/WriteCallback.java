@@ -21,12 +21,24 @@ package io.undertow.connector.io;
 import java.io.IOException;
 
 /**
+ * Callback that is invoked when a channel is writable.
+ *
  * @author Stuart Douglas
  */
-public interface WriteCallback<C, D> {
+public interface WriteCallback<D> {
 
-    void writeReady(C channel, D data);
+    /**
+     * Callback that is invoked when the channel is writable
+     *
+     * @param channel The channel
+     * @param data Context data
+     */
+    void writeReady(WriteChannel channel, D data);
 
-    void error();
+    /**
+     * Invoked if there is an IO error writing out the data
+     * @param e The exception
+     */
+    void error(IOException e);
 
 }

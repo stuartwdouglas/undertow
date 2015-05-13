@@ -18,8 +18,7 @@
 
 package io.undertow.connector.io;
 
-import io.undertow.buffers.PooledBuffer;
-import io.undertow.connector.io.IOChannel;
+import io.undertow.connector.PooledBuffer;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -29,18 +28,37 @@ import java.nio.channels.FileChannel;
  */
 public interface WriteChannel extends IOChannel<WriteChannel> {
 
-    void write(WriteCallback callback);
+    <D> void write(WriteCallback<D> callback, D context);
 
-    void write(PooledBuffer buffer, WriteCallback callback);
+    <D> void write(PooledBuffer buffer, WriteCallback<D> callback, D context);
 
-    void write(PooledBuffer[] buffers, WriteCallback callback);
+    <D> void write(PooledBuffer[] buffers, WriteCallback<D> callback, D context);
+
+    <D> void writeFinal(PooledBuffer buffer, WriteCallback<D> callback, D context);
+
+    <D> void writeFinal(PooledBuffer[] buffers, WriteCallback<D> callback, D context);
 
     void writeBlocking(PooledBuffer buffer) throws IOException;
 
     void writeBlocking(PooledBuffer[] buffers) throws IOException;
 
+    void writeFinalBlocking(PooledBuffer buffer) throws IOException;
+
+    void writeFinalBlocking(PooledBuffer[] buffers) throws IOException;
+
     void transferFrom(FileChannel channel, long position, long count, WriteCallback callback);
 
+    <D> void flush(WriteCallback<D> callback, D context);
+
+    void shutdownWrites();
+
+    /**
+     * Forcibly close the channel, breaking the underlying connection.
+     *
+     * A normal close should consist of a call to {@link #shutdownWrites()} followed
+     * by a call to one of the <code>flush()</code> calls.
+     *
+     */
     @Override
-    void close() throws IOException;
+    void close();
 }

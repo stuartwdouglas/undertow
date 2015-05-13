@@ -25,7 +25,7 @@ import io.undertow.websockets.core.WebSocketMessages;
 import io.undertow.websockets.extensions.ExtensionByteBuffer;
 import io.undertow.websockets.extensions.ExtensionFunction;
 import org.xnio.Buffers;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

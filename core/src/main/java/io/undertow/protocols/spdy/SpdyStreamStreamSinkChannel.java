@@ -24,7 +24,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.HeaderValues;
 
 import org.xnio.IoUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

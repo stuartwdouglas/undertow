@@ -20,7 +20,7 @@ package io.undertow.websockets.core.protocol.version07;
 import io.undertow.websockets.core.StreamSourceFrameChannel;
 import io.undertow.websockets.core.WebSocketFrameType;
 import io.undertow.websockets.core.WebSocketMessages;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

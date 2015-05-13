@@ -20,7 +20,7 @@ package io.undertow.protocols.http2;
 
 import java.util.Collections;
 import java.util.List;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 /**
  * A HTTP2 Settings frame

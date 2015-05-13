@@ -16,14 +16,20 @@
  *  limitations under the License.
  */
 
-package io.undertow.connector.io;
+package io.undertow.connector;
 
-import java.io.IOException;
+import java.io.Closeable;
 
 /**
+ * A pool of byte buffers
+ *
  * @author Stuart Douglas
  */
-public interface ErrorCallback {
+public interface ByteBufferPool extends AutoCloseable, Closeable {
 
-    void error(IOException e, C channel, D data);
+    int bufferSize();
+
+    PooledBuffer allocate();
+
+    void close();
 }

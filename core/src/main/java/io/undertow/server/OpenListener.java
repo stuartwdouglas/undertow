@@ -20,7 +20,7 @@ package io.undertow.server;
 
 import org.xnio.ChannelListener;
 import org.xnio.OptionMap;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.StreamConnection;
 
 /**

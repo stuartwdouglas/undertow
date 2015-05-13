@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.ajp;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import io.undertow.server.protocol.framed.AbstractFramedStreamSourceChannel;
 

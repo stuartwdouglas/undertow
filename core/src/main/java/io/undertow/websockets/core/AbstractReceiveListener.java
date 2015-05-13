@@ -21,7 +21,7 @@ package io.undertow.websockets.core;
 import io.undertow.buffers.PooledBuffers;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import java.io.IOException;
 

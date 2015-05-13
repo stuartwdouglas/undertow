@@ -26,7 +26,7 @@ import io.undertow.servlet.core.CompositeThreadSetupAction;
 import io.undertow.servlet.util.DefaultClassIntrospector;
 import org.xnio.OptionMap;
 import org.xnio.Options;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.Xnio;
 import org.xnio.XnioWorker;
 

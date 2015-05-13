@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.spdy;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import java.util.Collections;
 import java.util.List;

@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.buffers;
+package io.undertow.connector;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;

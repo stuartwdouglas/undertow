@@ -25,7 +25,7 @@ import io.undertow.util.HeaderMap;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.XnioExecutor;
 import org.xnio.channels.StreamSinkChannel;
 

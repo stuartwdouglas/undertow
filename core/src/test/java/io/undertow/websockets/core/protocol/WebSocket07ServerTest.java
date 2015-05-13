@@ -21,7 +21,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import io.undertow.buffers.PooledBuffers;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.util.NetworkUtils;

@@ -21,7 +21,7 @@ package io.undertow.websockets.extensions;
 import java.nio.ByteBuffer;
 
 import io.undertow.websockets.core.WebSocketChannel;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 /**
  * A wrapper for {@link ByteBuffer} class used in extensions context.

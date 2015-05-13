@@ -18,7 +18,7 @@
 
 package io.undertow.protocols.spdy;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 /**
  * A SPDY Ping frame

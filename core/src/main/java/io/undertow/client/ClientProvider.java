@@ -19,7 +19,7 @@
 package io.undertow.client;
 
 import org.xnio.OptionMap;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
 import org.xnio.ssl.XnioSsl;

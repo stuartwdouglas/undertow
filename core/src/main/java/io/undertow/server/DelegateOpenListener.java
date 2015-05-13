@@ -18,7 +18,7 @@
 
 package io.undertow.server;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.StreamConnection;
 
 /**

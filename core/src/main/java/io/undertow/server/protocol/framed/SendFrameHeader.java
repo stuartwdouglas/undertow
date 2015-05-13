@@ -18,7 +18,7 @@
 
 package io.undertow.server.protocol.framed;
 
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 /**
  * @author Stuart Douglas

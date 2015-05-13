@@ -21,7 +21,7 @@ package io.undertow.protocols.ajp;
 import java.io.IOException;
 
 import org.xnio.ChannelListener;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import io.undertow.server.protocol.framed.FrameHeaderData;
 import io.undertow.util.HeaderMap;

@@ -24,7 +24,7 @@ import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 import org.xnio.Option;
 import org.xnio.OptionMap;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 import org.xnio.StreamConnection;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;

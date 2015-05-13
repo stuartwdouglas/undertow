@@ -19,7 +19,7 @@
 package io.undertow.protocols.http2;
 
 import io.undertow.util.HeaderMap;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 /**
  * A HTTP2 push promise frame

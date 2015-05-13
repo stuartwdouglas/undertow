@@ -21,7 +21,7 @@ package io.undertow.conduits;
 import io.undertow.UndertowMessages;
 import org.xnio.Buffers;
 import org.xnio.IoUtils;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.channels.StreamSourceChannel;
 import org.xnio.conduits.AbstractStreamSinkConduit;
 import org.xnio.conduits.ConduitWritableByteChannel;

@@ -34,7 +34,7 @@ import static io.undertow.protocols.ajp.AjpUtils.putString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.xnio.ChannelListener;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.PooledBuffer;
 
 import io.undertow.UndertowMessages;
 import io.undertow.client.ProxiedRequestAttachments;

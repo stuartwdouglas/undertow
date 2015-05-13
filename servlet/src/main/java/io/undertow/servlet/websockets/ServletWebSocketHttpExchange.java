@@ -27,7 +27,7 @@ import org.xnio.FinishedIoFuture;
 import org.xnio.FutureResult;
 import org.xnio.IoFuture;
 import org.xnio.IoUtils;
-import io.undertow.buffers.ByteBufferPool;
+import io.undertow.connector.ByteBufferPool;
 
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;

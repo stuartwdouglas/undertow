@@ -25,8 +25,8 @@ import io.undertow.server.ConnectorStatistics;
 import io.undertow.server.ConnectorStatisticsImpl;
 import org.xnio.ChannelListener;
 import org.xnio.OptionMap;
-import io.undertow.buffers.ByteBufferPool;
-import io.undertow.buffers.PooledBuffer;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.connector.PooledBuffer;
 import org.xnio.StreamConnection;
 
 import io.undertow.UndertowLogger;
