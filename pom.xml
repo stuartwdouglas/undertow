@@ -104,6 +104,7 @@
         <module>servlet</module>
         <module>examples</module>
         <module>websockets-jsr</module>
+        <module>xnio-connector</module>
     </modules>
 
     <build>
@@ -210,6 +211,12 @@
             <dependency>
                 <groupId>io.undertow</groupId>
                 <artifactId>undertow-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.undertow</groupId>
+                <artifactId>undertow-xnio-connector</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
