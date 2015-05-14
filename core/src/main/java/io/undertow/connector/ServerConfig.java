@@ -21,8 +21,6 @@ package io.undertow.connector;
 import io.undertow.server.HttpHandler;
 import org.xnio.OptionMap;
 import org.xnio.StreamConnection;
-import org.xnio.Xnio;
-import org.xnio.XnioWorker;
 import org.xnio.channels.AcceptingChannel;
 
 import javax.net.ssl.KeyManager;
@@ -50,7 +48,17 @@ public class ServerConfig {
 
     private List<AcceptingChannel<? extends StreamConnection>> channels;
 
-    public ServerConfig() {
+    public ServerConfig(int bufferSize, int buffersPerRegion, int ioThreads, int workerThreads, boolean directBuffers, HttpHandler rootHandler, OptionMap workerOptions, OptionMap socketOptions, OptionMap serverOptions, List<AcceptingChannel<? extends StreamConnection>> channels) {
+        this.bufferSize = bufferSize;
+        this.buffersPerRegion = buffersPerRegion;
+        this.ioThreads = ioThreads;
+        this.workerThreads = workerThreads;
+        this.directBuffers = directBuffers;
+        this.rootHandler = rootHandler;
+        this.workerOptions = workerOptions;
+        this.socketOptions = socketOptions;
+        this.serverOptions = serverOptions;
+        this.channels = channels;
     }
 
 

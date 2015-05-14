@@ -27,6 +27,6 @@ public interface UndertowConnector {
 
     int getPriority();
 
-    UndertowServer createServer(Undertow)
+    UndertowServer createServer(ServerConfig config);
 
 }

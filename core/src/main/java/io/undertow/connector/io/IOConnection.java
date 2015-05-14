@@ -19,11 +19,10 @@
 package io.undertow.connector.io;
 
 /**
- * 
+ *
  * Represents a connection. This connection will generally have a limited scope (i.e. a single HTTP request).
  * Using the connection outside of this scope will have undefined results.
  *
- * 
  * @author Stuart Douglas
  */
 public interface IOConnection extends IOChannel<IOConnection> {
