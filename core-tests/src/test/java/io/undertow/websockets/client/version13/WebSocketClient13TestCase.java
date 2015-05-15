@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.undertow.Undertow;
-import io.undertow.protocols.ssl.UndertowXnioSsl;
+import io.undertow.connector.xnio.protocols.ssl.UndertowXnioSsl;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.ConnectHandler;

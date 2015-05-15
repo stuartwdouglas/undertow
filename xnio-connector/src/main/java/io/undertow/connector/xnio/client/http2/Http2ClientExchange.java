@@ -30,8 +30,8 @@ import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
 import io.undertow.client.ContinueNotification;
-import io.undertow.protocols.http2.Http2StreamSinkChannel;
-import io.undertow.protocols.http2.Http2StreamSourceChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2StreamSinkChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2StreamSourceChannel;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.HeaderMap;
 

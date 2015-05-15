@@ -23,7 +23,7 @@ import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.conduits.BytesReceivedStreamSourceConduit;
 import io.undertow.conduits.BytesSentStreamSinkConduit;
-import io.undertow.protocols.http2.Http2Channel;
+import io.undertow.connector.xnio.protocols.http2.Http2Channel;
 import io.undertow.server.ConnectorStatistics;
 import io.undertow.server.ConnectorStatisticsImpl;
 import io.undertow.server.DelegateOpenListener;

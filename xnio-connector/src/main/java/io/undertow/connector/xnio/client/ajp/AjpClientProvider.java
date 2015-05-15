@@ -21,7 +21,7 @@ package io.undertow.connector.xnio.client.ajp;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientProvider;
-import io.undertow.protocols.ajp.AjpClientChannel;
+import io.undertow.connector.xnio.protocols.ajp.AjpClientChannel;
 
 import org.xnio.ChannelListener;
 import org.xnio.IoFuture;

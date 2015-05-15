@@ -22,7 +22,7 @@ import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.conduits.BytesReceivedStreamSourceConduit;
 import io.undertow.conduits.BytesSentStreamSinkConduit;
-import io.undertow.protocols.spdy.SpdyChannel;
+import io.undertow.connector.xnio.protocols.spdy.SpdyChannel;
 import io.undertow.server.ConnectorStatistics;
 import io.undertow.server.ConnectorStatisticsImpl;
 import io.undertow.server.DelegateOpenListener;

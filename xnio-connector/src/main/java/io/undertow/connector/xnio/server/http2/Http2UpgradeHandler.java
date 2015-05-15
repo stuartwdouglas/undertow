@@ -23,7 +23,7 @@ import java.nio.ByteBuffer;
 import org.xnio.OptionMap;
 import org.xnio.StreamConnection;
 
-import io.undertow.protocols.http2.Http2Channel;
+import io.undertow.connector.xnio.protocols.http2.Http2Channel;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.HttpUpgradeListener;

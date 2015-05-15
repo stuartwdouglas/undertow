@@ -29,7 +29,7 @@ import javax.net.ssl.SSLEngine;
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
-import io.undertow.protocols.ssl.UndertowXnioSsl;
+import io.undertow.connector.xnio.protocols.ssl.UndertowXnioSsl;
 import io.undertow.server.AggregateConnectorStatistics;
 import io.undertow.server.ConnectorStatistics;
 import io.undertow.server.DelegateOpenListener;

@@ -22,7 +22,7 @@ import io.undertow.UndertowMessages;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RenegotiationRequiredException;
 import io.undertow.server.SSLSessionInfo;
-import io.undertow.protocols.spdy.SpdyChannel;
+import io.undertow.connector.xnio.protocols.spdy.SpdyChannel;
 import org.xnio.Options;
 import org.xnio.SslClientAuthMode;
 

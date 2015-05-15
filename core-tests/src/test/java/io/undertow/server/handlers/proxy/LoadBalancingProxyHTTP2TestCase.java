@@ -20,7 +20,7 @@ package io.undertow.server.handlers.proxy;
 
 import io.undertow.Undertow;
 import io.undertow.UndertowOptions;
-import io.undertow.protocols.ssl.UndertowXnioSsl;
+import io.undertow.connector.xnio.protocols.ssl.UndertowXnioSsl;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.JvmRouteHandler;

@@ -24,7 +24,7 @@ import static io.undertow.Handlers.path;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-import io.undertow.protocols.ssl.UndertowXnioSsl;
+import io.undertow.connector.xnio.protocols.ssl.UndertowXnioSsl;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;

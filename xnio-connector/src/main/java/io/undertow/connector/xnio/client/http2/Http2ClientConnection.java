@@ -26,7 +26,7 @@ import java.net.SocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import io.undertow.protocols.http2.Http2PushPromiseStreamSourceChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2PushPromiseStreamSourceChannel;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Protocols;
 import org.xnio.ChannelExceptionHandler;
@@ -48,12 +48,12 @@ import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ProxiedRequestAttachments;
-import io.undertow.protocols.http2.AbstractHttp2StreamSourceChannel;
-import io.undertow.protocols.http2.Http2Channel;
-import io.undertow.protocols.http2.Http2HeadersStreamSinkChannel;
-import io.undertow.protocols.http2.Http2PingStreamSourceChannel;
-import io.undertow.protocols.http2.Http2RstStreamStreamSourceChannel;
-import io.undertow.protocols.http2.Http2StreamSourceChannel;
+import io.undertow.connector.xnio.protocols.http2.AbstractHttp2StreamSourceChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2Channel;
+import io.undertow.connector.xnio.protocols.http2.Http2HeadersStreamSinkChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2PingStreamSourceChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2RstStreamStreamSourceChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2StreamSourceChannel;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 

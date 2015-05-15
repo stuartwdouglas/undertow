@@ -23,7 +23,7 @@ import io.undertow.buffers.DefaultByteBufferPool;
 import io.undertow.connector.ByteBufferPool;
 import io.undertow.connector.ServerConfig;
 import io.undertow.connector.UndertowServer;
-import io.undertow.protocols.ssl.UndertowXnioSsl;
+import io.undertow.connector.xnio.protocols.ssl.UndertowXnioSsl;
 import io.undertow.server.HttpHandler;
 import io.undertow.connector.xnio.server.ajp.AjpOpenListener;
 import io.undertow.connector.xnio.server.http.AlpnOpenListener;

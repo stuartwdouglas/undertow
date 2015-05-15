@@ -21,7 +21,7 @@ package io.undertow.connector.xnio.client.http2;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientProvider;
-import io.undertow.protocols.http2.Http2Channel;
+import io.undertow.connector.xnio.protocols.http2.Http2Channel;
 import org.xnio.ChannelListener;
 import org.xnio.IoFuture;
 import org.xnio.OptionMap;

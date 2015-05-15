@@ -32,7 +32,7 @@ import javax.net.ssl.SSLEngine;
 
 import io.undertow.buffers.DefaultByteBufferPool;
 import io.undertow.conduits.PushBackStreamSourceConduit;
-import io.undertow.protocols.ssl.UndertowXnioSsl;
+import io.undertow.connector.xnio.protocols.ssl.UndertowXnioSsl;
 import org.eclipse.jetty.alpn.ALPN;
 import org.xnio.ChannelListener;
 import org.xnio.IoFuture;
@@ -51,7 +51,7 @@ import io.undertow.UndertowMessages;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientProvider;
-import io.undertow.protocols.spdy.SpdyChannel;
+import io.undertow.connector.xnio.protocols.spdy.SpdyChannel;
 import io.undertow.util.ImmediatePooled;
 
 /**

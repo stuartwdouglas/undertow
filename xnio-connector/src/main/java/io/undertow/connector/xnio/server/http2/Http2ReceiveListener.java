@@ -32,11 +32,11 @@ import org.xnio.OptionMap;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowOptions;
-import io.undertow.protocols.http2.AbstractHttp2StreamSourceChannel;
-import io.undertow.protocols.http2.Http2Channel;
-import io.undertow.protocols.http2.Http2DataStreamSinkChannel;
-import io.undertow.protocols.http2.Http2HeadersStreamSinkChannel;
-import io.undertow.protocols.http2.Http2StreamSourceChannel;
+import io.undertow.connector.xnio.protocols.http2.AbstractHttp2StreamSourceChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2Channel;
+import io.undertow.connector.xnio.protocols.http2.Http2DataStreamSinkChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2HeadersStreamSinkChannel;
+import io.undertow.connector.xnio.protocols.http2.Http2StreamSourceChannel;
 import io.undertow.server.Connectors;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;

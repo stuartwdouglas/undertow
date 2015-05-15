@@ -32,7 +32,7 @@ import org.xnio.StreamConnection;
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
-import io.undertow.protocols.spdy.SpdyChannel;
+import io.undertow.connector.xnio.protocols.spdy.SpdyChannel;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.OpenListener;
 

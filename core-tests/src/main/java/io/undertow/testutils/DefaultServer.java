@@ -20,7 +20,7 @@ package io.undertow.testutils;
 
 import io.undertow.UndertowOptions;
 import io.undertow.buffers.DefaultByteBufferPool;
-import io.undertow.protocols.ssl.UndertowXnioSsl;
+import io.undertow.connector.xnio.protocols.ssl.UndertowXnioSsl;
 import io.undertow.security.impl.GSSAPIAuthenticationMechanism;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;

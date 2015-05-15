@@ -44,8 +44,8 @@ import io.undertow.UndertowOptions;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientProvider;
-import io.undertow.protocols.http2.Http2Channel;
-import io.undertow.protocols.http2.Http2Setting;
+import io.undertow.connector.xnio.protocols.http2.Http2Channel;
+import io.undertow.connector.xnio.protocols.http2.Http2Setting;
 import io.undertow.util.FlexBase64;
 import io.undertow.util.Headers;
 
