@@ -33,7 +33,7 @@ import io.undertow.server.HttpServerExchange;
  * will be called.
  *
  * In addition to the HTTPExchange authentication state can also be associated with the
- * {@link io.undertow.server.protocol.http.HttpServerConnection} and with the {@link io.undertow.server.session.Session} however this is
+ * {@link io.undertow.connector.xnio.server.http.HttpServerConnection} and with the {@link io.undertow.server.session.Session} however this is
  * mechanism specific so it is down to the actual mechanisms to decide if there is state that can be re-used.
  *
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>

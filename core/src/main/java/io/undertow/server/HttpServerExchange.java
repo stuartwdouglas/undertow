@@ -825,7 +825,7 @@ public final class HttpServerExchange extends AbstractAttachable {
     /**
      * Upgrade the channel to a raw socket. This method set the response code to 101, and then marks both the
      * request and response as terminated, which means that once the current request is completed the raw channel
-     * can be obtained from {@link io.undertow.server.protocol.http.HttpServerConnection#getChannel()}
+     * can be obtained from {@link io.undertow.connector.xnio.server.http.HttpServerConnection#getChannel()}
      *
      * @throws IllegalStateException if a response or upgrade was already sent, or if the request body is already being
      *                               read
@@ -843,7 +843,7 @@ public final class HttpServerExchange extends AbstractAttachable {
     /**
      * Upgrade the channel to a raw socket. This method set the response code to 101, and then marks both the
      * request and response as terminated, which means that once the current request is completed the raw channel
-     * can be obtained from {@link io.undertow.server.protocol.http.HttpServerConnection#getChannel()}
+     * can be obtained from {@link io.undertow.connector.xnio.server.http.HttpServerConnection#getChannel()}
      *
      * @param productName the product name to report to the client
      * @throws IllegalStateException if a response or upgrade was already sent, or if the request body is already being

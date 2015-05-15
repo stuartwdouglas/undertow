@@ -22,7 +22,7 @@ import java.net.InetSocketAddress;
 
 import io.undertow.buffers.DefaultByteBufferPool;
 import io.undertow.server.HttpHandler;
-import io.undertow.server.protocol.http.HttpOpenListener;
+import io.undertow.connector.xnio.server.http.HttpOpenListener;
 import io.undertow.util.Transfer;
 import io.undertow.websockets.WebSocketConnectionCallback;
 import io.undertow.websockets.WebSocketProtocolHandshakeHandler;

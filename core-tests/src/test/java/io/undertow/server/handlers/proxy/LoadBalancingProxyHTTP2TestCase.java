@@ -25,7 +25,7 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.JvmRouteHandler;
 import io.undertow.server.handlers.ResponseCodeHandler;
-import io.undertow.server.protocol.http2.Http2ServerConnection;
+import io.undertow.connector.xnio.server.http2.Http2ServerConnection;
 import io.undertow.server.session.InMemorySessionManager;
 import io.undertow.server.session.SessionAttachmentHandler;
 import io.undertow.server.session.SessionCookieConfig;

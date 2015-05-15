@@ -23,7 +23,6 @@ import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.server.protocol.framed.AbstractFramedChannel;
 import io.undertow.server.protocol.framed.FrameHeaderData;
-import io.undertow.server.protocol.http2.Http2OpenListener;
 import io.undertow.util.Attachable;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.AttachmentList;
@@ -53,12 +52,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * SPDY channel.
+ * HTTP2 channel.
  *
  * @author Stuart Douglas
  */
 public class Http2Channel extends AbstractFramedChannel<Http2Channel, AbstractHttp2StreamSourceChannel, AbstractHttp2StreamSinkChannel> implements Attachable {
 
+    public static final String HTTP2 = "h2";
     public static final String CLEARTEXT_UPGRADE_STRING = "h2c";
 
     static final int FRAME_TYPE_DATA = 0x00;
@@ -177,7 +177,7 @@ public class Http2Channel extends AbstractFramedChannel<Http2Channel, AbstractHt
         super(connectedStreamChannel, bufferPool, Http2FramePriority.INSTANCE, data);
         streamIdCounter = clientSide ? (fromUpgrade ? 3 : 1) : 2;
         pushEnabled = settings.get(UndertowOptions.HTTP2_SETTINGS_ENABLE_PUSH, true);
-        this.protocol = protocol == null ? Http2OpenListener.HTTP2 : protocol;
+        this.protocol = protocol == null ? HTTP2 : protocol;
         if (initialOtherSideSettings != null) {
             Http2SettingsParser parser = new Http2SettingsParser(initialOtherSideSettings.remaining());
             try {

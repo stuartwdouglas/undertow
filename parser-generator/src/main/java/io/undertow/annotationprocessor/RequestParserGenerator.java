@@ -29,7 +29,7 @@ import org.jboss.classfilewriter.code.CodeAttribute;
  */
 public class RequestParserGenerator extends AbstractParserGenerator {
 
-    public static final String PARSE_STATE_CLASS = "io.undertow.server.protocol.http.ParseState";
+    public static final String PARSE_STATE_CLASS = "io.undertow.connector.xnio.server.http.ParseState";
     public static final String HTTP_EXCHANGE_CLASS = "io.undertow.server.HttpServerExchange";
     public static final String HTTP_EXCHANGE_DESCRIPTOR = "Lio/undertow/server/HttpServerExchange;";
 

@@ -18,16 +18,16 @@
 
 package io.undertow.server.handlers;
 
-import java.io.IOException;
-
 import io.undertow.UndertowLogger;
 import io.undertow.io.IoCallback;
 import io.undertow.io.Sender;
 import io.undertow.predicate.Predicate;
 import io.undertow.predicate.Predicates;
-import io.undertow.server.protocol.http.HttpContinue;
+import io.undertow.server.HttpContinue;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+
+import java.io.IOException;
 
 /**
  * Handler that provides support for HTTP/1.1 continue responses.
@@ -37,7 +37,7 @@ import io.undertow.server.HttpServerExchange;
  *
  * If no predicate is supplied then all requests will be accepted.
  *
- * @see io.undertow.server.protocol.http.HttpContinue
+ * @see io.undertow.server.HttpContinue
  * @author Stuart Douglas
  */
 public class HttpContinueAcceptingHandler implements HttpHandler {

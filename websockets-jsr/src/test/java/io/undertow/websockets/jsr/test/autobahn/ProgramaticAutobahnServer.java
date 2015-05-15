@@ -18,7 +18,7 @@
 package io.undertow.websockets.jsr.test.autobahn;
 
 import io.undertow.buffers.DefaultByteBufferPool;
-import io.undertow.server.protocol.http.HttpOpenListener;
+import io.undertow.connector.xnio.server.http.HttpOpenListener;
 import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.DeploymentManager;
 import io.undertow.servlet.api.FilterInfo;

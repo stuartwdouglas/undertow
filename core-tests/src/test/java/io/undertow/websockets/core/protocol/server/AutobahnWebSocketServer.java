@@ -19,7 +19,7 @@ package io.undertow.websockets.core.protocol.server;
 
 import io.undertow.buffers.DefaultByteBufferPool;
 import io.undertow.server.HttpHandler;
-import io.undertow.server.protocol.http.HttpOpenListener;
+import io.undertow.connector.xnio.server.http.HttpOpenListener;
 import io.undertow.util.Transfer;
 import io.undertow.websockets.core.StreamSinkFrameChannel;
 import io.undertow.websockets.core.StreamSourceFrameChannel;

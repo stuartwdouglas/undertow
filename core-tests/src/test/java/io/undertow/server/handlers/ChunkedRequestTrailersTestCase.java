@@ -20,8 +20,8 @@ package io.undertow.server.handlers;
 
 import io.undertow.UndertowOptions;
 import io.undertow.server.HttpHandler;
-import io.undertow.server.protocol.http.HttpAttachments;
-import io.undertow.server.protocol.http.HttpServerConnection;
+import io.undertow.server.HttpAttachments;
+import io.undertow.connector.xnio.server.http.HttpServerConnection;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpOneOnly;

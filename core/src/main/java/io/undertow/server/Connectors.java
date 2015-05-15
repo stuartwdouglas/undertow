@@ -310,4 +310,8 @@ public class Connectors {
         }
         return true;
     }
+
+    public static void clearRequestChannel(HttpServerExchange exchange) {
+        exchange.requestChannel = null;
+    }
 }
