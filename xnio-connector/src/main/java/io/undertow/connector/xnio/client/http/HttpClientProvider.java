@@ -16,15 +16,15 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.http;
+package io.undertow.connector.xnio.client.http;
 
 import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientProvider;
-import io.undertow.client.http2.Http2ClientProvider;
-import io.undertow.client.spdy.SpdyClientProvider;
+import io.undertow.connector.xnio.client.http2.Http2ClientProvider;
+import io.undertow.connector.xnio.client.spdy.SpdyClientProvider;
 import org.xnio.ChannelListener;
 import org.xnio.IoFuture;
 import org.xnio.OptionMap;

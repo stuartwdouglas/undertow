@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.http;
+package io.undertow.connector.xnio.client.http;
 
 import io.undertow.util.HttpString;
 

@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.spdy;
+package io.undertow.connector.xnio.client.http2;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Set;
 import javax.net.ssl.SSLEngine;
 
-import io.undertow.buffers.DefaultByteBufferPool;
 import io.undertow.conduits.PushBackStreamSourceConduit;
 import io.undertow.protocols.ssl.UndertowXnioSsl;
 import org.eclipse.jetty.alpn.ALPN;
@@ -51,33 +50,32 @@ import io.undertow.UndertowMessages;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.ClientProvider;
-import io.undertow.protocols.spdy.SpdyChannel;
+import io.undertow.protocols.http2.Http2Channel;
 import io.undertow.util.ImmediatePooled;
 
 /**
- * Dedicated SPDY client that will never fall back to HTTPS
+ * Plaintext HTTP2 client provider that works using HTTP upgrade
  *
  * @author Stuart Douglas
  */
-public class SpdyClientProvider implements ClientProvider {
+public class Http2ClientProvider implements ClientProvider {
 
-    private static final String PROTOCOL_KEY = SpdyClientProvider.class.getName() + ".protocol";
+    private static final String PROTOCOL_KEY = Http2ClientProvider.class.getName() + ".protocol";
 
-    private static final String SPDY_3 = "spdy/3";
-    private static final String SPDY_3_1 = "spdy/3.1";
+    private static final String HTTP2 = "h2";
     private static final String HTTP_1_1 = "http/1.1";
 
-    private static final List<String> PROTOCOLS = Collections.unmodifiableList(Arrays.asList(SPDY_3_1, HTTP_1_1));
+    private static final List<String> PROTOCOLS = Collections.unmodifiableList(Arrays.asList(HTTP2, HTTP_1_1));
 
     private static final Method ALPN_PUT_METHOD;
 
     static {
         Method npnPutMethod;
         try {
-            Class<?> npnClass = Class.forName("org.eclipse.jetty.alpn.ALPN", false, SpdyClientProvider.class.getClassLoader());
-            npnPutMethod = npnClass.getDeclaredMethod("put", SSLEngine.class, Class.forName("org.eclipse.jetty.alpn.ALPN$Provider", false, SpdyClientProvider.class.getClassLoader()));
+            Class<?> npnClass = Class.forName("org.eclipse.jetty.alpn.ALPN", false, Http2ClientProvider.class.getClassLoader());
+            npnPutMethod = npnClass.getDeclaredMethod("put", SSLEngine.class, Class.forName("org.eclipse.jetty.alpn.ALPN$Provider", false, Http2ClientProvider.class.getClassLoader()));
         } catch (Exception e) {
-            UndertowLogger.CLIENT_LOGGER.jettyALPNNotFound("SPDY");
+            UndertowLogger.CLIENT_LOGGER.jettyALPNNotFound("HTTP2");
             npnPutMethod = null;
         }
         ALPN_PUT_METHOD = npnPutMethod;
@@ -96,22 +94,11 @@ public class SpdyClientProvider implements ClientProvider {
 
     @Override
     public Set<String> handlesSchemes() {
-        return new HashSet<>(Arrays.asList(new String[]{"spdy", "spdy-plain"}));
+        return new HashSet<>(Arrays.asList(new String[]{"h2"}));
     }
 
     @Override
     public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioWorker worker, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
-        if(uri.getScheme().equals("spdy-plain")) {
-
-            if(bindAddress == null) {
-                worker.openStreamConnection(new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? 443 : uri.getPort()), createOpenListener(listener, uri, ssl, bufferPool, options), options).addNotifier(createNotifier(listener), null);
-            } else {
-                worker.openStreamConnection(bindAddress, new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? 443 : uri.getPort()), createOpenListener(listener, uri, ssl, bufferPool, options), null, options).addNotifier(createNotifier(listener), null);
-            }
-            return;
-        }
-
-
         if(ALPN_PUT_METHOD == null) {
             listener.failed(UndertowMessages.MESSAGES.jettyNPNNotAvailable());
             return;
@@ -131,16 +118,6 @@ public class SpdyClientProvider implements ClientProvider {
 
     @Override
     public void connect(final ClientCallback<ClientConnection> listener, InetSocketAddress bindAddress, final URI uri, final XnioIoThread ioThread, final XnioSsl ssl, final ByteBufferPool bufferPool, final OptionMap options) {
-        if(uri.getScheme().equals("spdy-plain")) {
-
-            if(bindAddress == null) {
-                ioThread.openStreamConnection(new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? 443 : uri.getPort()), createOpenListener(listener, uri, ssl, bufferPool, options), options).addNotifier(createNotifier(listener), null);
-            } else {
-                ioThread.openStreamConnection(bindAddress, new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? 443 : uri.getPort()), createOpenListener(listener, uri, ssl, bufferPool, options), null, options).addNotifier(createNotifier(listener), null);
-            }
-            return;
-        }
-
         if(ALPN_PUT_METHOD == null) {
             listener.failed(UndertowMessages.MESSAGES.jettyNPNNotAvailable());
             return;
@@ -149,11 +126,11 @@ public class SpdyClientProvider implements ClientProvider {
             listener.failed(UndertowMessages.MESSAGES.sslWasNull());
             return;
         }
-        OptionMap tlsOptions = OptionMap.builder().addAll(options).set(Options.SSL_STARTTLS, true).getMap();
         if(bindAddress == null) {
-            ssl.openSslConnection(ioThread, new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? 443 : uri.getPort()), createOpenListener(listener, uri, ssl, bufferPool, tlsOptions), tlsOptions).addNotifier(createNotifier(listener), null);
+            OptionMap tlsOptions = OptionMap.builder().addAll(options).set(Options.SSL_STARTTLS, true).getMap();
+            ssl.openSslConnection(ioThread, new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? 443 : uri.getPort()), createOpenListener(listener, uri, ssl, bufferPool, tlsOptions), options).addNotifier(createNotifier(listener), null);
         } else {
-            ssl.openSslConnection(ioThread, bindAddress, new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? 443 : uri.getPort()), createOpenListener(listener, uri, ssl, bufferPool, tlsOptions), tlsOptions).addNotifier(createNotifier(listener), null);
+            ssl.openSslConnection(ioThread, bindAddress, new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? 443 : uri.getPort()), createOpenListener(listener, uri, ssl, bufferPool, options), options).addNotifier(createNotifier(listener), null);
         }
 
     }
@@ -179,16 +156,12 @@ public class SpdyClientProvider implements ClientProvider {
     }
 
     private void handleConnected(StreamConnection connection, final ClientCallback<ClientConnection> listener, URI uri, XnioSsl ssl, ByteBufferPool bufferPool, OptionMap options) {
-        if(connection instanceof SslConnection) {
-            handlePotentialSpdyConnection(connection, listener, bufferPool, options, new ChannelListener<SslConnection>() {
-                @Override
-                public void handleEvent(SslConnection channel) {
-                    listener.failed(UndertowMessages.MESSAGES.spdyNotSupported());
-                }
-            });
-        } else {
-            listener.completed(createSpdyChannel(connection, bufferPool));
-        }
+        handlePotentialHttp2Connection(connection, listener, bufferPool, options, new ChannelListener<SslConnection>() {
+            @Override
+            public void handleEvent(SslConnection channel) {
+                listener.failed(UndertowMessages.MESSAGES.spdyNotSupported());
+            }
+        });
     }
 
     public static boolean isEnabled() {
@@ -196,18 +169,18 @@ public class SpdyClientProvider implements ClientProvider {
     }
 
     /**
-     * Not really part of the public API, but is used by the HTTP client to initiate a SPDY connection for HTTPS requests.
+     * Not really part of the public API, but is used by the HTTP client to initiate a HTTP2 connection for HTTPS requests.
      */
-    public static void handlePotentialSpdyConnection(final StreamConnection connection, final ClientCallback<ClientConnection> listener, final ByteBufferPool bufferPool, final OptionMap options, final ChannelListener<SslConnection> spdyFailedListener) {
+    public static void handlePotentialHttp2Connection(final StreamConnection connection, final ClientCallback<ClientConnection> listener, final ByteBufferPool bufferPool, final OptionMap options, final ChannelListener<SslConnection> http2FailedListener) {
 
         final SslConnection sslConnection = (SslConnection) connection;
         final SSLEngine sslEngine = UndertowXnioSsl.getSslEngine(sslConnection);
 
-        final SpdySelectionProvider spdySelectionProvider = new SpdySelectionProvider(sslEngine);
+        final Http2SelectionProvider http2SelectionProvider = new Http2SelectionProvider(sslEngine);
         try {
-            ALPN_PUT_METHOD.invoke(null, sslEngine, spdySelectionProvider);
+            ALPN_PUT_METHOD.invoke(null, sslEngine, http2SelectionProvider);
         } catch (Exception e) {
-            spdyFailedListener.handleEvent(sslConnection);
+            http2FailedListener.handleEvent(sslConnection);
             return;
         }
 
@@ -217,13 +190,13 @@ public class SpdyClientProvider implements ClientProvider {
                 @Override
                 public void handleEvent(StreamSourceChannel channel) {
 
-                    if (spdySelectionProvider.selected != null) {
-                        if (spdySelectionProvider.selected.equals(HTTP_1_1)) {
+                    if (http2SelectionProvider.selected != null) {
+                        if (http2SelectionProvider.selected.equals(HTTP_1_1)) {
                             sslConnection.getSourceChannel().suspendReads();
-                            spdyFailedListener.handleEvent(sslConnection);
+                            http2FailedListener.handleEvent(sslConnection);
                             return;
-                        } else if (spdySelectionProvider.selected.equals(SPDY_3) || spdySelectionProvider.selected.equals(SPDY_3_1)) {
-                            listener.completed(createSpdyChannel(connection, bufferPool));
+                        } else if (http2SelectionProvider.selected.equals(HTTP2)) {
+                            listener.completed(createHttp2Channel(connection, bufferPool, options));
                         }
                     } else {
                         ByteBuffer buf = ByteBuffer.allocate(100);
@@ -235,17 +208,17 @@ public class SpdyClientProvider implements ClientProvider {
                                 pb.pushBack(new ImmediatePooled(buf));
                                 connection.getSourceChannel().setConduit(pb);
                             }
-                            if(spdySelectionProvider.selected == null) {
-                                spdySelectionProvider.selected = (String) sslEngine.getSession().getValue(PROTOCOL_KEY);
+                            if (http2SelectionProvider.selected == null) {
+                                http2SelectionProvider.selected = (String) sslEngine.getSession().getValue(PROTOCOL_KEY);
                             }
-                            if ((spdySelectionProvider.selected == null && read > 0) || HTTP_1_1.equals(spdySelectionProvider.selected)) {
+                            if ((http2SelectionProvider.selected == null && read > 0) || HTTP_1_1.equals(http2SelectionProvider.selected)) {
                                 sslConnection.getSourceChannel().suspendReads();
-                                spdyFailedListener.handleEvent(sslConnection);
+                                http2FailedListener.handleEvent(sslConnection);
                                 return;
-                            } else if (spdySelectionProvider.selected != null) {
+                            } else if (http2SelectionProvider.selected != null) {
                                 //we have spdy
-                                if (spdySelectionProvider.selected.equals(SPDY_3) || spdySelectionProvider.selected.equals(SPDY_3_1)) {
-                                    listener.completed(createSpdyChannel(connection, bufferPool));
+                                if (http2SelectionProvider.selected.equals(HTTP2)) {
+                                    listener.completed(createHttp2Channel(connection, bufferPool, options));
                                 }
                             }
                         } catch (IOException e) {
@@ -258,21 +231,23 @@ public class SpdyClientProvider implements ClientProvider {
             sslConnection.getSourceChannel().resumeReads();
         } catch (IOException e) {
             listener.failed(e);
+        } catch (Throwable e) {
+            listener.failed(new IOException(e));
         }
 
 
     }
 
-    private static SpdyClientConnection createSpdyChannel(StreamConnection connection, ByteBufferPool bufferPool) {
-        SpdyChannel spdyChannel = new SpdyChannel(connection, bufferPool, null, new DefaultByteBufferPool(false, 8192, 100, 1), true);
-        return new SpdyClientConnection(spdyChannel);
+    private static Http2ClientConnection createHttp2Channel(StreamConnection connection, ByteBufferPool bufferPool, OptionMap options) {
+        Http2Channel http2Channel = new Http2Channel(connection, null, bufferPool, null, true, false, options);
+        return new Http2ClientConnection(http2Channel, false);
     }
 
-    private static class SpdySelectionProvider implements ALPN.ClientProvider {
+    private static class Http2SelectionProvider implements ALPN.ClientProvider {
         private String selected;
         private final SSLEngine sslEngine;
 
-        private SpdySelectionProvider(SSLEngine sslEngine) {
+        private Http2SelectionProvider(SSLEngine sslEngine) {
             this.sslEngine = sslEngine;
         }
 

@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.http2;
+package io.undertow.connector.xnio.client.http2;
 
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;

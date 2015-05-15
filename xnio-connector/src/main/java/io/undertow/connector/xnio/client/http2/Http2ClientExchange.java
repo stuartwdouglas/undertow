@@ -16,7 +16,13 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.spdy;
+package io.undertow.connector.xnio.client.http2;
+
+import java.io.IOException;
+
+import io.undertow.client.PushCallback;
+import org.xnio.channels.StreamSinkChannel;
+import org.xnio.channels.StreamSourceChannel;
 
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
@@ -24,55 +30,51 @@ import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
 import io.undertow.client.ContinueNotification;
-import io.undertow.client.PushCallback;
-import io.undertow.protocols.spdy.SpdyStreamSinkChannel;
-import io.undertow.protocols.spdy.SpdyStreamSourceChannel;
-import io.undertow.protocols.spdy.SpdySynReplyStreamSourceChannel;
+import io.undertow.protocols.http2.Http2StreamSinkChannel;
+import io.undertow.protocols.http2.Http2StreamSourceChannel;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.HeaderMap;
-import io.undertow.util.Headers;
-import org.xnio.channels.StreamSinkChannel;
-import org.xnio.channels.StreamSourceChannel;
-
-import java.io.IOException;
 
 /**
  * @author Stuart Douglas
  */
-public class SpdyClientExchange extends AbstractAttachable implements ClientExchange {
+public class Http2ClientExchange extends AbstractAttachable implements ClientExchange {
     private ClientCallback<ClientExchange> responseListener;
     private ContinueNotification continueNotification;
-    private SpdyStreamSourceChannel response;
+    private Http2StreamSourceChannel response;
     private ClientResponse clientResponse;
+    private ClientResponse continueResponse;
     private final ClientConnection clientConnection;
-    private final SpdyStreamSinkChannel request;
+    private final Http2StreamSinkChannel request;
     private final ClientRequest clientRequest;
     private IOException failedReason;
+
     private PushCallback pushCallback;
 
-    public SpdyClientExchange(ClientConnection clientConnection, SpdyStreamSinkChannel request, ClientRequest clientRequest) {
+    public Http2ClientExchange(ClientConnection clientConnection, Http2StreamSinkChannel request, ClientRequest clientRequest) {
         this.clientConnection = clientConnection;
         this.request = request;
         this.clientRequest = clientRequest;
     }
 
+
     @Override
     public void setResponseListener(ClientCallback<ClientExchange> responseListener) {
         this.responseListener = responseListener;
-        if (responseListener != null) {
-            if (failedReason != null) {
-                responseListener.failed(failedReason);
-            } else if (clientResponse != null) {
-                responseListener.completed(this);
-            }
+        if(failedReason != null) {
+            responseListener.failed(failedReason);
         }
     }
 
     @Override
     public void setContinueHandler(ContinueNotification continueHandler) {
-        String expect = clientRequest.getRequestHeaders().getFirst(Headers.EXPECT);
-        if ("100-continue".equalsIgnoreCase(expect)) {
-            continueHandler.handleContinue(this);
+        this.continueNotification = continueHandler;
+    }
+
+    void setContinueResponse(ClientResponse response) {
+        this.continueResponse = response;
+        if (continueNotification != null) {
+            this.continueNotification.handleContinue(this);
         }
     }
 
@@ -107,7 +109,7 @@ public class SpdyClientExchange extends AbstractAttachable implements ClientExch
 
     @Override
     public ClientResponse getContinueResponse() {
-        return null;
+        return continueResponse;
     }
 
     @Override
@@ -116,25 +118,26 @@ public class SpdyClientExchange extends AbstractAttachable implements ClientExch
     }
 
     void failed(final IOException e) {
-        this.failedReason = e;
+        failedReason = e;
         if(responseListener != null) {
             responseListener.failed(e);
         }
     }
 
-    void responseReady(SpdySynReplyStreamSourceChannel result) {
+    void responseReady(Http2StreamSourceChannel result) {
         this.response = result;
-        HeaderMap headers = result.getHeaders();
-        final String status = result.getHeaders().getFirst(SpdyClientConnection.STATUS);
-        int statusCode = 500;
-        if (status != null && status.length() > 3) {
-            statusCode = Integer.parseInt(status.substring(0, 3));
-        }
-        headers.remove(SpdyClientConnection.VERSION);
-        headers.remove(SpdyClientConnection.STATUS);
-        clientResponse = new ClientResponse(statusCode, status != null ? status.substring(3) : "", clientRequest.getProtocol(), headers);
+        ClientResponse clientResponse = createResponse(result);
+        this.clientResponse = clientResponse;
         if (responseListener != null) {
             responseListener.completed(this);
         }
+    }
+
+    ClientResponse createResponse(Http2StreamSourceChannel result) {
+        HeaderMap headers = result.getHeaders();
+        final String status = result.getHeaders().getFirst(Http2ClientConnection.STATUS);
+        int statusCode = Integer.parseInt(status);
+        headers.remove(Http2ClientConnection.STATUS);
+        return new ClientResponse(statusCode, status != null ? status.substring(3) : "", clientRequest.getProtocol(), headers);
     }
 }

@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.spdy;
+package io.undertow.connector.xnio.client.spdy;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;

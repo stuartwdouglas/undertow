@@ -47,6 +47,12 @@
 
         <dependency>
             <groupId>io.undertow</groupId>
+            <artifactId>undertow-parser-generator</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.undertow</groupId>
             <artifactId>undertow-core</artifactId>
         </dependency>
 

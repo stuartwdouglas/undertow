@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.http2;
+package io.undertow.connector.xnio.client.http2;
 
 import static io.undertow.util.Headers.CONTENT_LENGTH;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;

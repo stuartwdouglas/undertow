@@ -1,0 +1,6 @@
+io.undertow.connector.xnio.client.http.HttpClientProvider
+io.undertow.connector.xnio.client.ajp.AjpClientProvider
+io.undertow.connector.xnio.client.spdy.SpdyClientProvider
+io.undertow.connector.xnio.client.http2.Http2ClientProvider
+io.undertow.connector.xnio.client.http2.Http2ClearClientProvider
+io.undertow.connector.xnio.client.http2.Http2PriorKnowledgeClientProvider

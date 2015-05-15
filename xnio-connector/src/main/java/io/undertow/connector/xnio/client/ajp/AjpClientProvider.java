@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.ajp;
+package io.undertow.connector.xnio.client.ajp;
 
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;

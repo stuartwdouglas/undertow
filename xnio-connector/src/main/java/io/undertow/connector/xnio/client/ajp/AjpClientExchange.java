@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.http;
+package io.undertow.connector.xnio.client.ajp;
 
 import io.undertow.channels.DetachableStreamSinkChannel;
 import io.undertow.channels.DetachableStreamSourceChannel;
@@ -27,6 +27,9 @@ import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
 import io.undertow.client.ContinueNotification;
 import io.undertow.client.PushCallback;
+import io.undertow.protocols.ajp.AjpClientChannel;
+import io.undertow.protocols.ajp.AjpClientRequestClientStreamSinkChannel;
+import io.undertow.protocols.ajp.AjpClientResponseStreamSourceChannel;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.Headers;
 import org.xnio.channels.StreamSinkChannel;
@@ -39,25 +42,29 @@ import static org.xnio.Bits.anyAreSet;
 /**
  * @author Stuart Douglas
  */
-class HttpClientExchange extends AbstractAttachable implements ClientExchange {
+class AjpClientExchange extends AbstractAttachable implements ClientExchange {
 
     private final ClientRequest request;
     private final boolean requiresContinue;
-    private final HttpClientConnection clientConnection;
+    private final AjpClientConnection clientConnection;
 
     private ClientCallback<ClientExchange> responseCallback;
     private ClientCallback<ClientExchange> readyCallback;
     private ContinueNotification continueNotification;
+    private AjpClientChannel ajpClientChannel;
 
     private ClientResponse response;
     private ClientResponse continueResponse;
     private IOException failedReason;
 
+    private AjpClientResponseStreamSourceChannel responseChannel;
+    private AjpClientRequestClientStreamSinkChannel requestChannel;
+
     private int state = 0;
     private static final int REQUEST_TERMINATED = 1;
     private static final int RESPONSE_TERMINATED = 1 << 1;
 
-    public HttpClientExchange(ClientCallback<ClientExchange> readyCallback, ClientRequest request, HttpClientConnection clientConnection) {
+    public AjpClientExchange(ClientCallback<ClientExchange> readyCallback, ClientRequest request, AjpClientConnection clientConnection) {
         this.readyCallback = readyCallback;
         this.request = request;
         this.clientConnection = clientConnection;
@@ -73,9 +80,6 @@ class HttpClientExchange extends AbstractAttachable implements ClientExchange {
     }
 
     void terminateRequest() {
-        if(anyAreSet(state, REQUEST_TERMINATED)) {
-            return;
-        }
         state |= REQUEST_TERMINATED;
         if (anyAreSet(state, RESPONSE_TERMINATED)) {
             clientConnection.requestDone();
@@ -83,9 +87,6 @@ class HttpClientExchange extends AbstractAttachable implements ClientExchange {
     }
 
     void terminateResponse() {
-        if(anyAreSet(state, RESPONSE_TERMINATED)) {
-            return;
-        }
         state |= RESPONSE_TERMINATED;
         if (anyAreSet(state, REQUEST_TERMINATED)) {
             clientConnection.requestDone();
@@ -147,7 +148,7 @@ class HttpClientExchange extends AbstractAttachable implements ClientExchange {
 
     @Override
     public StreamSinkChannel getRequestChannel() {
-        return new DetachableStreamSinkChannel(clientConnection.getConnection().getSinkChannel()) {
+        return new DetachableStreamSinkChannel(requestChannel) {
             @Override
             protected boolean isFinished() {
                 return anyAreSet(state, REQUEST_TERMINATED);
@@ -157,7 +158,7 @@ class HttpClientExchange extends AbstractAttachable implements ClientExchange {
 
     @Override
     public StreamSourceChannel getResponseChannel() {
-        return new DetachableStreamSourceChannel(clientConnection.getConnection().getSourceChannel()) {
+        return new DetachableStreamSourceChannel(responseChannel) {
             @Override
             protected boolean isFinished() {
                 return anyAreSet(state, RESPONSE_TERMINATED);
@@ -185,9 +186,17 @@ class HttpClientExchange extends AbstractAttachable implements ClientExchange {
         return clientConnection;
     }
 
-    void invokeReadReadyCallback() {
+    void setResponseChannel(AjpClientResponseStreamSourceChannel responseChannel) {
+        this.responseChannel = responseChannel;
+    }
+
+    void setRequestChannel(AjpClientRequestClientStreamSinkChannel requestChannel) {
+        this.requestChannel = requestChannel;
+    }
+
+    void invokeReadReadyCallback(final ClientExchange result) {
         if(readyCallback != null) {
-            readyCallback.completed(this);
+            readyCallback.completed(result);
             readyCallback = null;
         }
     }

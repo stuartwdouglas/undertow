@@ -16,14 +16,8 @@
  *  limitations under the License.
  */
 
-package io.undertow.client.http;
+package io.undertow.client;
 
-import io.undertow.client.ClientCallback;
-import io.undertow.client.ClientConnection;
-import io.undertow.client.ClientExchange;
-import io.undertow.client.ClientRequest;
-import io.undertow.client.ClientResponse;
-import io.undertow.client.UndertowClient;
 import io.undertow.io.Sender;
 import io.undertow.protocols.ssl.UndertowXnioSsl;
 import io.undertow.server.HttpHandler;
