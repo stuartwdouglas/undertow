@@ -65,8 +65,7 @@
 
         <dependency>
             <groupId>io.undertow</groupId>
-            <artifactId>undertow-core</artifactId>
-            <type>test-jar</type>
+            <artifactId>undertow-core-tests</artifactId>
             <scope>test</scope>
         </dependency>
 

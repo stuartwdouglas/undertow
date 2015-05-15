@@ -20,13 +20,10 @@ package io.undertow.connector;
 
 import io.undertow.server.HttpHandler;
 import org.xnio.OptionMap;
-import org.xnio.StreamConnection;
-import org.xnio.channels.AcceptingChannel;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,27 +37,64 @@ public class ServerConfig {
     private final int ioThreads;
     private final int workerThreads;
     private final boolean directBuffers;
-    private final List<ListenerConfig> listeners = new ArrayList<>();
+    private final List<ListenerConfig> listeners;
     private final HttpHandler rootHandler;
     private final OptionMap workerOptions;
     private final OptionMap socketOptions;
     private final OptionMap serverOptions;
 
-    private List<AcceptingChannel<? extends StreamConnection>> channels;
-
-    public ServerConfig(int bufferSize, int buffersPerRegion, int ioThreads, int workerThreads, boolean directBuffers, HttpHandler rootHandler, OptionMap workerOptions, OptionMap socketOptions, OptionMap serverOptions, List<AcceptingChannel<? extends StreamConnection>> channels) {
+    public ServerConfig(int bufferSize, int buffersPerRegion, int ioThreads, int workerThreads, boolean directBuffers, List<ListenerConfig> listeners, HttpHandler rootHandler, OptionMap workerOptions, OptionMap socketOptions, OptionMap serverOptions) {
         this.bufferSize = bufferSize;
         this.buffersPerRegion = buffersPerRegion;
         this.ioThreads = ioThreads;
         this.workerThreads = workerThreads;
         this.directBuffers = directBuffers;
+        this.listeners = listeners;
         this.rootHandler = rootHandler;
         this.workerOptions = workerOptions;
         this.socketOptions = socketOptions;
         this.serverOptions = serverOptions;
-        this.channels = channels;
     }
 
+    public int getBufferSize() {
+        return bufferSize;
+    }
+
+    public int getBuffersPerRegion() {
+        return buffersPerRegion;
+    }
+
+    public int getIoThreads() {
+        return ioThreads;
+    }
+
+    public int getWorkerThreads() {
+        return workerThreads;
+    }
+
+    public boolean isDirectBuffers() {
+        return directBuffers;
+    }
+
+    public List<ListenerConfig> getListeners() {
+        return listeners;
+    }
+
+    public HttpHandler getRootHandler() {
+        return rootHandler;
+    }
+
+    public OptionMap getWorkerOptions() {
+        return workerOptions;
+    }
+
+    public OptionMap getSocketOptions() {
+        return socketOptions;
+    }
+
+    public OptionMap getServerOptions() {
+        return serverOptions;
+    }
 
     public static class ListenerConfig {
 

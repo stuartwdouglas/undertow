@@ -70,8 +70,8 @@ import io.undertow.websockets.jsr.JsrWebSocketFilter;
 import io.undertow.websockets.jsr.ServerWebSocketContainer;
 import io.undertow.websockets.jsr.UndertowSession;
 import io.undertow.websockets.jsr.test.annotated.AnnotatedClientEndpoint;
-import io.undertow.websockets.utils.FrameChecker;
-import io.undertow.websockets.utils.WebSocketTestClient;
+import io.undertow.testutils.websockets.FrameChecker;
+import io.undertow.testutils.websockets.WebSocketTestClient;
 
 /**
  * @author <a href="mailto:nmaurer@redhat.com">Norman Maurer</a>

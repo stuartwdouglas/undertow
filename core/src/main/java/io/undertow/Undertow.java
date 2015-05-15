@@ -18,35 +18,20 @@
 
 package io.undertow;
 
-import io.undertow.buffers.DefaultByteBufferPool;
-import io.undertow.protocols.ssl.UndertowXnioSsl;
+import io.undertow.connector.ServerConfig;
+import io.undertow.connector.ServerConfig.ListenerConfig;
+import io.undertow.connector.UndertowConnector;
+import io.undertow.connector.UndertowServer;
 import io.undertow.server.HttpHandler;
-import io.undertow.server.protocol.ajp.AjpOpenListener;
-import io.undertow.server.protocol.http.AlpnOpenListener;
-import io.undertow.server.protocol.http.HttpOpenListener;
-import io.undertow.server.protocol.http2.Http2OpenListener;
-import io.undertow.server.protocol.spdy.SpdyOpenListener;
-import org.xnio.ChannelListener;
-import org.xnio.ChannelListeners;
-import org.xnio.IoUtils;
 import org.xnio.Option;
 import org.xnio.OptionMap;
-import org.xnio.Options;
-import io.undertow.connector.ByteBufferPool;
-import org.xnio.StreamConnection;
-import org.xnio.Xnio;
-import org.xnio.XnioWorker;
-import org.xnio.channels.AcceptingChannel;
-import org.xnio.ssl.SslConnection;
-import org.xnio.ssl.XnioSsl;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
-import java.net.Inet4Address;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ServiceLoader;
 
 /**
  * Convenience class used to build an Undertow server.
@@ -54,179 +39,28 @@ import java.util.List;
  *
  * @author Stuart Douglas
  */
-public final class Undertow {
+public class Undertow {
 
-    private final int bufferSize;
-    private final int buffersPerRegion;
-    private final int ioThreads;
-    private final int workerThreads;
-    private final boolean directBuffers;
-    private final List<ListenerConfig> listeners = new ArrayList<>();
-    private final HttpHandler rootHandler;
-    private final OptionMap workerOptions;
-    private final OptionMap socketOptions;
-    private final OptionMap serverOptions;
+    public static final String HTTP = "http";
+    public static final String HTTPS = "https";
+    public static final String AJP = "ajp";
 
-    private XnioWorker worker;
-    private List<AcceptingChannel<? extends StreamConnection>> channels;
-    private Xnio xnio;
+    private final UndertowServer undertowServer;
 
-    private Undertow(Builder builder) {
-        this.bufferSize = builder.bufferSize;
-        this.buffersPerRegion = builder.buffersPerRegion;
-        this.ioThreads = builder.ioThreads;
-        this.workerThreads = builder.workerThreads;
-        this.directBuffers = builder.directBuffers;
-        this.listeners.addAll(builder.listeners);
-        this.rootHandler = builder.handler;
-        this.workerOptions = builder.workerOptions.getMap();
-        this.socketOptions = builder.socketOptions.getMap();
-        this.serverOptions = builder.serverOptions.getMap();
+    public Undertow(UndertowServer server) {
+        this.undertowServer = server;
     }
 
-    /**
-     * @return A builder that can be used to create an Undertow server instance
-     */
+    public void start() {
+        undertowServer.start();
+    }
+
+    public void stop() {
+        undertowServer.stop();
+    }
+
     public static Builder builder() {
         return new Builder();
-    }
-
-    public synchronized void start() {
-        xnio = Xnio.getInstance(Undertow.class.getClassLoader());
-        channels = new ArrayList<>();
-        try {
-            worker = xnio.createWorker(OptionMap.builder()
-                    .set(Options.WORKER_IO_THREADS, ioThreads)
-                    .set(Options.CONNECTION_HIGH_WATER, 1000000)
-                    .set(Options.CONNECTION_LOW_WATER, 1000000)
-                    .set(Options.WORKER_TASK_CORE_THREADS, workerThreads)
-                    .set(Options.WORKER_TASK_MAX_THREADS, workerThreads)
-                    .set(Options.TCP_NODELAY, true)
-                    .set(Options.CORK, true)
-                    .addAll(workerOptions)
-                    .getMap());
-
-            OptionMap socketOptions = OptionMap.builder()
-                    .set(Options.WORKER_IO_THREADS, ioThreads)
-                    .set(Options.TCP_NODELAY, true)
-                    .set(Options.REUSE_ADDRESSES, true)
-                    .set(Options.BALANCING_TOKENS, 1)
-                    .set(Options.BALANCING_CONNECTIONS, 2)
-                    .set(Options.BACKLOG, 1000)
-                    .addAll(this.socketOptions)
-                    .getMap();
-
-
-            ByteBufferPool buffers = new DefaultByteBufferPool(directBuffers, bufferSize, buffersPerRegion, 3);
-
-            for (ListenerConfig listener : listeners) {
-                final HttpHandler rootHandler = listener.rootHandler != null ? listener.rootHandler : this.rootHandler;
-                if (listener.type == ListenerType.AJP) {
-                    AjpOpenListener openListener = new AjpOpenListener(buffers, serverOptions);
-                    openListener.setRootHandler(rootHandler);
-                    ChannelListener<AcceptingChannel<StreamConnection>> acceptListener = ChannelListeners.openListenerAdapter(openListener);
-                    AcceptingChannel<? extends StreamConnection> server = worker.createStreamConnectionServer(new InetSocketAddress(Inet4Address.getByName(listener.host), listener.port), acceptListener, socketOptions);
-                    server.resumeAccepts();
-                    channels.add(server);
-                } else {
-                    OptionMap undertowOptions = OptionMap.builder().set(UndertowOptions.BUFFER_PIPELINED_DATA, true).addAll(serverOptions).getMap();
-                    if (listener.type == ListenerType.HTTP) {
-                        HttpOpenListener openListener = new HttpOpenListener(buffers, undertowOptions);
-                        openListener.setRootHandler(rootHandler);
-                        ChannelListener<AcceptingChannel<StreamConnection>> acceptListener = ChannelListeners.openListenerAdapter(openListener);
-                        AcceptingChannel<? extends StreamConnection> server = worker.createStreamConnectionServer(new InetSocketAddress(Inet4Address.getByName(listener.host), listener.port), acceptListener, socketOptions);
-                        server.resumeAccepts();
-                        channels.add(server);
-                    } else if (listener.type == ListenerType.HTTPS) {
-                        ChannelListener<StreamConnection> openListener;
-
-                        HttpOpenListener httpOpenListener = new HttpOpenListener(buffers, undertowOptions);
-                        httpOpenListener.setRootHandler(rootHandler);
-
-                        boolean spdy = serverOptions.get(UndertowOptions.ENABLE_SPDY, false);
-                        boolean http2 = serverOptions.get(UndertowOptions.ENABLE_HTTP2, false);
-                        if(spdy || http2) {
-                            AlpnOpenListener alpn = new AlpnOpenListener(buffers, undertowOptions, httpOpenListener);
-                            if(spdy) {
-                                SpdyOpenListener spdyListener = new SpdyOpenListener(buffers, new DefaultByteBufferPool(false, 1024, 100, 1), undertowOptions);
-                                spdyListener.setRootHandler(rootHandler);
-                                alpn.addProtocol(SpdyOpenListener.SPDY_3_1, spdyListener, 5);
-                            }
-                            if(http2) {
-                                Http2OpenListener http2Listener = new Http2OpenListener(buffers, undertowOptions);
-                                http2Listener.setRootHandler(rootHandler);
-                                alpn.addProtocol(Http2OpenListener.HTTP2, http2Listener, 10);
-                                alpn.addProtocol(Http2OpenListener.HTTP2_14, http2Listener, 7);
-                            }
-                            openListener = alpn;
-                        } else {
-                            openListener = httpOpenListener;
-                        }
-                        ChannelListener<AcceptingChannel<StreamConnection>> acceptListener = ChannelListeners.openListenerAdapter(openListener);
-                        XnioSsl xnioSsl;
-                        if (listener.sslContext != null) {
-                            xnioSsl = new UndertowXnioSsl(xnio, OptionMap.create(Options.USE_DIRECT_BUFFERS, true), listener.sslContext);
-                        } else {
-                            xnioSsl = xnio.getSslProvider(listener.keyManagers, listener.trustManagers, OptionMap.create(Options.USE_DIRECT_BUFFERS, true));
-                        }
-                        AcceptingChannel<SslConnection> sslServer = xnioSsl.createSslConnectionServer(worker, new InetSocketAddress(Inet4Address.getByName(listener.host), listener.port), (ChannelListener) acceptListener, socketOptions);
-                        sslServer.resumeAccepts();
-                        channels.add(sslServer);
-                    }
-                }
-
-            }
-
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public synchronized void stop() {
-        for (AcceptingChannel<? extends StreamConnection> channel : channels) {
-            IoUtils.safeClose(channel);
-        }
-        channels = null;
-        worker.shutdownNow();
-        worker = null;
-        xnio = null;
-    }
-
-
-    public static enum ListenerType {
-        HTTP,
-        HTTPS,
-        AJP
-    }
-
-    private static class ListenerConfig {
-        final ListenerType type;
-        final int port;
-        final String host;
-        final KeyManager[] keyManagers;
-        final TrustManager[] trustManagers;
-        final SSLContext sslContext;
-        final HttpHandler rootHandler;
-
-        private ListenerConfig(final ListenerType type, final int port, final String host, KeyManager[] keyManagers, TrustManager[] trustManagers, HttpHandler rootHandler) {
-            this.type = type;
-            this.port = port;
-            this.host = host;
-            this.keyManagers = keyManagers;
-            this.trustManagers = trustManagers;
-            this.rootHandler = rootHandler;
-            this.sslContext = null;
-        }
-
-        private ListenerConfig(final ListenerType type, final int port, final String host, SSLContext sslContext, HttpHandler rootHandler) {
-            this.type = type;
-            this.port = port;
-            this.host = host;
-            this.rootHandler = rootHandler;
-            this.keyManagers = null;
-            this.trustManagers = null;
-            this.sslContext = sslContext;
-        }
     }
 
     public static final class Builder {
@@ -269,58 +103,61 @@ public final class Undertow {
         }
 
         public Undertow build() {
-            return new Undertow(this);
+            ServiceLoader<UndertowConnector> connectors = ServiceLoader.load(UndertowConnector.class);
+            ServerConfig config = new ServerConfig(bufferSize, buffersPerRegion, ioThreads, workerThreads, directBuffers, listeners, handler, workerOptions.getMap(), socketOptions.getMap(), serverOptions.getMap());
+            return new Undertow(connectors.iterator().next().createServer(config));
+
         }
 
         @Deprecated
         public Builder addListener(int port, String host) {
-            listeners.add(new ListenerConfig(ListenerType.HTTP, port, host, null, null, null));
+            listeners.add(new ListenerConfig(HTTP, port, host, null, null, null, null));
             return this;
         }
 
         @Deprecated
-        public Builder addListener(int port, String host, ListenerType listenerType) {
-            listeners.add(new ListenerConfig(listenerType, port, host, null, null, null));
+        public Builder addListener(int port, String host, String listenerType) {
+            listeners.add(new ListenerConfig(listenerType, port, host, null, null, null, null));
             return this;
         }
 
         public Builder addHttpListener(int port, String host) {
-            listeners.add(new ListenerConfig(ListenerType.HTTP, port, host, null, null, null));
+            listeners.add(new ListenerConfig(HTTP, port, host, null, null, null, null));
             return this;
         }
 
         public Builder addHttpsListener(int port, String host, KeyManager[] keyManagers, TrustManager[] trustManagers) {
-            listeners.add(new ListenerConfig(ListenerType.HTTPS, port, host, keyManagers, trustManagers, null));
+            listeners.add(new ListenerConfig(HTTPS, port, host, keyManagers, trustManagers, null, null));
             return this;
         }
 
         public Builder addHttpsListener(int port, String host, SSLContext sslContext) {
-            listeners.add(new ListenerConfig(ListenerType.HTTPS, port, host, sslContext, null));
+            listeners.add(new ListenerConfig(HTTPS, port, host, null, null, sslContext, null));
             return this;
         }
 
         public Builder addAjpListener(int port, String host) {
-            listeners.add(new ListenerConfig(ListenerType.AJP, port, host, null, null, null));
+            listeners.add(new ListenerConfig(AJP, port, host, null, null, null, null));
             return this;
         }
 
         public Builder addHttpListener(int port, String host, HttpHandler rootHandler) {
-            listeners.add(new ListenerConfig(ListenerType.HTTP, port, host, null, null, rootHandler));
+            listeners.add(new ListenerConfig(HTTP, port, host, null, null, null, rootHandler));
             return this;
         }
 
         public Builder addHttpsListener(int port, String host, KeyManager[] keyManagers, TrustManager[] trustManagers, HttpHandler rootHandler) {
-            listeners.add(new ListenerConfig(ListenerType.HTTPS, port, host, keyManagers, trustManagers, rootHandler));
+            listeners.add(new ListenerConfig(HTTPS, port, host, keyManagers, trustManagers, null, rootHandler));
             return this;
         }
 
         public Builder addHttpsListener(int port, String host, SSLContext sslContext, HttpHandler rootHandler) {
-            listeners.add(new ListenerConfig(ListenerType.HTTPS, port, host, sslContext, rootHandler));
+            listeners.add(new ListenerConfig(HTTPS, port, host, null, null, sslContext, rootHandler));
             return this;
         }
 
         public Builder addAjpListener(int port, String host, HttpHandler rootHandler) {
-            listeners.add(new ListenerConfig(ListenerType.AJP, port, host, null, null, rootHandler));
+            listeners.add(new ListenerConfig(AJP, port, host, null, null, null, rootHandler));
             return this;
         }
         public Builder setBufferSize(final int bufferSize) {

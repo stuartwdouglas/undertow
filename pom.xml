@@ -105,6 +105,7 @@
         <module>examples</module>
         <module>websockets-jsr</module>
         <module>xnio-connector</module>
+        <module>core-tests</module>
     </modules>
 
     <build>
@@ -222,9 +223,8 @@
 
             <dependency>
                 <groupId>io.undertow</groupId>
-                <artifactId>undertow-core</artifactId>
+                <artifactId>undertow-core-tests</artifactId>
                 <version>${project.version}</version>
-                <type>test-jar</type>
                 <scope>test</scope>
             </dependency>
 
@@ -462,9 +462,6 @@
                     <scope>test</scope>
                 </dependency>
             </dependencies>
-            <modules>
-                <module>http2-test-suite</module>
-            </modules>
         </profile>
         <profile>
             <id>jdk8.old</id>
@@ -482,9 +479,6 @@
                     <scope>test</scope>
                 </dependency>
             </dependencies>
-            <modules>
-                <module>http2-test-suite</module>
-            </modules>
         </profile>
         <profile>
             <id>jdk8.old2</id>
@@ -502,9 +496,6 @@
                     <scope>test</scope>
                 </dependency>
             </dependencies>
-            <modules>
-                <module>http2-test-suite</module>
-            </modules>
         </profile>
         <profile>
             <id>jdk8.old3</id>
@@ -522,9 +513,6 @@
                     <scope>test</scope>
                 </dependency>
             </dependencies>
-            <modules>
-                <module>http2-test-suite</module>
-            </modules>
         </profile>
         <profile>
             <id>jdk7</id>
@@ -541,9 +529,6 @@
                     <scope>test</scope>
                 </dependency>
             </dependencies>
-            <modules>
-                <module>http2-test-suite</module>
-            </modules>
         </profile>
         <profile>
             <id>dist</id>

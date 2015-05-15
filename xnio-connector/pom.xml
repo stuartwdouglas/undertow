@@ -74,13 +74,6 @@
         </dependency>
 
         <dependency>
-            <groupId>io.undertow</groupId>
-            <artifactId>undertow-core</artifactId>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
             <groupId>org.jboss.xnio</groupId>
             <artifactId>xnio-nio</artifactId>
             <scope>test</scope>
@@ -157,28 +150,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <enableAssertions>true</enableAssertions>
-                    <runOrder>reversealphabetical</runOrder>
-                    <systemPropertyVariables>
-                        <test.ajp>${ajp}</test.ajp>
-                        <test.proxy>${proxy}</test.proxy>
-                        <test.dump>${dump}</test.dump>
-                        <test.bufferSize>${bufferSize}</test.bufferSize>
-                        <default.server.address>localhost</default.server.address>
-                        <default.server.port>7777</default.server.port>
-                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        <test.level>${test.level}</test.level>
-                        <java.net.preferIPv6Addresses>${test.ipv6}</java.net.preferIPv6Addresses>
-                        <alpn-boot-string>${alpn-boot-string}</alpn-boot-string>
-                        <sun.net.useExclusiveBind>false</sun.net.useExclusiveBind>
-                    </systemPropertyVariables>
-                    <argLine>${alpn-boot-string} ${jacoco.agent.argLine} ${surefire.system.args}</argLine>
-                </configuration>
             </plugin>
         </plugins>
     </build>

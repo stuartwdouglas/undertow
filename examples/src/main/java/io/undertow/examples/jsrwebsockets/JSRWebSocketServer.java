@@ -18,11 +18,9 @@
 
 package io.undertow.examples.jsrwebsockets;
 
-import javax.servlet.ServletException;
-import org.xnio.ByteBufferSlicePool;
-
 import io.undertow.Handlers;
 import io.undertow.Undertow;
+import io.undertow.buffers.DefaultByteBufferPool;
 import io.undertow.examples.UndertowExample;
 import io.undertow.server.handlers.PathHandler;
 import io.undertow.server.handlers.resource.ClassPathResourceManager;
@@ -30,6 +28,8 @@ import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.DeploymentManager;
 import io.undertow.servlet.api.ServletContainer;
 import io.undertow.websockets.jsr.WebSocketDeploymentInfo;
+
+import javax.servlet.ServletException;
 
 /**
  * @author Stuart Douglas
@@ -56,7 +56,7 @@ public class JSRWebSocketServer {
                 .setResourceManager(new ClassPathResourceManager(JSRWebSocketServer.class.getClassLoader(), JSRWebSocketServer.class.getPackage()))
                 .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME,
                         new WebSocketDeploymentInfo()
-                                .setBuffers(new ByteBufferSlicePool(100, 1000))
+                                .setBuffers(new DefaultByteBufferPool(true, 100, 1000, 1))
                                 .addEndpoint(JsrChatWebSocketEndpoint.class)
                 )
                 .setDeploymentName("chat.war");

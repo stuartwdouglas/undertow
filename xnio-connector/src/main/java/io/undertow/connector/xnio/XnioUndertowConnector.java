@@ -16,16 +16,28 @@
  *  limitations under the License.
  */
 
-package io.undertow.connector;
+package io.undertow.connector.xnio;
+
+import io.undertow.connector.ServerConfig;
+import io.undertow.connector.UndertowConnector;
+import io.undertow.connector.UndertowServer;
 
 /**
  * @author Stuart Douglas
  */
-public interface UndertowServer extends AutoCloseable {
+public class XnioUndertowConnector implements UndertowConnector {
+    @Override
+    public String getName() {
+        return "xnio";
+    }
 
-    void start();
+    @Override
+    public int getPriority() {
+        return 100;
+    }
 
-    void stop();
-
-    void close();
+    @Override
+    public UndertowServer createServer(ServerConfig config) {
+        return new XnioUndertowServer(config);
+    }
 }
