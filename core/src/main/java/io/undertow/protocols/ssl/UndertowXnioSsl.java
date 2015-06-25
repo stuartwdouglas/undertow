@@ -18,6 +18,7 @@
 
 package io.undertow.protocols.ssl;
 
+import org.apache.tomcat.util.net.openssl.OpenSSLContext;
 import org.xnio.BufferAllocator;
 import org.xnio.ByteBufferSlicePool;
 import org.xnio.ChannelListener;
@@ -286,7 +287,13 @@ public class UndertowXnioSsl extends XnioSsl {
     }
 
     public AcceptingChannel<SslConnection> createSslConnectionServer(final XnioWorker worker, final InetSocketAddress bindAddress, final ChannelListener<? super AcceptingChannel<SslConnection>> acceptListener, final OptionMap optionMap) throws IOException {
-        final UndertowAcceptingSslChannel server = new UndertowAcceptingSslChannel(sslContext, worker.createStreamConnectionServer(bindAddress,  null,  optionMap), optionMap, bufferPool, false);
+        final UndertowAcceptingSslChannel server = new UndertowAcceptingSslChannel(sslContext, worker.createStreamConnectionServer(bindAddress,  null,  optionMap), optionMap, bufferPool, false, null);
+        if (acceptListener != null) server.getAcceptSetter().set(acceptListener);
+        return server;
+    }
+
+    public AcceptingChannel<SslConnection> createSslConnectionServer(final XnioWorker worker, final InetSocketAddress bindAddress, final ChannelListener<? super AcceptingChannel<SslConnection>> acceptListener, final OptionMap optionMap, OpenSSLContext openSSLContext) throws IOException {
+        final UndertowAcceptingSslChannel server = new UndertowAcceptingSslChannel(sslContext, worker.createStreamConnectionServer(bindAddress,  null,  optionMap), optionMap, bufferPool, false, openSSLContext);
         if (acceptListener != null) server.getAcceptSetter().set(acceptListener);
         return server;
     }

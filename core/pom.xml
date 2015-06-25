@@ -45,6 +45,51 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>tomcat</groupId>
+            <artifactId>jni</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>/Users/stuart/workspace/tomcat/output/build/lib/tomcat-jni.jar</systemPath>
+        </dependency>
+
+        <dependency>
+            <groupId>tomcat</groupId>
+            <artifactId>cataline</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>/Users/stuart/workspace/tomcat/output/build/lib/catalina.jar</systemPath>
+        </dependency>
+
+        <dependency>
+            <groupId>tomcat</groupId>
+            <artifactId>coyote</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>/Users/stuart/workspace/tomcat/output/build/lib/tomcat-coyote.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>tomcat</groupId>
+            <artifactId>util</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>/Users/stuart/workspace/tomcat/output/build/lib/tomcat-util.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>tomcat</groupId>
+            <artifactId>api</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>/Users/stuart/workspace/tomcat/output/build/lib/tomcat-api.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>tomcat</groupId>
+            <artifactId>log</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>/Users/stuart/workspace/tomcat/output/build/bin/tomcat-juli.jar</systemPath>
+        </dependency>
+
 
         <dependency>
             <groupId>io.undertow</groupId>

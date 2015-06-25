@@ -18,6 +18,7 @@
 
 package io.undertow.protocols.ssl;
 
+import org.apache.tomcat.util.net.openssl.OpenSSLContext;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.Option;
@@ -80,9 +81,10 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
     private final ChannelListener.Setter<AcceptingChannel<SslConnection>> acceptSetter;
     protected final boolean startTls;
     protected final Pool<ByteBuffer> applicationBufferPool;
+    private final OpenSSLContext openSSLContext;
 
 
-    public UndertowAcceptingSslChannel(final SSLContext sslContext, final AcceptingChannel<? extends StreamConnection> tcpServer, final OptionMap optionMap, final Pool<ByteBuffer> applicationBufferPool, final boolean startTls) {
+    public UndertowAcceptingSslChannel(final SSLContext sslContext, final AcceptingChannel<? extends StreamConnection> tcpServer, final OptionMap optionMap, final Pool<ByteBuffer> applicationBufferPool, final boolean startTls, OpenSSLContext openSSLContext) {
         this.tcpServer = tcpServer;
         this.sslContext = sslContext;
         this.applicationBufferPool = applicationBufferPool;
@@ -98,6 +100,7 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
         closeSetter = ChannelListeners.<AcceptingChannel<SslConnection>>getDelegatingSetter(tcpServer.getCloseSetter(), this);
         //noinspection ThisEscapedInObjectConstruction
         acceptSetter = ChannelListeners.<AcceptingChannel<SslConnection>>getDelegatingSetter(tcpServer.getAcceptSetter(), this);
+        this.openSSLContext = openSSLContext;
     }
 
     private static final Set<Option<?>> SUPPORTED_OPTIONS = Option.setBuilder()
@@ -139,7 +142,12 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
             return null;
         }
         final InetSocketAddress peerAddress = tcpConnection.getPeerAddress(InetSocketAddress.class);
-        final SSLEngine engine = sslContext.createSSLEngine(getHostNameNoResolve(peerAddress), peerAddress.getPort());
+        final SSLEngine engine;
+        if(openSSLContext == null) {
+            engine = sslContext.createSSLEngine(getHostNameNoResolve(peerAddress), peerAddress.getPort());
+        } else {
+            engine = openSSLContext.createSSLEngine();
+        }
         final boolean clientMode = useClientMode != 0;
         engine.setUseClientMode(clientMode);
         if (! clientMode) {
@@ -158,7 +166,7 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
                 default: throw new IllegalStateException();
             }
         }
-        engine.setEnableSessionCreation(enableSessionCreation != 0);
+        //engine.setEnableSessionCreation(enableSessionCreation != 0);
         final String[] cipherSuites = UndertowAcceptingSslChannel.this.cipherSuites;
         if (cipherSuites != null) {
             final Set<String> supported = new HashSet<>(Arrays.asList(engine.getSupportedCipherSuites()));

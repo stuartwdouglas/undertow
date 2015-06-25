@@ -41,6 +41,14 @@ import io.undertow.util.NetworkUtils;
 import io.undertow.util.SingleByteStreamSinkConduit;
 import io.undertow.util.SingleByteStreamSourceConduit;
 
+import org.apache.tomcat.jni.Library;
+import org.apache.tomcat.jni.SSL;
+import org.apache.tomcat.util.net.SSLHostConfig;
+import org.apache.tomcat.util.net.SSLHostConfigCertificate;
+import org.apache.tomcat.util.net.SSLUtil;
+import org.apache.tomcat.util.net.openssl.OpenSSLContext;
+import org.apache.tomcat.util.net.openssl.OpenSSLImplementation;
+import org.apache.tomcat.util.net.openssl.OpenSSLKeyManager;
 import org.jboss.logging.Logger;
 import org.junit.Assume;
 import org.junit.Ignore;
@@ -82,6 +90,7 @@ import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 
@@ -96,6 +105,17 @@ import static org.xnio.SslClientAuthMode.REQUESTED;
  * @author Stuart Douglas
  */
 public class DefaultServer extends BlockJUnit4ClassRunner {
+
+    private static final OpenSSLImplementation OPEN_SSL_IMPLEMENTATION = new OpenSSLImplementation();
+
+    {
+        try {
+            Library.initialize(null);
+            SSL.initialize(null);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     static final String DEFAULT = "default";
     private static final int PROXY_OFFSET = 1111;
@@ -688,7 +708,31 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
                 .getMap();
 
         UndertowXnioSsl ssl = new UndertowXnioSsl(worker.getXnio(), OptionMap.EMPTY, SSL_BUFFER_POOL, context);
-        sslServer = ssl.createSslConnectionServer(worker, new InetSocketAddress(getHostAddress("default"), port), openListener, combined);
+
+        final SSLHostConfig sslHostConfig = new SSLHostConfig();
+        final SSLHostConfigCertificate certificate = new SSLHostConfigCertificate(sslHostConfig, SSLHostConfigCertificate.Type.RSA);
+        certificate.setCertificateFile("/Users/stuart/workspace/undertow/core/src/test/resources/server.crt");
+        certificate.setCertificateKeyFile("/Users/stuart/workspace/undertow/core/src/test/resources/server.key");
+        sslHostConfig.addCertificate(certificate);
+
+        sslHostConfig.setCaCertificatePath("/Users/stuart/workspace/undertow/core/src/test/resources/ca.crt");
+        sslHostConfig.setCaCertificateFile("/Users/stuart/workspace/undertow/core/src/test/resources/ca.crt");
+
+        sslHostConfig.setConfigType(SSLHostConfig.Type.OPENSSL);
+        sslHostConfig.setProtocols("TLSv1.1");
+        sslHostConfig.setCiphers("ALL");
+        sslHostConfig.setCertificateVerification("NONE");
+        sslHostConfig.setHostName("localhost");
+        sslHostConfig.setCertificateVerificationDepth(100);
+
+        OpenSSLContext sslContext = new OpenSSLContext(sslHostConfig, certificate);
+        final SSLUtil sslUtil = OPEN_SSL_IMPLEMENTATION.getSSLUtil(sslHostConfig, certificate);
+        try {
+            sslContext.init(sslUtil.getKeyManagers(), sslUtil.getTrustManagers(), new SecureRandom());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        sslServer = ssl.createSslConnectionServer(worker, new InetSocketAddress(getHostAddress("default"), port), openListener, combined, sslContext);
         sslServer.getAcceptSetter().set(openListener);
         sslServer.resumeAccepts();
     }
