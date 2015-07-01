@@ -19,6 +19,11 @@
 package io.undertow.examples.jsrwebsockets;
 
 import javax.servlet.ServletException;
+
+import io.undertow.security.idm.IdentityManager;
+import io.undertow.servlet.api.LoginConfig;
+import io.undertow.servlet.api.SecurityConstraint;
+import io.undertow.servlet.api.WebResourceCollection;
 import org.xnio.ByteBufferSlicePool;
 
 import io.undertow.Handlers;
@@ -30,6 +35,9 @@ import io.undertow.servlet.api.DeploymentInfo;
 import io.undertow.servlet.api.DeploymentManager;
 import io.undertow.servlet.api.ServletContainer;
 import io.undertow.websockets.jsr.WebSocketDeploymentInfo;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Stuart Douglas
@@ -49,10 +57,18 @@ public class JSRWebSocketServer {
 
         final ServletContainer container = ServletContainer.Factory.newInstance();
 
+        final Map<String, char[]> users = new HashMap<>(2);
+        users.put("userOne", "passwordOne".toCharArray());
+        users.put("userTwo", "passwordTwo".toCharArray());
+
+        final IdentityManager identityManager = new MapIdentityManager(users);
         DeploymentInfo builder = new DeploymentInfo()
                 .setClassLoader(JSRWebSocketServer.class.getClassLoader())
                 .setContextPath("/")
                 .addWelcomePage("index.html")
+                .setIdentityManager(identityManager)
+                .addSecurityConstraint(new SecurityConstraint().addWebResourceCollection(new WebResourceCollection().addUrlPattern("/*")).addRoleAllowed("user"))
+                .setLoginConfig(new LoginConfig("foo").addFirstAuthMethod("BASIC"))
                 .setResourceManager(new ClassPathResourceManager(JSRWebSocketServer.class.getClassLoader(), JSRWebSocketServer.class.getPackage()))
                 .addServletContextAttribute(WebSocketDeploymentInfo.ATTRIBUTE_NAME,
                         new WebSocketDeploymentInfo()
