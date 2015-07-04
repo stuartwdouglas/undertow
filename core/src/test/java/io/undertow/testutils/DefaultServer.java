@@ -76,10 +76,10 @@ import java.io.InputStream;
 import java.net.Inet4Address;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 
@@ -155,7 +155,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
         }
     }
 
-    private static SSLContext createSSLContext(final KeyStore keyStore, final KeyStore trustStore) throws IOException {
+    private static SSLContext createSSLContext(final KeyStore keyStore, final KeyStore trustStore, boolean client) throws IOException {
         KeyManager[] keyManagers;
         try {
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -176,9 +176,14 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
 
         SSLContext sslContext;
         try {
-            sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(keyManagers, trustManagers, null);
-        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            if(client) {
+                sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(keyManagers, trustManagers, new SecureRandom());
+            } else {
+                sslContext = SSLContext.getInstance("openssl.TLSv1");
+                sslContext.init(keyManagers, trustManagers, new SecureRandom());
+            }
+        } catch (Exception e) {
             throw new IOException("Unable to create and initialise the SSLContext", e);
         }
 
@@ -278,7 +283,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
                         .set(Options.BALANCING_TOKENS, 1)
                         .set(Options.BALANCING_CONNECTIONS, 2)
                         .getMap();
-                final SSLContext serverContext = createSSLContext(loadKeyStore(SERVER_KEY_STORE), loadKeyStore(SERVER_TRUST_STORE));
+                final SSLContext serverContext = createSSLContext(loadKeyStore(SERVER_KEY_STORE), loadKeyStore(SERVER_TRUST_STORE), false);
                 UndertowXnioSsl ssl = new UndertowXnioSsl(worker.getXnio(), OptionMap.EMPTY, SSL_BUFFER_POOL, serverContext);
                 if (ajp) {
                     openListener = new AjpOpenListener(pool);
@@ -300,7 +305,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
                     openListener = new SpdyOpenListener(pool, new DebuggingSlicePool(new DefaultByteBufferPool(false, 8192)), OptionMap.create(UndertowOptions.ENABLE_SPDY, true));
                     acceptListener = ChannelListeners.openListenerAdapter(wrapOpenListener(new AlpnOpenListener(pool).addProtocol(SpdyOpenListener.SPDY_3_1, (io.undertow.server.DelegateOpenListener) openListener, 5)));
 
-                    SSLContext clientContext = createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE));
+                    SSLContext clientContext = createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE), true);
 
                     server = ssl.createSslConnectionServer(worker, new InetSocketAddress(getHostAddress("default"), 7777 + PROXY_OFFSET), acceptListener, serverOptions);
                     server.getAcceptSetter().set(acceptListener);
@@ -319,7 +324,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
                     openListener = new Http2OpenListener(pool, OptionMap.create(UndertowOptions.ENABLE_HTTP2, true, UndertowOptions.HTTP2_SETTINGS_ENABLE_PUSH, false));
                     acceptListener = ChannelListeners.openListenerAdapter(wrapOpenListener(new AlpnOpenListener(pool).addProtocol(Http2OpenListener.HTTP2, (io.undertow.server.DelegateOpenListener) openListener, 10)));
 
-                    SSLContext clientContext = createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE));
+                    SSLContext clientContext = createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE), true);
                     server = ssl.createSslConnectionServer(worker, new InetSocketAddress(getHostAddress("default"), 7777 + PROXY_OFFSET), acceptListener, serverOptions);
                     server.resumeAccepts();
 
@@ -599,7 +604,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
 
     public static SSLContext createClientSslContext() {
         try {
-            return createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE));
+            return createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE), true);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -607,7 +612,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
 
     public static SSLContext getServerSslContext() {
         try {
-            return createSSLContext(loadKeyStore(SERVER_KEY_STORE), loadKeyStore(SERVER_TRUST_STORE));
+            return createSSLContext(loadKeyStore(SERVER_KEY_STORE), loadKeyStore(SERVER_TRUST_STORE), false);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -632,8 +637,8 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
      * single client. Client cert mode is not set by default
      */
     public static void startSSLServer(OptionMap optionMap, ChannelListener openListener) throws IOException {
-        SSLContext serverContext = createSSLContext(loadKeyStore(SERVER_KEY_STORE), loadKeyStore(SERVER_TRUST_STORE));
-        clientSslContext = createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE));
+        SSLContext serverContext = createSSLContext(loadKeyStore(SERVER_KEY_STORE), loadKeyStore(SERVER_TRUST_STORE), false);
+        clientSslContext = createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE), true);
         startSSLServer(serverContext, optionMap, openListener);
     }
 
