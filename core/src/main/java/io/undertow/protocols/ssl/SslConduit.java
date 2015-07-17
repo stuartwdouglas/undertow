@@ -19,6 +19,7 @@
 package io.undertow.protocols.ssl;
 
 import io.undertow.UndertowLogger;
+import org.jboss.logging.Logger;
 import org.xnio.Buffers;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
@@ -61,6 +62,8 @@ import static org.xnio.Bits.anyAreSet;
  * @author Stuart Douglas
  */
 public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
+
+    private static final Logger log = Logger.getLogger(SslConduit.class.getPackage().getName());
 
     /**
      * If this is set we are in the middle of a handshake, and we cannot
@@ -622,6 +625,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
         if(outstandingTasks > 0) {
             return 0;
         }
+        boolean bytesProduced = false;
         if(anyAreSet(state, FLAG_READ_REQUIRES_WRITE)) {
             doWrap(null, 0, 0);
             if(allAreClear(state, FLAG_WRITE_REQUIRES_READ)) { //unless a wrap is immediately required we just return
@@ -690,6 +694,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                         result = engine.unwrap(this.dataToUnwrap.getBuffer(), d);
                         unwrapBufferUsed = true;
                     }
+                    bytesProduced = result.bytesProduced() > 0;
                 } else {
                     unwrapBufferUsed = true;
                     if (unwrappedData == null) {
@@ -698,6 +703,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                         unwrappedData.getBuffer().compact();
                     }
                     result = engine.unwrap(this.dataToUnwrap.getBuffer(), unwrappedData.getBuffer());
+                    bytesProduced = result.bytesProduced() > 0;
                 }
             } finally {
                 if(unwrapBufferUsed) {
@@ -737,6 +743,10 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
         } finally {
             boolean requiresListenerInvocation = false; //if there is data in the buffer and reads are resumed we should re-run the listener
             if (unwrappedData != null && unwrappedData.getBuffer().hasRemaining()) {
+                requiresListenerInvocation = true;
+            }
+            //if bytes are produced then there may be more data waiting buffered in the engine
+            if(bytesProduced) {
                 requiresListenerInvocation = true;
             }
             if(dataToUnwrap != null) {
