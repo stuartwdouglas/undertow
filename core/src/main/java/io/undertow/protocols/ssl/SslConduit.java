@@ -19,6 +19,7 @@
 package io.undertow.protocols.ssl;
 
 import io.undertow.UndertowLogger;
+import org.jboss.logging.Logger;
 import org.xnio.Buffers;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
@@ -62,7 +63,11 @@ import static org.xnio.Bits.anyAreSet;
  */
 public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
+<<<<<<< 82aca5cf46e7af1bc2f0ae9e75429cd79139942c
     public static final int MAX_READ_LISTENER_INVOCATIONS = Integer.getInteger("io.undertow.ssl.max-read-listener-invocations", 100);
+=======
+    private static final Logger log = Logger.getLogger(SslConduit.class.getPackage().getName());
+>>>>>>> Fix issue with data buffered in the engine not being read
 
     /**
      * If this is set we are in the middle of a handshake, and we cannot
@@ -654,6 +659,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
         if(outstandingTasks > 0) {
             return 0;
         }
+        boolean bytesProduced = false;
         if(anyAreSet(state, FLAG_READ_REQUIRES_WRITE)) {
             doWrap(null, 0, 0);
             if(allAreClear(state, FLAG_WRITE_REQUIRES_READ)) { //unless a wrap is immediately required we just return
@@ -727,6 +733,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                         result = engine.unwrap(this.dataToUnwrap.getBuffer(), d);
                         unwrapBufferUsed = true;
                     }
+                    bytesProduced = result.bytesProduced() > 0;
                 } else {
                     unwrapBufferUsed = true;
                     if (unwrappedData == null) {
@@ -735,6 +742,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                         unwrappedData.getBuffer().compact();
                     }
                     result = engine.unwrap(this.dataToUnwrap.getBuffer(), unwrappedData.getBuffer());
+                    bytesProduced = result.bytesProduced() > 0;
                 }
             } finally {
                 if (unwrapBufferUsed) {

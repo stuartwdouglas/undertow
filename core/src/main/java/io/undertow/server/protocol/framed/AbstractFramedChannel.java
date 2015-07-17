@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -39,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import io.undertow.UndertowOptions;
+import org.jboss.logging.Logger;
 import org.xnio.Buffers;
 import org.xnio.ChannelExceptionHandler;
 import org.xnio.ChannelListener;
@@ -71,6 +73,8 @@ import org.xnio.channels.SuspendableWriteChannel;
  * @author Stuart Douglas
  */
 public abstract class AbstractFramedChannel<C extends AbstractFramedChannel<C, R, S>, R extends AbstractFramedStreamSourceChannel<C, R, S>, S extends AbstractFramedStreamSinkChannel<C, R, S>> implements ConnectedChannel {
+
+    private static final Logger log = Logger.getLogger(AbstractFramedChannel.class.getPackage().getName());
 
     /**
      * The maximum number of buffers we will queue before suspending reads and
@@ -617,11 +621,16 @@ public abstract class AbstractFramedChannel<C extends AbstractFramedChannel<C, R
                     ++j;
                 }
                 long toWrite = Buffers.remaining(data);
+                long initial = toWrite;
                 long res;
+                if(log.isDebugEnabled()) {
+                    log.debugf("writing %s bytes. Bytes: %s", toWrite, Arrays.toString(data));
+                }
                 do {
                     res = channel.getSinkChannel().write(data);
                     toWrite -= res;
                 } while (res > 0 && toWrite > 0);
+
                 int max = toSend;
 
                 while (max > 0) {
