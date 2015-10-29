@@ -338,4 +338,8 @@ public interface UndertowLogger extends BasicLogger {
     @LogMessage(level = ERROR)
     @Message(id = 5071, value = "Undertow request failed %s")
     void undertowRequestFailed(@Cause Throwable t, HttpServerExchange exchange);
+
+    @LogMessage(level = ERROR)
+    @Message(id = 5072, value = "Worker task failed")
+    void workerTaskFailed(@Cause Throwable t);
 }

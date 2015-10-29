@@ -30,6 +30,7 @@ import io.undertow.server.protocol.ParseTimeoutUpdater;
 import io.undertow.server.protocol.http2.Http2ReceiveListener;
 import io.undertow.util.ClosingChannelExceptionHandler;
 import io.undertow.util.HttpString;
+import io.undertow.util.MagicPool;
 import io.undertow.util.Methods;
 import io.undertow.util.Protocols;
 import io.undertow.util.StringWriteChannelListener;
@@ -296,7 +297,11 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
                                 newRequest();
                                 channel.getSourceChannel().setReadListener(HttpReadListener.this);
                                 requestStateUpdater.set(this, 0);
-                                channel.getSourceChannel().resumeReads();
+                                if(Thread.currentThread() instanceof MagicPool.MagicThread) {
+                                    ((MagicPool.MagicThread)Thread.currentThread()).executeReadTask((StreamSourceChannel)channel.getSourceChannel(),(ChannelListener) HttpReadListener.this);
+                                } else {
+                                    channel.getSourceChannel().resumeReads();
+                                }
                                 break;
                             }
                         }
