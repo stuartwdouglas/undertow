@@ -25,10 +25,8 @@ import org.xnio.channels.StreamSourceChannel;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.lang.reflect.Method;
-import java.nio.channels.Selector;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executor;
-import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * An executor that has the following semantics:
@@ -37,8 +35,8 @@ import java.util.concurrent.LinkedBlockingDeque;
  */
 public class MagicPool implements Executor {
 
-    private final LinkedBlockingDeque<MagicThread> threads = new LinkedBlockingDeque<>();
-    private final LinkedBlockingDeque<Runnable> tasks = new LinkedBlockingDeque<>();
+    private final ConcurrentLinkedDeque<MagicThread> threads = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<Runnable> tasks = new ConcurrentLinkedDeque<>();
 
     private final Xnio xnio;
 
@@ -46,7 +44,6 @@ public class MagicPool implements Executor {
         this.xnio = xnio;
         for (int i = 0; i < size; ++i) {
             MagicThread magicThread = new MagicThread();
-            threads.add(magicThread);
             magicThread.start();
         }
     }
@@ -83,24 +80,15 @@ public class MagicPool implements Executor {
     public class MagicThread extends Thread {
         private Runnable runnable;
         private IoWaitTask ioWaitTask = null;
-        private final Selector selector;
 
         private boolean waitingOnSelector = false;
         private boolean waitingOnMonitor = false;
 
-        MagicThread() {
-            try {
-                Class nioXnio = getClass().getClassLoader().loadClass("org.xnio.nio.NioXnio");
-                Method selectorMethod = nioXnio.getDeclaredMethod("getSelector");
-                selectorMethod.setAccessible(true);
-                selector = (Selector) selectorMethod.invoke(xnio);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
         public boolean execute(Runnable command) {
             synchronized (this) {
+                if(threads.contains(this)) {
+                    throw new IllegalStateException();
+                }
                 if (waitingOnMonitor) {
                     if (runnable != null) {
                         throw new IllegalStateException();
@@ -112,7 +100,7 @@ public class MagicPool implements Executor {
                         throw new IllegalStateException();
                     }
                     runnable = command;
-                    selector.wakeup();
+                    interrupt();
                 } else {
                     return false;
                 }
@@ -144,9 +132,18 @@ public class MagicPool implements Executor {
                         synchronized (this) {
                             waitingOnMonitor = true;
                             try {
+                                if (threads.contains(MagicThread.this)) {
+                                    throw new IllegalStateException();
+                                }
+                                if(runnable != null) {
+                                    throw new IllegalStateException();
+                                }
                                 threads.add(this);
-                                wait();
+                                while (runnable == null) {
+                                    wait();
+                                }
                             } finally {
+                                threads.remove(this);
                                 waitingOnMonitor = false;
                             }
                             if (runnable != null) {
@@ -221,34 +218,54 @@ public class MagicPool implements Executor {
             }
 
             public void run() {
-                if (!tasks.isEmpty()) {
-                    channel.getReadSetter().set((ChannelListener)listener);
-                    channel.resumeReads();
-                    return;
-                }
                 try {
                     synchronized (MagicThread.this) {
+                        if(runnable != null) {
+                            throw new IllegalStateException();
+                        }
                         waitingOnSelector = true;
+                        if (threads.contains(MagicThread.this)) {
+                            throw new IllegalStateException();
+                        }
+                        if(runnable != null) {
+                            throw new IllegalStateException();
+                        }
                         threads.add(MagicThread.this);
                     }
-                    channel.awaitReadable();
-                    synchronized (MagicThread.this) {
-                        waitingOnSelector = false;
-                        if (runnable == null) {
-                            listener.handleEvent((StreamSourceChannel)channel);
+                    boolean handleEvent = false;
+                    try {
+                        if (channel.isOpen()) {
+                            channel.awaitReadable();
+                        }
+                    } finally {
+                        synchronized (MagicThread.this) {
+                            threads.remove(MagicThread.this);
+                            waitingOnSelector = false;
+                            if (runnable == null) {
+                                handleEvent = true;
+                            }
+                            interrupted();
                         }
                     }
+                    if (handleEvent) {
+                        listener.handleEvent(channel);
+                    } else {
+                        channel.getReadSetter().set((ChannelListener) listener);
+                        channel.resumeReads();
+                    }
                 } catch (InterruptedIOException e) {
-                    channel.getReadSetter().set((ChannelListener)listener);
+                    channel.getReadSetter().set((ChannelListener) listener);
                     channel.resumeReads();
+                    interrupted();
                 } catch (IOException e) {
-                    channel.getReadSetter().set((ChannelListener)listener);
+                    channel.getReadSetter().set((ChannelListener) listener);
                     channel.wakeupReads();
                 }
             }
 
             void cancel() {
-                channel.getReadSetter().set((ChannelListener)listener);
+                threads.remove(MagicThread.this);
+                channel.getReadSetter().set((ChannelListener) listener);
                 channel.resumeReads();
             }
         }

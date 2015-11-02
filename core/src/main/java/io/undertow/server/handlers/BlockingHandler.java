@@ -21,6 +21,7 @@ package io.undertow.server.handlers;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 import io.undertow.server.HandlerWrapper;
 import io.undertow.server.HttpHandler;
@@ -36,22 +37,33 @@ import io.undertow.server.handlers.builder.HandlerBuilder;
  */
 public final class BlockingHandler implements HttpHandler {
 
+    private final Executor executor;
     private volatile HttpHandler handler;
 
-    public BlockingHandler(final HttpHandler handler) {
+    public BlockingHandler(final Executor executor, final HttpHandler handler) {
         this.handler = handler;
+        this.executor = executor;
     }
 
     public BlockingHandler() {
         this(null);
     }
+    public BlockingHandler(final HttpHandler handler) {
+        this.handler = handler;
+        this.executor = null;
+    }
+
 
     @Override
     public void handleRequest(final HttpServerExchange exchange) throws Exception {
 
         exchange.startBlocking();
         if (exchange.isInIoThread()) {
-            exchange.dispatch(handler);
+            if(executor == null) {
+                exchange.dispatch(handler);
+            } else {
+                exchange.dispatch(executor, handler);
+            }
         } else {
             handler.handleRequest(exchange);
         }

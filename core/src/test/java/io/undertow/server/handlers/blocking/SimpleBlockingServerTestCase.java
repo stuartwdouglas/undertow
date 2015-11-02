@@ -18,11 +18,6 @@
 
 package io.undertow.server.handlers.blocking;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-
 import io.undertow.io.IoCallback;
 import io.undertow.io.Sender;
 import io.undertow.server.HttpHandler;
@@ -32,6 +27,7 @@ import io.undertow.testutils.DefaultServer;
 import io.undertow.testutils.HttpClientUtils;
 import io.undertow.testutils.TestHttpClient;
 import io.undertow.util.Headers;
+import io.undertow.util.MagicPool;
 import io.undertow.util.Methods;
 import io.undertow.util.StatusCodes;
 import org.apache.http.HttpResponse;
@@ -45,6 +41,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
 /**
  * @author Stuart Douglas
  */
@@ -55,9 +56,7 @@ public class SimpleBlockingServerTestCase {
 
     @BeforeClass
     public static void setup() {
-        final BlockingHandler blockingHandler = new BlockingHandler();
-        DefaultServer.setRootHandler(blockingHandler);
-        blockingHandler.setRootHandler(new HttpHandler() {
+        final BlockingHandler blockingHandler = new BlockingHandler(new MagicPool(30, DefaultServer.getWorker().getXnio()), new HttpHandler() {
             @Override
             public void handleRequest(final HttpServerExchange exchange) {
                 try {
@@ -110,17 +109,21 @@ public class SimpleBlockingServerTestCase {
                 }
             }
         });
+        DefaultServer.setRootHandler(blockingHandler);
     }
 
     @Test
-    public void sendHttpRequest() throws IOException {
+    public void sendHttpRequest() throws IOException, InterruptedException {
         message = "My HTTP Request!";
+        Thread.sleep(1000000);
         TestHttpClient client = new TestHttpClient();
         try {
-            HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/path");
-            HttpResponse result = client.execute(get);
-            Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
-            Assert.assertEquals(message, HttpClientUtils.readResponse(result));
+            for (int i = 0; i < 10; ++i) {
+                HttpGet get = new HttpGet(DefaultServer.getDefaultServerURL() + "/path");
+                HttpResponse result = client.execute(get);
+                Assert.assertEquals(StatusCodes.OK, result.getStatusLine().getStatusCode());
+                Assert.assertEquals(message, HttpClientUtils.readResponse(result));
+            }
         } finally {
             client.getConnectionManager().shutdown();
         }
