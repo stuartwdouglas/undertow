@@ -20,11 +20,12 @@ package io.undertow.util;
 
 import io.undertow.UndertowLogger;
 import org.xnio.ChannelListener;
-import org.xnio.Xnio;
 import org.xnio.channels.StreamSourceChannel;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.ArrayDeque;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executor;
 
@@ -35,13 +36,18 @@ import java.util.concurrent.Executor;
  */
 public class MagicPool implements Executor {
 
+    private static Runnable EMPTY = new Runnable() {
+        @Override
+        public void run() {
+
+        }
+    };
+
     private final ConcurrentLinkedDeque<MagicThread> threads = new ConcurrentLinkedDeque<>();
+    private final Queue<MagicThread> blockingIoThreads = new ArrayDeque<>();
     private final ConcurrentLinkedDeque<Runnable> tasks = new ConcurrentLinkedDeque<>();
 
-    private final Xnio xnio;
-
-    public MagicPool(int size, Xnio xnio) {
-        this.xnio = xnio;
+    public MagicPool(int size) {
         for (int i = 0; i < size; ++i) {
             MagicThread magicThread = new MagicThread();
             magicThread.start();
@@ -50,63 +56,38 @@ public class MagicPool implements Executor {
 
     @Override
     public void execute(Runnable command) {
+        execute(command, true);
+    }
+
+    private void execute(Runnable command, boolean queueTask) {
         //try and directly execute, avoiding the thread list
-        do {
-            MagicThread poll = threads.poll();
+
+        MagicThread poll = threads.poll();
+        if (poll != null) {
+            //execute in this waiting thread
+            poll.executeWaiter(command);
+            return;
+        }
+        //no free threads
+        //look for IO blocked threads
+        synchronized (this) {
+            poll = blockingIoThreads.poll();
             if (poll != null) {
-                //try and execute in this polled thread
-                if (poll.execute(command)) {
-                    return;
-                }
-            } else {
-                break;
+                poll.executeInIOBlockedThread(command);
+                return;
             }
-        } while (true);
+        }
         //the direct execution failed, add it to the task list
-        tasks.add(command);
-        do {
-            //now we need to try again, there could be available threads now
-            MagicThread poll = threads.poll();
-            if (poll == null) { //all threads are busy, task will be executed
-                return;
-            }
-            if (poll.poke()) {
-                //a thread was woken up to process the task queue
-                return;
-            }
-        } while (true);
+        if (queueTask) {
+            tasks.add(command);
+            //we need to retry execution, as all threads could now be waiting
+            execute(EMPTY, false);
+        }
     }
 
     public class MagicThread extends Thread {
         private Runnable runnable;
         private IoWaitTask ioWaitTask = null;
-
-        private boolean waitingOnSelector = false;
-        private boolean waitingOnMonitor = false;
-
-        public boolean execute(Runnable command) {
-            synchronized (this) {
-                if(threads.contains(this)) {
-                    throw new IllegalStateException();
-                }
-                if (waitingOnMonitor) {
-                    if (runnable != null) {
-                        throw new IllegalStateException();
-                    }
-                    runnable = command;
-                    notifyAll();
-                } else if (waitingOnSelector) {
-                    if (runnable != null) {
-                        throw new IllegalStateException();
-                    }
-                    runnable = command;
-                    interrupt();
-                } else {
-                    return false;
-                }
-            }
-            return true;
-        }
 
         @Override
         public void run() {
@@ -130,33 +111,24 @@ public class MagicPool implements Executor {
                         //no task, and no IO task, lets wait on the monitor for a task
                         Runnable r = null;
                         synchronized (this) {
-                            waitingOnMonitor = true;
-                            try {
-                                if (threads.contains(MagicThread.this)) {
-                                    throw new IllegalStateException();
-                                }
-                                if(runnable != null) {
-                                    throw new IllegalStateException();
-                                }
-                                threads.add(this);
-                                while (runnable == null) {
-                                    wait();
-                                }
-                            } finally {
-                                threads.remove(this);
-                                waitingOnMonitor = false;
+                            if (threads.contains(MagicThread.this)) {
+                                throw new IllegalStateException();
                             }
                             if (runnable != null) {
-                                r = runnable;
-                                runnable = null;
+                                throw new IllegalStateException();
                             }
+                            threads.add(this);
+                            while (runnable == null) {
+                                wait();
+                            }
+
+                            r = runnable;
+                            runnable = null;
                         }
-                        if (r != null) {
-                            try {
-                                r.run();
-                            } catch (Throwable t) {
-                                UndertowLogger.ROOT_LOGGER.workerTaskFailed(t);
-                            }
+                        try {
+                            r.run();
+                        } catch (Throwable t) {
+                            UndertowLogger.ROOT_LOGGER.workerTaskFailed(t);
                         }
                     } else {
                         //we have an IO wait task, and nothing has been queued
@@ -198,13 +170,23 @@ public class MagicPool implements Executor {
             ioWaitTask = new IoWaitTask(channel, listener);
         }
 
-        public boolean poke() {
-            return execute(new Runnable() {
-                @Override
-                public void run() {
-
+        public void executeWaiter(Runnable command) {
+            synchronized (MagicThread.this) {
+                if (runnable != null) {
+                    throw new IllegalStateException();
                 }
-            });
+                runnable = command;
+                notifyAll();
+            }
+        }
+
+        public void executeInIOBlockedThread(Runnable command) {
+            assert Thread.holdsLock(MagicPool.this);
+            if (runnable != null) {
+                throw new IllegalStateException();
+            }
+            runnable = command;
+            interrupt();
         }
 
         class IoWaitTask {
@@ -219,18 +201,17 @@ public class MagicPool implements Executor {
 
             public void run() {
                 try {
-                    synchronized (MagicThread.this) {
-                        if(runnable != null) {
+                    synchronized (MagicPool.this) {
+                        if (runnable != null) {
                             throw new IllegalStateException();
                         }
-                        waitingOnSelector = true;
                         if (threads.contains(MagicThread.this)) {
                             throw new IllegalStateException();
                         }
-                        if(runnable != null) {
+                        if (runnable != null) {
                             throw new IllegalStateException();
                         }
-                        threads.add(MagicThread.this);
+                        blockingIoThreads.add(MagicThread.this);
                     }
                     boolean handleEvent = false;
                     try {
@@ -238,11 +219,12 @@ public class MagicPool implements Executor {
                             channel.awaitReadable();
                         }
                     } finally {
-                        synchronized (MagicThread.this) {
-                            threads.remove(MagicThread.this);
-                            waitingOnSelector = false;
-                            if (runnable == null) {
-                                handleEvent = true;
+                        synchronized (MagicPool.this) {
+                            synchronized (threads) {
+                                if (runnable == null) {
+                                    threads.remove(MagicThread.this);
+                                    handleEvent = true;
+                                }
                             }
                             interrupted();
                         }
@@ -264,7 +246,6 @@ public class MagicPool implements Executor {
             }
 
             void cancel() {
-                threads.remove(MagicThread.this);
                 channel.getReadSetter().set((ChannelListener) listener);
                 channel.resumeReads();
             }

@@ -56,7 +56,7 @@ public class SimpleBlockingServerTestCase {
 
     @BeforeClass
     public static void setup() {
-        final BlockingHandler blockingHandler = new BlockingHandler(new MagicPool(30, DefaultServer.getWorker().getXnio()), new HttpHandler() {
+        final BlockingHandler blockingHandler = new BlockingHandler(new MagicPool(30), new HttpHandler() {
             @Override
             public void handleRequest(final HttpServerExchange exchange) {
                 try {
