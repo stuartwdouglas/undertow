@@ -24,8 +24,8 @@ import org.xnio.channels.StreamSourceChannel;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.util.ArrayDeque;
-import java.util.Queue;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executor;
 
@@ -44,7 +44,7 @@ public class MagicPool implements Executor {
     };
 
     private final ConcurrentLinkedDeque<MagicThread> threads = new ConcurrentLinkedDeque<>();
-    private final Queue<MagicThread> blockingIoThreads = new ArrayDeque<>();
+    private final LinkedHashSet<MagicThread> blockingIoThreads = new LinkedHashSet<>();
     private final ConcurrentLinkedDeque<Runnable> tasks = new ConcurrentLinkedDeque<>();
 
     public MagicPool(int size) {
@@ -71,10 +71,14 @@ public class MagicPool implements Executor {
         //no free threads
         //look for IO blocked threads
         synchronized (this) {
-            poll = blockingIoThreads.poll();
-            if (poll != null) {
-                poll.executeInIOBlockedThread(command);
-                return;
+            if(!blockingIoThreads.isEmpty()) {
+                Iterator<MagicThread> iterator = blockingIoThreads.iterator();
+                poll = iterator.next();
+                iterator.remove();
+                if (poll != null) {
+                    poll.executeInIOBlockedThread(command);
+                    return;
+                }
             }
         }
         //the direct execution failed, add it to the task list
@@ -86,7 +90,7 @@ public class MagicPool implements Executor {
     }
 
     public class MagicThread extends Thread {
-        private Runnable runnable;
+        private volatile Runnable runnable;
         private IoWaitTask ioWaitTask = null;
 
         @Override
@@ -140,11 +144,9 @@ public class MagicPool implements Executor {
                             UndertowLogger.ROOT_LOGGER.workerTaskFailed(t);
                         }
                         Runnable r = null;
-                        synchronized (this) {
-                            if (runnable != null) {
-                                r = runnable;
-                                runnable = null;
-                            }
+                        if (runnable != null) {
+                            r = runnable;
+                            runnable = null;
                         }
                         if (r != null) {
                             try {
@@ -170,7 +172,7 @@ public class MagicPool implements Executor {
             ioWaitTask = new IoWaitTask(channel, listener);
         }
 
-        public void executeWaiter(Runnable command) {
+        private void executeWaiter(Runnable command) {
             synchronized (MagicThread.this) {
                 if (runnable != null) {
                     throw new IllegalStateException();
@@ -180,7 +182,7 @@ public class MagicPool implements Executor {
             }
         }
 
-        public void executeInIOBlockedThread(Runnable command) {
+        private void executeInIOBlockedThread(Runnable command) {
             assert Thread.holdsLock(MagicPool.this);
             if (runnable != null) {
                 throw new IllegalStateException();
@@ -205,9 +207,6 @@ public class MagicPool implements Executor {
                         if (runnable != null) {
                             throw new IllegalStateException();
                         }
-                        if (threads.contains(MagicThread.this)) {
-                            throw new IllegalStateException();
-                        }
                         if (runnable != null) {
                             throw new IllegalStateException();
                         }
@@ -220,11 +219,9 @@ public class MagicPool implements Executor {
                         }
                     } finally {
                         synchronized (MagicPool.this) {
-                            synchronized (threads) {
-                                if (runnable == null) {
-                                    threads.remove(MagicThread.this);
-                                    handleEvent = true;
-                                }
+                            if (runnable == null) {
+                                blockingIoThreads.remove(MagicThread.this);
+                                handleEvent = true;
                             }
                             interrupted();
                         }

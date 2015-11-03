@@ -22,6 +22,7 @@ import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.conduits.ReadDataStreamSourceConduit;
+import io.undertow.connector.PooledByteBuffer;
 import io.undertow.protocols.http2.Http2Channel;
 import io.undertow.server.ConnectorStatisticsImpl;
 import io.undertow.server.Connectors;
@@ -37,7 +38,6 @@ import io.undertow.util.StringWriteChannelListener;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.IoUtils;
-import io.undertow.connector.PooledByteBuffer;
 import org.xnio.StreamConnection;
 import org.xnio.channels.StreamSinkChannel;
 import org.xnio.channels.StreamSourceChannel;
@@ -60,7 +60,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
      * used for HTTP2 prior knowledge support
      */
     private static final HttpString PRI = new HttpString("PRI");
-    private static final byte[] PRI_EXPECTED = new byte[] {'S', 'M', '\r', '\n', '\r', '\n'};
+    private static final byte[] PRI_EXPECTED = new byte[]{'S', 'M', '\r', '\n', '\r', '\n'};
 
 
     private static final String BAD_REQUEST = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
@@ -98,7 +98,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
         this.allowUnknownProtocols = connection.getUndertowOptions().get(UndertowOptions.ALLOW_UNKNOWN_PROTOCOLS, false);
         int requestParseTimeout = connection.getUndertowOptions().get(UndertowOptions.REQUEST_PARSE_TIMEOUT, -1);
         int requestIdleTimeout = connection.getUndertowOptions().get(UndertowOptions.NO_REQUEST_TIMEOUT, -1);
-        if(requestIdleTimeout < 0 && requestParseTimeout < 0) {
+        if (requestIdleTimeout < 0 && requestParseTimeout < 0) {
             this.parseTimeoutUpdater = null;
         } else {
             this.parseTimeoutUpdater = new ParseTimeoutUpdater(connection, requestParseTimeout, requestIdleTimeout);
@@ -110,7 +110,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
         state.reset();
         read = 0;
         httpServerExchange = new HttpServerExchange(connection, maxEntitySize);
-        if(parseTimeoutUpdater != null) {
+        if (parseTimeoutUpdater != null) {
             parseTimeoutUpdater.connectionIdle();
         }
         connection.setCurrentExchange(null);
@@ -159,7 +159,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
                 }
 
                 if (res <= 0) {
-                    if(bytesRead && parseTimeoutUpdater != null) {
+                    if (bytesRead && parseTimeoutUpdater != null) {
                         parseTimeoutUpdater.failedParse();
                     }
                     handleFailedRead(channel, res);
@@ -187,7 +187,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
                     return;
                 }
             } while (!state.isComplete());
-            if(parseTimeoutUpdater != null) {
+            if (parseTimeoutUpdater != null) {
                 parseTimeoutUpdater.requestStarted();
             }
 
@@ -196,14 +196,14 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
             this.httpServerExchange = null;
             requestStateUpdater.set(this, 1);
 
-            if(httpServerExchange.getProtocol() == Protocols.HTTP_2_0) {
+            if (httpServerExchange.getProtocol() == Protocols.HTTP_2_0) {
                 free = handleHttp2PriorKnowledge(pooled, httpServerExchange);
                 return;
             }
 
-            if(!allowUnknownProtocols) {
+            if (!allowUnknownProtocols) {
                 HttpString protocol = httpServerExchange.getProtocol();
-                if(protocol != Protocols.HTTP_1_1 && protocol != Protocols.HTTP_1_0 && protocol != Protocols.HTTP_0_9) {
+                if (protocol != Protocols.HTTP_1_1 && protocol != Protocols.HTTP_1_0 && protocol != Protocols.HTTP_0_9) {
                     UndertowLogger.REQUEST_IO_LOGGER.debugf("Closing connection from %s due to unknown protocol %s", connection.getChannel().getPeerAddress(), protocol);
                     sendBadRequestAndClose(connection.getChannel(), new IOException());
                     return;
@@ -214,10 +214,10 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
                 Connectors.setRequestStartTime(httpServerExchange);
             }
             connection.setCurrentExchange(httpServerExchange);
-            if(connectorStatistics != null) {
+            if (connectorStatistics != null) {
                 connectorStatistics.setup(httpServerExchange);
             }
-            if(connection.getSslSession() != null) {
+            if (connection.getSslSession() != null) {
                 //TODO: figure out a better solution for this
                 //in order to improve performance we do not generally suspend reads, instead we a CAS to detect when
                 //data arrives while a request is running and suspend lazily, as suspend/resume is relatively expensive
@@ -235,7 +235,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
     }
 
     private boolean handleHttp2PriorKnowledge(PooledByteBuffer pooled, HttpServerExchange httpServerExchange) throws IOException {
-        if(httpServerExchange.getRequestMethod().equals(PRI) && connection.getUndertowOptions().get(UndertowOptions.ENABLE_HTTP2, false)) {
+        if (httpServerExchange.getRequestMethod().equals(PRI) && connection.getUndertowOptions().get(UndertowOptions.ENABLE_HTTP2, false)) {
             handleHttp2PriorKnowledge(connection.getChannel(), connection, pooled);
             return false;
         } else {
@@ -246,8 +246,10 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
 
     private void handleFailedRead(ConduitStreamSourceChannel channel, int res) {
         if (res == 0) {
+
             channel.setReadListener(this);
             channel.resumeReads();
+
         } else if (res == -1) {
             IoUtils.safeClose(connection);
         }
@@ -297,8 +299,8 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
                                 newRequest();
                                 channel.getSourceChannel().setReadListener(HttpReadListener.this);
                                 requestStateUpdater.set(this, 0);
-                                if(Thread.currentThread() instanceof MagicPool.MagicThread) {
-                                    ((MagicPool.MagicThread)Thread.currentThread()).executeReadTask((StreamSourceChannel)channel.getSourceChannel(),(ChannelListener) HttpReadListener.this);
+                                if (Thread.currentThread() instanceof MagicPool.MagicThread) {
+                                    ((MagicPool.MagicThread) Thread.currentThread()).executeReadTask((StreamSourceChannel) channel.getSourceChannel(), (ChannelListener) HttpReadListener.this);
                                 } else {
                                     channel.getSourceChannel().resumeReads();
                                 }
@@ -361,7 +363,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
     }
 
     private boolean isUpgradeOrConnect(HttpServerExchange exchange) {
-        return exchange.isUpgrade() || (exchange.getRequestMethod().equals(Methods.CONNECT) && ((HttpServerConnection)exchange.getConnection()).isConnectHandled() );
+        return exchange.isUpgrade() || (exchange.getRequestMethod().equals(Methods.CONNECT) && ((HttpServerConnection) exchange.getConnection()).isConnectHandled());
     }
 
     @Override
@@ -376,19 +378,19 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
 
         byte[] data = new byte[PRI_EXPECTED.length];
         final ByteBuffer buffer = ByteBuffer.wrap(data);
-        if(readData.getBuffer().hasRemaining()) {
+        if (readData.getBuffer().hasRemaining()) {
             while (readData.getBuffer().hasRemaining() && buffer.hasRemaining()) {
                 buffer.put(readData.getBuffer().get());
             }
         }
         final PooledByteBuffer extraData;
-        if(readData.getBuffer().hasRemaining()) {
+        if (readData.getBuffer().hasRemaining()) {
             extraData = readData;
         } else {
             readData.close();
             extraData = null;
         }
-        if(!doHttp2PriRead(connection, buffer, serverConnection, extraData)) {
+        if (!doHttp2PriRead(connection, buffer, serverConnection, extraData)) {
             request.getReadSetter().set(new ChannelListener<StreamSourceChannel>() {
                 @Override
                 public void handleEvent(StreamSourceChannel channel) {
@@ -405,7 +407,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
     }
 
     private boolean doHttp2PriRead(StreamConnection connection, ByteBuffer buffer, HttpServerConnection serverConnection, PooledByteBuffer extraData) throws IOException {
-        if(buffer.hasRemaining()) {
+        if (buffer.hasRemaining()) {
             int res = connection.getSourceChannel().read(buffer);
             if (res == -1) {
                 return true; //fail
@@ -415,8 +417,8 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
             }
         }
         buffer.flip();
-        for(int i = 0; i < PRI_EXPECTED.length; ++i) {
-            if(buffer.get() != PRI_EXPECTED[i]) {
+        for (int i = 0; i < PRI_EXPECTED.length; ++i) {
+            if (buffer.get() != PRI_EXPECTED[i]) {
                 throw UndertowMessages.MESSAGES.http2PriRequestFailed();
             }
         }

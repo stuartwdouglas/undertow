@@ -56,12 +56,12 @@ public class SimpleBlockingServerTestCase {
 
     @BeforeClass
     public static void setup() {
-        final BlockingHandler blockingHandler = new BlockingHandler(new MagicPool(30), new HttpHandler() {
+        final BlockingHandler blockingHandler = new BlockingHandler(new MagicPool(100), new HttpHandler() {
             @Override
             public void handleRequest(final HttpServerExchange exchange) {
                 try {
                     if (exchange.getRequestMethod().equals(Methods.POST)) {
-                        //for a post we just echo back what was sent
+                        //for a post we juswt echo back what was sent
                         //we need to fully buffer it, as otherwise the send buffer fills up, and the client will still be blocked
                         //on writing and will never read
                         byte[] buffer = new byte[1024];
