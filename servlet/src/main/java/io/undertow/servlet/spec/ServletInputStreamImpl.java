@@ -164,12 +164,16 @@ public class ServletInputStreamImpl extends ServletInputStream {
     }
 
     private void readIntoBuffer() throws IOException {
+        if(request.getExchange().getHackStatistics().getIoReadStart() == -1) {
+            request.getExchange().getHackStatistics().setIoReadStart(System.currentTimeMillis());
+        }
         if (pooled == null && !anyAreSet(state, FLAG_FINISHED)) {
             pooled = bufferPool.allocate();
 
             int res = Channels.readBlocking(channel, pooled.getBuffer());
             pooled.getBuffer().flip();
             if (res == -1) {
+                request.getExchange().getHackStatistics().setIoReadEnd(System.currentTimeMillis());
                 state |= FLAG_FINISHED;
                 pooled.close();
                 pooled = null;
@@ -178,6 +182,9 @@ public class ServletInputStreamImpl extends ServletInputStream {
     }
 
     private void readIntoBufferNonBlocking() throws IOException {
+        if(request.getExchange().getHackStatistics().getIoReadStart() == -1) {
+            request.getExchange().getHackStatistics().setIoReadStart(System.currentTimeMillis());
+        }
         if (pooled == null && !anyAreSet(state, FLAG_FINISHED)) {
             pooled = bufferPool.allocate();
             if (listener == null) {
@@ -189,6 +196,7 @@ public class ServletInputStreamImpl extends ServletInputStream {
                 }
                 pooled.getBuffer().flip();
                 if (res == -1) {
+                    request.getExchange().getHackStatistics().setIoReadEnd(System.currentTimeMillis());
                     state |= FLAG_FINISHED;
                     pooled.close();
                     pooled = null;
@@ -200,6 +208,7 @@ public class ServletInputStreamImpl extends ServletInputStream {
                 int res = channel.read(pooled.getBuffer());
                 pooled.getBuffer().flip();
                 if (res == -1) {
+                    request.getExchange().getHackStatistics().setIoWriteEnd(System.currentTimeMillis());
                     state |= FLAG_FINISHED;
                     pooled.close();
                     pooled = null;

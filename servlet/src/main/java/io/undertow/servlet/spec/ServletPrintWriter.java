@@ -131,6 +131,10 @@ public class ServletPrintWriter {
             error = true;
             return;
         }
+
+        if(outputStream.getExchange().getHackStatistics().getIoWriteStart() == -1) {
+            outputStream.getExchange().getHackStatistics().setIoWriteStart(System.currentTimeMillis());
+        }
         try {
             if (!buffer.hasRemaining()) {
                 outputStream.flushInternal();
@@ -203,6 +207,9 @@ public class ServletPrintWriter {
                     //already closed
                     error = true;
                     return;
+                }
+                if(outputStream.getExchange().getHackStatistics().getIoWriteStart() == -1) {
+                    outputStream.getExchange().getHackStatistics().setIoWriteStart(System.currentTimeMillis());
                 }
                 //fast path, basically we are hoping this is ascii only
                 int remaining = buffer.remaining();

@@ -19,6 +19,7 @@
 package io.undertow.servlet.spec;
 
 import io.undertow.io.BufferWritableOutputStream;
+import io.undertow.server.HttpServerExchange;
 import io.undertow.servlet.UndertowServletMessages;
 import io.undertow.servlet.api.ThreadSetupAction;
 import io.undertow.servlet.core.CompositeThreadSetupAction;
@@ -114,6 +115,10 @@ public class ServletOutputStreamImpl extends ServletOutputStream implements Buff
         this.servletRequestContext = servletRequestContext;
     }
 
+    HttpServerExchange getExchange() {
+        return servletRequestContext.getExchange();
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -137,6 +142,10 @@ public class ServletOutputStreamImpl extends ServletOutputStream implements Buff
         }
         if (len < 1) {
             return;
+        }
+
+        if(servletRequestContext.getExchange().getHackStatistics().getIoWriteStart() == -1) {
+            servletRequestContext.getExchange().getHackStatistics().setIoWriteStart(System.currentTimeMillis());
         }
 
         if (listener == null) {
@@ -277,6 +286,9 @@ public class ServletOutputStreamImpl extends ServletOutputStream implements Buff
             return;
         }
 
+        if(servletRequestContext.getExchange().getHackStatistics().getIoWriteStart() == -1) {
+            servletRequestContext.getExchange().getHackStatistics().setIoWriteStart(System.currentTimeMillis());
+        }
         if (listener == null) {
             //if we have received the exact amount of content write it out in one go
             //this is a common case when writing directly from a buffer cache.
@@ -582,8 +594,11 @@ public class ServletOutputStreamImpl extends ServletOutputStream implements Buff
                 servletRequestContext.getOriginalResponse().isTreatAsCommitted()) {
             return;
         }
+
         if (listener == null) {
             if (anyAreSet(state, FLAG_CLOSED)) return;
+
+            servletRequestContext.getExchange().getHackStatistics().setIoWriteEnd(System.currentTimeMillis());
             state |= FLAG_CLOSED;
             state &= ~FLAG_READY;
             if (allAreClear(state, FLAG_WRITE_STARTED) && channel == null && servletRequestContext.getOriginalResponse().getHeader(Headers.CONTENT_LENGTH_STRING) == null) {
@@ -637,6 +652,7 @@ public class ServletOutputStreamImpl extends ServletOutputStream implements Buff
         if (anyAreSet(state, FLAG_CLOSED) || servletRequestContext.getOriginalResponse().isTreatAsCommitted()) {
             return;
         }
+        servletRequestContext.getExchange().getHackStatistics().setIoWriteEnd(System.currentTimeMillis());
         try {
 
             state |= FLAG_CLOSED;

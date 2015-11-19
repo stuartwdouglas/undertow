@@ -167,9 +167,11 @@ public class ServletInitialHandler implements HttpHandler, ServletDispatcher {
 
         if (exchange.isInIoThread() || executor != null) {
             //either the exchange has not been dispatched yet, or we need to use a special executor
+            exchange.getHackStatistics().setThreadPoolDispatch(System.currentTimeMillis());
             exchange.dispatch(executor, new HttpHandler() {
                 @Override
                 public void handleRequest(final HttpServerExchange exchange) throws Exception {
+                    exchange.getHackStatistics().setThreadPoolStart(System.currentTimeMillis());
                     if(System.getSecurityManager() == null) {
                         dispatchRequest(exchange, servletRequestContext, info.getServletChain(), DispatcherType.REQUEST);
                     } else {

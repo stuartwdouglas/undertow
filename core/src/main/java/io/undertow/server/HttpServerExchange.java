@@ -34,6 +34,7 @@ import io.undertow.io.UndertowInputStream;
 import io.undertow.io.UndertowOutputStream;
 import io.undertow.security.api.SecurityContext;
 import io.undertow.server.handlers.Cookie;
+import io.undertow.server.protocol.http.HackStatistics;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.ConduitFactory;
@@ -202,6 +203,8 @@ public final class HttpServerExchange extends AbstractAttachable {
     private Receiver receiver;
 
     private long requestStartTime = -1;
+
+    private final HackStatistics hackStatistics = new HackStatistics();
 
 
     /**
@@ -1476,6 +1479,10 @@ public final class HttpServerExchange extends AbstractAttachable {
         return blockingHttpExchange.getInputStream();
     }
 
+    public HackStatistics getHackStatistics() {
+        return hackStatistics;
+    }
+
     /**
      * @return The output stream
      * @throws IllegalStateException if {@link #startBlocking()} has not been called
@@ -1935,7 +1942,10 @@ public final class HttpServerExchange extends AbstractAttachable {
             if(Thread.currentThread() == getIoThread()) {
                 throw UndertowMessages.MESSAGES.awaitCalledFromIoThread();
             }
+            long start = System.currentTimeMillis();
             super.awaitWritable();
+            long tt = System.currentTimeMillis() - start;
+            hackStatistics.setAwaitWritableTime(hackStatistics.getAwaitWritableTime() + tt);
         }
 
         @Override
@@ -1943,7 +1953,10 @@ public final class HttpServerExchange extends AbstractAttachable {
             if(Thread.currentThread() == getIoThread()) {
                 throw UndertowMessages.MESSAGES.awaitCalledFromIoThread();
             }
+            long start = System.currentTimeMillis();
             super.awaitWritable(time, timeUnit);
+            long tt = System.currentTimeMillis() - start;
+            hackStatistics.setAwaitWritableTime(hackStatistics.getAwaitWritableTime() + tt);
         }
 
         @Override
@@ -2089,7 +2102,10 @@ public final class HttpServerExchange extends AbstractAttachable {
             }
             PooledByteBuffer[] buffered = getAttachment(BUFFERED_REQUEST_DATA);
             if (buffered == null) {
+                long start = System.currentTimeMillis();
                 super.awaitReadable();
+                long time = System.currentTimeMillis() - start;
+                hackStatistics.setAwaitReadableTime(hackStatistics.getAwaitReadableTime() + time);
             }
         }
 
@@ -2146,7 +2162,10 @@ public final class HttpServerExchange extends AbstractAttachable {
             }
             PooledByteBuffer[] buffered = getAttachment(BUFFERED_REQUEST_DATA);
             if (buffered == null) {
+                long start = System.currentTimeMillis();
                 super.awaitReadable(time, timeUnit);
+                long tt = System.currentTimeMillis() - start;
+                hackStatistics.setAwaitReadableTime(hackStatistics.getAwaitReadableTime() + tt);
             }
         }
 
