@@ -19,6 +19,7 @@
 package io.undertow.testutils;
 
 import io.undertow.UndertowOptions;
+import io.undertow.openssl.OpenSSLProvider;
 import io.undertow.protocols.ssl.UndertowXnioSsl;
 import io.undertow.security.impl.GSSAPIAuthenticationMechanism;
 import io.undertow.server.DefaultByteBufferPool;
@@ -138,9 +139,11 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
 
     private static final Logger log = Logger.getLogger(DefaultServer.class);
 
-
-
     private static final DebuggingSlicePool pool = new DebuggingSlicePool(new DefaultByteBufferPool(true, BUFFER_SIZE, 1000, 10, 100));
+
+    static {
+        OpenSSLProvider.register();
+    }
 
     private static KeyStore loadKeyStore(final String name) throws IOException {
         final InputStream stream = DefaultServer.class.getClassLoader().getResourceAsStream(name);
@@ -178,7 +181,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
         SSLContext sslContext;
         try {
             if(client) {
-                sslContext = SSLContext.getInstance("TLS");
+                sslContext =SSLContext.getInstance("openssl.TLSv1");
                 sslContext.init(keyManagers, trustManagers, new SecureRandom());
             } else {
                 sslContext = SSLContext.getInstance("openssl.TLSv1");
