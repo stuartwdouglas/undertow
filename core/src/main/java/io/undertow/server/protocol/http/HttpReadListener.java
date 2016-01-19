@@ -120,7 +120,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
             //we just immediately retry
             if (requestStateUpdater.compareAndSet(this, 1, 2)) {
                 try {
-                    channel.suspendReads();
+                    connection.getOriginalSourceConduit().suspendReads();
                 } finally {
                     requestStateUpdater.set(this, 1);
                 }

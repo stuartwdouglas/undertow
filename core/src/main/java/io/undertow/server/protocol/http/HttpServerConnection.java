@@ -293,7 +293,7 @@ public final class HttpServerConnection extends AbstractServerConnection {
             if (!exchange.isRequestComplete() || getExtraBytes() != null) {
                 //if there is more data we suspend reads
                 sourceChannel.setReadListener(null);
-                sourceChannel.suspendReads();
+                originalSourceConduit.suspendReads();
             }
         }
     }
