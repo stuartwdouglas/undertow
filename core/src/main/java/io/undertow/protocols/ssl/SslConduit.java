@@ -210,7 +210,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             delegate.getSinkChannel().resumeWrites();
         } else {
             if(anyAreSet(state, FLAG_DATA_TO_UNWRAP) || wakeup) {
-                runReadListener(true);
+                runReadListener3(true);
             } else {
                 delegate.getSourceChannel().resumeReads();
             }
@@ -218,7 +218,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
     }
 
 
-    private void runReadListener(final boolean resumeInListener) {
+    private void runReadListener1(final boolean resumeInListener) {
         try {
             delegate.getIoThread().execute(new Runnable() {
                 @Override
@@ -236,6 +236,59 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
         }
     }
 
+    private void runReadListener2(final boolean resumeInListener) {
+        try {
+            delegate.getIoThread().execute(new Runnable() {
+                @Override
+                public void run() {
+                    if(resumeInListener) {
+                        delegate.getSourceChannel().resumeReads();
+                    }
+                    readReadyHandler.readReady();
+                }
+            });
+        } catch (Exception e) {
+            //will only happen on shutdown
+            IoUtils.safeClose(connection, delegate);
+            UndertowLogger.REQUEST_IO_LOGGER.debugf(e, "Failed to queue read listener invocation");
+        }
+    }
+
+    private void runReadListener3(final boolean resumeInListener) {
+        try {
+            delegate.getIoThread().execute(new Runnable() {
+                @Override
+                public void run() {
+                    if(resumeInListener) {
+                        delegate.getSourceChannel().resumeReads();
+                    }
+                    readReadyHandler.readReady();
+                }
+            });
+        } catch (Exception e) {
+            //will only happen on shutdown
+            IoUtils.safeClose(connection, delegate);
+            UndertowLogger.REQUEST_IO_LOGGER.debugf(e, "Failed to queue read listener invocation");
+        }
+    }
+
+    private void runReadListener4(final boolean resumeInListener) {
+        try {
+            delegate.getIoThread().execute(new Runnable() {
+                @Override
+                public void run() {
+                    if(resumeInListener) {
+                        delegate.getSourceChannel().resumeReads();
+                    }
+                    readReadyHandler.readReady();
+                }
+            });
+        } catch (Exception e) {
+            //will only happen on shutdown
+            IoUtils.safeClose(connection, delegate);
+            UndertowLogger.REQUEST_IO_LOGGER.debugf(e, "Failed to queue read listener invocation");
+        }
+    }
     private void runWriteListener() {
         try {
             delegate.getIoThread().execute(new Runnable() {
@@ -585,7 +638,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             notifyWriteClosed();
         }
         if(runListener) {
-            runReadListener(false);
+            runReadListener2(false);
         }
     }
 
@@ -761,7 +814,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             //if we are in the read listener handshake we don't need to invoke
             //as it is about to be invoked anyway
             if(requiresListenerInvocation && anyAreSet(state, FLAG_READS_RESUMED) && !invokingReadListenerHandshake) {
-                runReadListener(false);
+                runReadListener1(false);
             }
         }
     }
@@ -1078,7 +1131,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     //otherwise it will run in a busy loop till the channel becomes writable
                     //we also don't re-run if we have outstanding tasks
                     if(!(anyAreSet(state, FLAG_READ_REQUIRES_WRITE) && wrappedData != null) && outstandingTasks == 0 && !noProgress) {
-                        runReadListener(false);
+                        runReadListener4(false);
                     }
                 }
             }
