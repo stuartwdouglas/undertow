@@ -245,7 +245,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     private void runReadListener(final boolean resumeInListener) {
         try {
-            if(readListenerInvocationCount++ == MAX_READ_LISTENER_INVOCATIONS) {
+            if(readListenerInvocationCount++ >= MAX_READ_LISTENER_INVOCATIONS) {
                 UndertowLogger.REQUEST_LOGGER.sslReadLoopDetected(this);
                 IoUtils.safeClose(connection, delegate);
                 close();

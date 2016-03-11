@@ -80,6 +80,7 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
     //0 = new request ok, reads resumed
     //1 = request running, new request not ok
     //2 = suspending/resuming in progress
+    //3 = eager read in progress
     @SuppressWarnings("unused")
     private volatile int requestState;
     private static final AtomicIntegerFieldUpdater<HttpReadListener> requestStateUpdater = AtomicIntegerFieldUpdater.newUpdater(HttpReadListener.class, "requestState");
@@ -87,6 +88,8 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
     private final ConnectorStatisticsImpl connectorStatistics;
 
     private ParseTimeoutUpdater parseTimeoutUpdater;
+
+    volatile PooledByteBuffer eagerReadBuffer;
 
     HttpReadListener(final HttpServerConnection connection, final HttpRequestParser parser, ConnectorStatisticsImpl connectorStatistics) {
         this.connection = connection;
@@ -121,7 +124,28 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
             //we just immediately retry
             if (requestStateUpdater.compareAndSet(this, 1, 2)) {
                 try {
-                    channel.suspendReads();
+                    if(connection.isSafeToReadNextRequest() && connection.getExtraBytes() == null) {
+                        if(eagerReadBuffer == null) {
+                            eagerReadBuffer = connection.getByteBufferPool().allocate();
+                        }
+                        ByteBuffer buf = eagerReadBuffer.getBuffer();
+                        if(buf.hasRemaining()) {
+                            try {
+                                int res = connection.getOriginalSourceConduit().read(buf);
+                                if(res ==0 && buf.position() == 0) {
+                                    eagerReadBuffer.close();
+                                    eagerReadBuffer = null;
+                                }
+                            } catch (IOException e) {
+                                UndertowLogger.REQUEST_IO_LOGGER.ioException(e);
+                                IoUtils.safeClose(connection);
+                            }
+                        } else {
+                            channel.suspendReads();
+                        }
+                    } else {
+                        channel.suspendReads();
+                    }
                 } finally {
                     requestStateUpdater.set(this, 1);
                 }
@@ -133,6 +157,17 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
 
     public void handleEventWithNoRunningRequest(final ConduitStreamSourceChannel channel) {
         PooledByteBuffer existing = connection.getExtraBytes();
+        if(existing == null) {
+            existing = eagerReadBuffer;
+            if(existing != null) {
+                eagerReadBuffer = null;
+                existing.getBuffer().flip();
+                if (!existing.getBuffer().hasRemaining()) {
+                    existing.close();
+                    existing = null;
+                }
+            }
+        }
         if ((existing == null && connection.getOriginalSourceConduit().isReadShutdown()) || connection.getOriginalSinkConduit().isWriteShutdown()) {
             IoUtils.safeClose(connection);
             channel.suspendReads();
@@ -302,7 +337,11 @@ final class HttpReadListener implements ChannelListener<ConduitStreamSourceChann
                                 try {
                                     newRequest();
                                     channel.getSourceChannel().setReadListener(HttpReadListener.this);
-                                    channel.getSourceChannel().resumeReads();
+                                    if(eagerReadBuffer != null) {
+                                        ChannelListeners.invokeChannelListener(channel.getIoThread(), channel.getSourceChannel(), this);
+                                    } else {
+                                        channel.getSourceChannel().resumeReads();
+                                    }
                                 } finally {
                                     requestStateUpdater.set(this, 0);
                                 }

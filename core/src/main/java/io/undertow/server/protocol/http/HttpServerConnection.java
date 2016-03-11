@@ -64,6 +64,7 @@ public final class HttpServerConnection extends AbstractServerConnection {
 
     private HttpUpgradeListener upgradeListener;
     private boolean connectHandled;
+    boolean currentRequestUpgradeOrConnect;
 
     public HttpServerConnection(StreamConnection channel, final ByteBufferPool bufferPool, final HttpHandler rootHandler, final OptionMap undertowOptions, final int bufferSize) {
         super(channel, bufferPool, rootHandler, undertowOptions, bufferSize);
@@ -79,6 +80,10 @@ public final class HttpServerConnection extends AbstractServerConnection {
             @Override
             public void closed(ServerConnection connection) {
                 responseConduit.freeBuffers();
+                if(readListener.eagerReadBuffer != null) {
+                    readListener.eagerReadBuffer.close();
+                    readListener.eagerReadBuffer = null;
+                }
             }
         });
     }
@@ -215,6 +220,17 @@ public final class HttpServerConnection extends AbstractServerConnection {
         return true;
     }
 
+    boolean isSafeToReadNextRequest() {
+        if(currentRequestUpgradeOrConnect) {
+            return false;
+        }
+        HttpServerExchange exchange = this.current;
+        if(exchange != null) {
+            return exchange.isRequestComplete();
+        }
+        return true;
+    }
+
     void setReadListener(HttpReadListener readListener) {
         this.readListener = readListener;
     }
@@ -268,6 +284,9 @@ public final class HttpServerConnection extends AbstractServerConnection {
 
     void setCurrentExchange(HttpServerExchange exchange) {
         this.current = exchange;
+        if(exchange != null) {
+            currentRequestUpgradeOrConnect = exchange.getRequestHeaders().contains(Headers.UPGRADE) || exchange.getRequestMethod().equals(Methods.CONNECT);
+        }
     }
 
     public void setPipelineBuffer(PipeliningBufferingStreamSinkConduit pipelineBuffer) {
