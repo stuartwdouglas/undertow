@@ -20,6 +20,7 @@ package io.undertow.protocols.ssl;
 
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
+import org.xnio.IoUtils;
 import org.xnio.Option;
 import org.xnio.OptionMap;
 import org.xnio.Options;
@@ -32,6 +33,7 @@ import org.xnio.XnioExecutor;
 import org.xnio.XnioIoThread;
 import org.xnio.XnioWorker;
 import org.xnio.channels.AcceptingChannel;
+import org.xnio.channels.QueuedAcceptingChannel;
 import org.xnio.ssl.SslConnection;
 
 import javax.net.ssl.SSLEngine;
@@ -39,10 +41,12 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
@@ -95,6 +99,19 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
         closeSetter = ChannelListeners.<AcceptingChannel<SslConnection>>getDelegatingSetter(tcpServer.getCloseSetter(), this);
         //noinspection ThisEscapedInObjectConstruction
         acceptSetter = ChannelListeners.<AcceptingChannel<SslConnection>>getDelegatingSetter(tcpServer.getAcceptSetter(), this);
+        ((QueuedAcceptingChannel<StreamConnection>)tcpServer).setAcceptTask(new QueuedAcceptingChannel.AcceptTask() {
+            @Override
+            public Object create(SocketChannel channel) {
+                InetSocketAddress peerAddress;
+                try {
+                    peerAddress = (InetSocketAddress) channel.getRemoteAddress();
+                } catch (IOException e) {
+                    IoUtils.safeClose(channel);
+                    throw new RuntimeException(e);
+                }
+                return ssl.getSslContext().createSSLEngine(getHostNameNoResolve(peerAddress), peerAddress.getPort());
+            }
+        });
     }
 
     private static final Set<Option<?>> SUPPORTED_OPTIONS = Option.setBuilder()
@@ -131,12 +148,12 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
     }
 
     public UndertowSslConnection accept() throws IOException {
-        final StreamConnection tcpConnection = tcpServer.accept();
-        if (tcpConnection == null) {
+        final Map.Entry<StreamConnection, Object> entry = ((QueuedAcceptingChannel<StreamConnection>)tcpServer).acceptEntry();
+        if (entry == null) {
             return null;
         }
-        final InetSocketAddress peerAddress = tcpConnection.getPeerAddress(InetSocketAddress.class);
-        final SSLEngine engine = ssl.getSslContext().createSSLEngine(getHostNameNoResolve(peerAddress), peerAddress.getPort());
+        StreamConnection tcpConnection = entry.getKey();
+        SSLEngine engine = (SSLEngine) entry.getValue();
         final boolean clientMode = useClientMode != 0;
         engine.setUseClientMode(clientMode);
         if (! clientMode) {
