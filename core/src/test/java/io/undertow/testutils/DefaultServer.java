@@ -181,7 +181,7 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
         SSLContext sslContext;
         try {
             if(client) {
-                sslContext =SSLContext.getInstance("openssl.TLSv1");
+                sslContext = SSLContext.getInstance("TLS");
                 sslContext.init(keyManagers, trustManagers, new SecureRandom());
             } else {
                 sslContext = SSLContext.getInstance("openssl.TLSv1");

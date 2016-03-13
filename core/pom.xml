@@ -85,7 +85,6 @@
         <dependency>
             <groupId>io.undertow.openssl</groupId>
             <artifactId>undertow-openssl</artifactId>
-            <version>1.0.0.Alpha1</version>
         </dependency>
 
         <dependency>

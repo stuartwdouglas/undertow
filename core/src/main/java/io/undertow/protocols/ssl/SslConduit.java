@@ -19,7 +19,6 @@
 package io.undertow.protocols.ssl;
 
 import io.undertow.UndertowLogger;
-import org.jboss.logging.Logger;
 import org.xnio.Buffers;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
@@ -63,11 +62,7 @@ import static org.xnio.Bits.anyAreSet;
  */
 public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
-<<<<<<< 82aca5cf46e7af1bc2f0ae9e75429cd79139942c
     public static final int MAX_READ_LISTENER_INVOCATIONS = Integer.getInteger("io.undertow.ssl.max-read-listener-invocations", 100);
-=======
-    private static final Logger log = Logger.getLogger(SslConduit.class.getPackage().getName());
->>>>>>> Fix issue with data buffered in the engine not being read
 
     /**
      * If this is set we are in the middle of a handshake, and we cannot
@@ -668,7 +663,6 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
         }
 
         PooledByteBuffer unwrappedData = this.unwrappedData;
-        boolean existingUnwrappedData = false;
         //copy any exiting data
         if(unwrappedData != null) {
             if(userBuffers != null) {
@@ -678,8 +672,6 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     this.unwrappedData = null;
                 }
                 return copied;
-            } else {
-                existingUnwrappedData = true;
             }
         }
         try {
@@ -786,20 +778,19 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             close();
             throw e;
         } finally {
-            try {
-                if (dataToUnwrap != null) {
-                    //if there is no data in the buffer we just free it
-                    if (!dataToUnwrap.getBuffer().hasRemaining()) {
-                        dataToUnwrap.close();
-                        dataToUnwrap = null;
-                        state &= ~FLAG_DATA_TO_UNWRAP;
-                    } else if (allAreClear(state, FLAG_DATA_TO_UNWRAP)) {
-                        //if there is not enough data in the buffer we compact it to make room for more
-                        dataToUnwrap.getBuffer().compact();
-                    }
+            if(bytesProduced && (anyAreSet(state, FLAG_READS_RESUMED) || allAreSet(state, FLAG_WRITE_REQUIRES_READ | FLAG_WRITES_RESUMED))) {
+                runReadListener(false);
+            }
+            if (dataToUnwrap != null) {
+                //if there is no data in the buffer we just free it
+                if (!dataToUnwrap.getBuffer().hasRemaining()) {
+                    dataToUnwrap.close();
+                    dataToUnwrap = null;
+                    state &= ~FLAG_DATA_TO_UNWRAP;
+                } else if (allAreClear(state, FLAG_DATA_TO_UNWRAP)) {
+                    //if there is not enough data in the buffer we compact it to make room for more
+                    dataToUnwrap.getBuffer().compact();
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
         }
     }

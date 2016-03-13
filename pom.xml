@@ -109,6 +109,7 @@
 
         <!-- Non-default maven plugin versions and configuration -->
         <version.org.zanata.plugin>3.7.4</version.org.zanata.plugin>
+        <version.io.undertow.openssl>1.0.0.Alpha1-SNAPSHOT</version.io.undertow.openssl>
     </properties>
 
     <modules>
@@ -283,6 +284,12 @@
                 <groupId>io.undertow.build</groupId>
                 <artifactId>undertow-checkstyle-config</artifactId>
                 <version>${version.io.undertow.build.checkstyle-config}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.undertow.openssl</groupId>
+                <artifactId>undertow-openssl</artifactId>
+                <version>${version.io.undertow.openssl}</version>
             </dependency>
 
             <dependency>
