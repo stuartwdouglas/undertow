@@ -18,6 +18,7 @@
 
 package io.undertow.protocols.ssl;
 
+import io.undertow.UndertowLogger;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
 import org.xnio.Option;
@@ -41,9 +42,13 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
@@ -75,9 +80,11 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
     private static final AtomicReferenceFieldUpdater<UndertowAcceptingSslChannel, String[]> protocolsUpdater = AtomicReferenceFieldUpdater.newUpdater(UndertowAcceptingSslChannel.class, String[].class, "protocols");
 
     private final ChannelListener.Setter<AcceptingChannel<SslConnection>> closeSetter;
-    private final ChannelListener.Setter<AcceptingChannel<SslConnection>> acceptSetter;
+    private final ChannelListener.SimpleSetter<AcceptingChannel<SslConnection>> acceptSetter;
     protected final boolean startTls;
     protected final ByteBufferPool applicationBufferPool;
+
+    private final ConcurrentMap<XnioIoThread, Deque<UndertowSslConnection>> connectionQueue = new ConcurrentHashMap<>();
 
     public UndertowAcceptingSslChannel(final UndertowXnioSsl ssl, final AcceptingChannel<? extends StreamConnection> tcpServer, final OptionMap optionMap, final ByteBufferPool applicationBufferPool, final boolean startTls) {
         this.tcpServer = tcpServer;
@@ -94,7 +101,41 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
         //noinspection ThisEscapedInObjectConstruction
         closeSetter = ChannelListeners.<AcceptingChannel<SslConnection>>getDelegatingSetter(tcpServer.getCloseSetter(), this);
         //noinspection ThisEscapedInObjectConstruction
-        acceptSetter = ChannelListeners.<AcceptingChannel<SslConnection>>getDelegatingSetter(tcpServer.getAcceptSetter(), this);
+        acceptSetter = new ChannelListener.SimpleSetter<>();
+        tcpServer.getAcceptSetter().set(new ChannelListener<AcceptingChannel<? extends StreamConnection>>() {
+            @Override
+            public void handleEvent(AcceptingChannel<? extends StreamConnection> channel) {
+                try {
+                    final StreamConnection connection = channel.accept();
+                    if(connection == null) {
+                        return;
+                    }
+                    channel.getWorker().execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                UndertowSslConnection sslConnection = createSslConnection(connection);
+                                sslConnection.doHandshakeBlocking();
+                                Deque<UndertowSslConnection> queue = connectionQueue.get(connection.getIoThread());
+                                if(queue == null) {
+                                    Deque<UndertowSslConnection> newQueue = new ConcurrentLinkedDeque<UndertowSslConnection>();
+                                    queue = connectionQueue.putIfAbsent(connection.getIoThread(), newQueue);
+                                    if(queue == null) {
+                                        queue = newQueue;
+                                    }
+                                }
+                                queue.add(sslConnection);
+                                ChannelListeners.invokeChannelListener(connection.getIoThread(), UndertowAcceptingSslChannel.this, acceptSetter.get());
+                            } catch (IOException e) {
+                                UndertowLogger.REQUEST_IO_LOGGER.ioException(e);
+                            }
+                        }
+                    });
+                } catch (IOException e) {
+                    UndertowLogger.REQUEST_IO_LOGGER.ioException(e);
+                }
+            }
+        });
     }
 
     private static final Set<Option<?>> SUPPORTED_OPTIONS = Option.setBuilder()
@@ -131,7 +172,14 @@ class UndertowAcceptingSslChannel implements AcceptingChannel<SslConnection> {
     }
 
     public UndertowSslConnection accept() throws IOException {
-        final StreamConnection tcpConnection = tcpServer.accept();
+        Deque<UndertowSslConnection> queue = connectionQueue.get(Thread.currentThread());
+        if(queue == null) {
+            return null;
+        }
+        return queue.poll();
+    }
+
+    protected UndertowSslConnection createSslConnection(StreamConnection tcpConnection) throws IOException {
         if (tcpConnection == null) {
             return null;
         }

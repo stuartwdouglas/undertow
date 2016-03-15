@@ -132,6 +132,10 @@ class UndertowSslConnection extends SslConnection {
         return SUPPORTED_OPTIONS.contains(option) || delegate.supportsOption(option);
     }
 
+    void doHandshakeBlocking() throws IOException {
+        sslConduit.doHandshakeBlocking();
+    }
+
     @Override
     protected boolean readClosed() {
         return super.readClosed();

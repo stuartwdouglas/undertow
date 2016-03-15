@@ -1002,6 +1002,15 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
      * Once they are complete we notify any waiting threads and wakeup reads/writes as appropriate
      */
     private void runTasks() {
+        if(Thread.currentThread() != delegate.getIoThread()) {
+            //we are not in the IO thread, just run the tasks directly
+            Runnable t = engine.getDelegatedTask();
+            while (t != null) {
+                t.run();
+                t = engine.getDelegatedTask();
+            }
+            return;
+        }
         //don't run anything in the IO thread till the tasks are done
         delegate.getSinkChannel().suspendWrites();
         delegate.getSourceChannel().suspendReads();
@@ -1022,30 +1031,17 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                             task.run();
                         } finally {
                             synchronized (SslConduit.this) {
-                                if (outstandingTasks == 1) {
-                                    getWriteThread().execute(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            synchronized (SslConduit.this) {
-                                                SslConduit.this.notifyAll();
+                                outstandingTasks--;
+                                if (outstandingTasks == 0) {
 
-                                                --outstandingTasks;
-                                                try {
-                                                    doHandshake();
-                                                } catch (IOException e) {
-                                                    IoUtils.safeClose(connection);
-                                                }
-                                                if (anyAreSet(state, FLAG_READS_RESUMED)) {
-                                                    wakeupReads(); //wakeup, because we need to run an unwrap even if there is no data to be read
-                                                }
-                                                if (anyAreSet(state, FLAG_WRITES_RESUMED)) {
-                                                    resumeWrites(); //we don't need to wakeup, as the channel should be writable
-                                                }
-                                            }
-                                        }
-                                    });
-                                } else {
-                                    outstandingTasks--;
+                                    SslConduit.this.notifyAll();
+
+                                    if (anyAreSet(state, FLAG_READS_RESUMED)) {
+                                        wakeupReads(); //wakeup, because we need to run an unwrap even if there is no data to be read
+                                    }
+                                    if (anyAreSet(state, FLAG_WRITES_RESUMED)) {
+                                        resumeWrites(); //we don't need to wakeup, as the channel should be writable
+                                    }
                                 }
                             }
                         }
@@ -1065,6 +1061,28 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
      */
     public void close() {
         closed();
+    }
+
+    public void doHandshakeBlocking() throws IOException {
+        while (anyAreSet(state, FLAG_IN_HANDSHAKE) && !anyAreSet(state, FLAG_CLOSED | FLAG_READ_CLOSED | FLAG_WRITE_CLOSED) && delegate.isOpen()) {
+            doHandshake();
+            if(outstandingTasks > 0) {
+                synchronized (this) {
+                    while (outstandingTasks > 0) {
+                        try {
+                            this.wait();
+                        } catch (InterruptedException e) {
+                            throw new InterruptedIOException();
+                        }
+                    }
+                }
+            }
+            if(anyAreSet(state, FLAG_READ_REQUIRES_WRITE)) {
+                delegate.getSinkChannel().awaitWritable();
+            } else if(anyAreSet(state, FLAG_WRITE_REQUIRES_READ)) {
+                delegate.getSourceChannel().awaitReadable();
+            }
+        }
     }
 
     /**
