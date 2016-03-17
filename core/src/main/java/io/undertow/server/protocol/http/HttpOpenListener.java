@@ -23,6 +23,7 @@ import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.conduits.BytesReceivedStreamSourceConduit;
 import io.undertow.conduits.BytesSentStreamSinkConduit;
+import io.undertow.conduits.EagerReadStreamSourceConduit;
 import io.undertow.conduits.ReadTimeoutStreamSourceConduit;
 import io.undertow.conduits.WriteTimeoutStreamSinkConduit;
 import io.undertow.server.ConnectorStatistics;
@@ -38,6 +39,7 @@ import io.undertow.connector.ByteBufferPool;
 import io.undertow.connector.PooledByteBuffer;
 import org.xnio.Pool;
 import org.xnio.StreamConnection;
+import org.xnio.ssl.SslConnection;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -93,6 +95,10 @@ public final class HttpOpenListener implements ChannelListener<StreamConnection>
     }
     @Override
     public void handleEvent(final StreamConnection channel, PooledByteBuffer buffer) {
+        if(!(channel instanceof SslConnection)) {
+            //TODO: figure this out
+            channel.getSourceChannel().setConduit(new EagerReadStreamSourceConduit(channel.getSourceChannel().getConduit(), channel.getSourceChannel(), bufferPool));
+        }
         if (UndertowLogger.REQUEST_LOGGER.isTraceEnabled()) {
             UndertowLogger.REQUEST_LOGGER.tracef("Opened connection with %s", channel.getPeerAddress());
         }

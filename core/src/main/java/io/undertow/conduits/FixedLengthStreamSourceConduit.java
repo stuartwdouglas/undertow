@@ -164,6 +164,7 @@ public final class FixedLengthStreamSourceConduit extends AbstractStreamSourceCo
                     Connectors.terminateRequest(exchange);
                     exchange.setPersistent(false);
                     finishListener.handleEvent(this);
+                    next.terminateReads();
                     this.state |= FLAG_FINISHED | FLAG_CLOSED;
                     throw UndertowMessages.MESSAGES.requestEntityWasTooLarge(exchange.getMaxEntitySize());
                 }

@@ -1636,7 +1636,7 @@ public final class HttpServerExchange extends AbstractAttachable {
             //not much point trying to flush
 
             //make sure the listeners have been invoked
-            invokeExchangeCompleteListeners();
+            terminateResponse();
             return;
         }
         try {

@@ -166,13 +166,19 @@ public class ServletInputStreamImpl extends ServletInputStream {
     private void readIntoBuffer() throws IOException {
         if (pooled == null && !anyAreSet(state, FLAG_FINISHED)) {
             pooled = bufferPool.allocate();
-
-            int res = Channels.readBlocking(channel, pooled.getBuffer());
-            pooled.getBuffer().flip();
-            if (res == -1) {
+            try {
+                int res = Channels.readBlocking(channel, pooled.getBuffer());
+                pooled.getBuffer().flip();
+                if (res == -1) {
+                    state |= FLAG_FINISHED;
+                    pooled.close();
+                    pooled = null;
+                }
+            } catch (Exception e) {
                 state |= FLAG_FINISHED;
                 pooled.close();
                 pooled = null;
+                throw e;
             }
         }
     }

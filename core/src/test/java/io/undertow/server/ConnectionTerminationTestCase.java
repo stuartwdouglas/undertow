@@ -45,10 +45,12 @@ import io.undertow.util.FileUtils;
 public class ConnectionTerminationTestCase {
 
     private volatile boolean completionListenerCalled = false;
-    private final CountDownLatch completionListenerCalledLatch = new CountDownLatch(1);
+    private volatile CountDownLatch completionListenerCalledLatch;
 
     @Test
     public void testAbnormalRequestTermination() throws IOException, InterruptedException {
+        completionListenerCalledLatch = new CountDownLatch(1);
+        completionListenerCalled = false;
         DefaultServer.setRootHandler(new HttpHandler() {
             @Override
             public void handleRequest(final HttpServerExchange exchange) throws Exception {
