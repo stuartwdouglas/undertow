@@ -18,16 +18,16 @@
 
 package io.undertow.protocols.ssl;
 
+import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
 import io.undertow.connector.PooledByteBuffer;
+import io.undertow.util.ImmediatePooledByteBuffer;
 import sun.security.ssl.ProtocolVersion;
 import sun.security.ssl.SSLEngineImpl;
 
-import javax.crypto.SecretKey;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayOutputStream;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.BufferUnderflowException;
@@ -54,39 +54,29 @@ final class SSLServerHelloALPNUpdater {
     private static final Field HANDSHAKER;
     private static final Field HANDSHAKER_PROTOCOL_VERSION;
     private static final Field HANDSHAKE_HASH;
-    private static final Field HANDSHAKE_SESSION;
     private static final Field HANDSHAKE_HASH_VERSION;
     private static final Method HANDSHAKE_HASH_UPDATE;
     private static final Method HANDSHAKE_HASH_PROTOCOL_DETERMINED;
-    private static final Method SESSION_MASTER_SECRET;
     private static final Field HANDSHAKE_HASH_DATA;
     private static final Field HANDSHAKE_HASH_FIN_MD;
-    private static final Field HANDSHAKE_CIPHER_SUITE;
-    private static final Constructor FINISHED_MESSAGE_CONSTRUCTOR;
 
 
     static {
 
         boolean enabled = true;
-        Field handshaker = null;
-        Field handshakeHash = null;
-        Field handshakeHashVersion = null;
-        Field handshakeHashData = null;
-        Field handshakeHashFinMd = null;
-        Field handshakeCipherSuite = null;
-        Field protocolVersion = null;
-        Field handshakeSession;
-        Method handshakeHashUpdate = null;
-        Method handshakeHashProtocolDetermined = null;
-        Method sessionMasterSecret = null;
-        Constructor finishedMessageConstructor = null;
+        Field handshaker;
+        Field handshakeHash;
+        Field handshakeHashVersion;
+        Field handshakeHashData;
+        Field handshakeHashFinMd;
+        Field protocolVersion;
+        Method handshakeHashUpdate;
+        Method handshakeHashProtocolDetermined;
         try {
             handshaker = SSLEngineImpl.class.getDeclaredField("handshaker");
             handshaker.setAccessible(true);
             handshakeHash = handshaker.getType().getDeclaredField("handshakeHash");
             handshakeHash.setAccessible(true);
-            handshakeSession = handshaker.getType().getDeclaredField("session");
-            handshakeSession.setAccessible(true);
             protocolVersion = handshaker.getType().getDeclaredField("protocolVersion");
             protocolVersion.setAccessible(true);
             handshakeHashVersion = handshakeHash.getType().getDeclaredField("version");
@@ -99,15 +89,7 @@ final class SSLServerHelloALPNUpdater {
             handshakeHashData.setAccessible(true);
             handshakeHashFinMd = handshakeHash.getType().getDeclaredField("finMD");
             handshakeHashFinMd.setAccessible(true);
-            handshakeCipherSuite = handshaker.getType().getDeclaredField("cipherSuite");
-            handshakeCipherSuite.setAccessible(true);
 
-            Class<?> finishedClass = Class.forName("sun.security.ssl.HandshakeMessage$Finished", true, ProtocolVersion.class.getClassLoader());
-            finishedMessageConstructor = finishedClass.getDeclaredConstructor(ProtocolVersion.class, handshakeHash.getType(), int.class, SecretKey.class, handshakeCipherSuite.getType());
-
-            Class<?> sessionImpl = Class.forName("sun.security.ssl.SSLSessionImpl", true, ProtocolVersion.class.getClassLoader());
-            sessionMasterSecret = sessionImpl.getDeclaredMethod("getMasterSecret");
-            sessionMasterSecret.setAccessible(true);
         } catch (Exception e) {
             enabled = false;
             handshaker = null;
@@ -117,11 +99,7 @@ final class SSLServerHelloALPNUpdater {
             handshakeHashProtocolDetermined = null;
             handshakeHashData = null;
             handshakeHashFinMd = null;
-            handshakeCipherSuite = null;
-            finishedMessageConstructor = null;
-            sessionMasterSecret = null;
             protocolVersion = null;
-            handshakeSession = null;
         }
         ENABLED = enabled;
         HANDSHAKER = handshaker;
@@ -131,11 +109,7 @@ final class SSLServerHelloALPNUpdater {
         HANDSHAKE_HASH_UPDATE = handshakeHashUpdate;
         HANDSHAKE_HASH_DATA = handshakeHashData;
         HANDSHAKE_HASH_FIN_MD = handshakeHashFinMd;
-        HANDSHAKE_CIPHER_SUITE = handshakeCipherSuite;
-        FINISHED_MESSAGE_CONSTRUCTOR = finishedMessageConstructor;
         HANDSHAKER_PROTOCOL_VERSION = protocolVersion;
-        SESSION_MASTER_SECRET = sessionMasterSecret;
-        HANDSHAKE_SESSION = handshakeSession;
     }
 
     /**
@@ -186,7 +160,7 @@ final class SSLServerHelloALPNUpdater {
         }
     }
 
-    public static PooledByteBuffer exploreServerHello(ByteBuffer source, String selectedAlpnProtocol, SSLEngine sslEngineToHack, byte[] clientHelloRecord)
+    public static PooledByteBuffer exploreServerHello(ByteBuffer source, String selectedAlpnProtocol, SSLEngine sslEngineToHack, byte[] clientHelloRecord, ALPNHackByteArrayOutputStream alpnHackByteArrayOutputStream)
             throws SSLException {
 
         ByteBuffer input = source.duplicate();
@@ -372,10 +346,10 @@ final class SSLServerHelloALPNUpdater {
         }
         List<ByteBuffer> outgoingRecords = extractRecords(original);
 
-        return hackSslEngine(sslEngineToHack, outgoingRecords, clientHelloRecord);
+        return null;
     }
 
-    private static List<ByteBuffer> extractRecords(ByteBuffer data) {
+    public static List<ByteBuffer> extractRecords(ByteBuffer data) {
         List<ByteBuffer> ret = new ArrayList<>();
         while (data.hasRemaining()) {
             byte d1 = data.get();
@@ -394,63 +368,6 @@ final class SSLServerHelloALPNUpdater {
             ret.add(ByteBuffer.wrap(b));
         }
         return ret;
-    }
-
-    private static PooledByteBuffer hackSslEngine(SSLEngine sslEngineToHack, List<ByteBuffer> outgoingRecords, byte[] clientHelloRecord) {
-
-        //hack up the SSL engine internal state
-        try {
-            Object handshaker = HANDSHAKER.get(sslEngineToHack);
-            Object hash = HANDSHAKE_HASH.get(handshaker);
-            int version = (int) HANDSHAKE_HASH_VERSION.get(hash);
-            ByteArrayOutputStream data = (ByteArrayOutputStream) HANDSHAKE_HASH_DATA.get(hash);
-            data.reset();
-            ProtocolVersion protocolVersion = (ProtocolVersion) HANDSHAKER_PROTOCOL_VERSION.get(handshaker);
-            if(version != -1) {
-                HANDSHAKE_HASH_VERSION.set(hash, -1);
-                HANDSHAKE_HASH_PROTOCOL_DETERMINED.invoke(hash, protocolVersion);
-            }
-            MessageDigest digest = (MessageDigest) HANDSHAKE_HASH_FIN_MD.get(hash);
-            digest.reset();
-            byte[] hsm = extractHandshakeMessage(ByteBuffer.wrap(clientHelloRecord));
-            if(hsm != null) {
-                HANDSHAKE_HASH_UPDATE.invoke(hash, hsm, 0, hsm.length);
-            }
-            long length = 0;
-            for (int i = 0, outgoingRecordsSize = outgoingRecords.size(); i < outgoingRecordsSize; i++) {
-                ByteBuffer b = outgoingRecords.get(i);
-                length += b.remaining();
-                byte[] m = extractHandshakeMessage(b.duplicate());
-
-                if (m != null) {
-                    if (m[0] == 20) {
-                        //finished message, need to regenerate it
-                        Object message = FINISHED_MESSAGE_CONSTRUCTOR.newInstance(protocolVersion, hash, 2, SESSION_MASTER_SECRET.invoke(HANDSHAKE_SESSION.get(handshaker)), HANDSHAKE_CIPHER_SUITE.get(handshaker));
-                        System.out.println(message);
-                    } else {
-                        HANDSHAKE_HASH_UPDATE.invoke(hash, m, 0, m.length);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-        return null;
-    }
-
-
-    private static byte[] extractHandshakeMessage(ByteBuffer data) {
-        int type = data.get();
-        data.get();
-        data.get();
-        int length = getInt16(data);
-        byte[] b = new byte[length];
-        data.get(b);
-        if (type == 22) {
-            return b;
-        }
-        return null;
     }
 
     /*
@@ -517,6 +434,66 @@ final class SSLServerHelloALPNUpdater {
         if (length != 0) {
             int position = input.position();
             input.position(position + length);
+        }
+    }
+
+    public static ALPNHackByteArrayOutputStream replaceByteOutput(SSLEngine sslEngine, String selectedAlpnProtocol) {
+        try {
+            Object handshaker = HANDSHAKER.get(sslEngine);
+            Object hash = HANDSHAKE_HASH.get(handshaker);
+            ByteArrayOutputStream existing = (ByteArrayOutputStream) HANDSHAKE_HASH_DATA.get(hash);
+
+            ALPNHackByteArrayOutputStream out = new ALPNHackByteArrayOutputStream(sslEngine, existing.toByteArray(), selectedAlpnProtocol);
+            HANDSHAKE_HASH_DATA.set(hash, out);
+            return out;
+        } catch (Exception e) {
+            UndertowLogger.ROOT_LOGGER.debug("Failed to replace hash output stream ",e);
+            return null;
+        }
+    }
+
+    public static PooledByteBuffer createNewOutputData(byte[] newServerHello, List<ByteBuffer> records) {
+        int length = newServerHello.length;
+        length += 5; //Framing layer
+        for(int i = 1; i < records.size(); ++i) {
+            //the first record is the old server hello, so we start at 1 rather than zero
+            ByteBuffer rec = records.get(i);
+            length += rec.remaining();
+        }
+        byte[] newData = new byte[length];
+        ByteBuffer ret = ByteBuffer.wrap(newData);
+        ByteBuffer oldHello = records.get(0);
+        ret.put(oldHello.get()); //type
+        ret.put(oldHello.get()); //major
+        ret.put(oldHello.get()); //minor
+        ret.put((byte) ((newServerHello.length >> 8) & 0xFF));
+        ret.put((byte) (newServerHello.length & 0xFF));
+        ret.put(newServerHello);
+        for(int i = 1; i < records.size(); ++i) {
+            ByteBuffer rec = records.get(i);
+            ret.put(rec);
+        }
+        ret.flip();
+        return new ImmediatePooledByteBuffer(ret);
+    }
+
+    public static void regenerateHashes(SSLEngine sslEngineToHack, ByteArrayOutputStream data, byte[] ... hashBytes) {
+        //hack up the SSL engine internal state
+        try {
+            Object handshaker = HANDSHAKER.get(sslEngineToHack);
+            Object hash = HANDSHAKE_HASH.get(handshaker);
+            data.reset();
+            ProtocolVersion protocolVersion = (ProtocolVersion) HANDSHAKER_PROTOCOL_VERSION.get(handshaker);
+            HANDSHAKE_HASH_VERSION.set(hash, -1);
+            HANDSHAKE_HASH_PROTOCOL_DETERMINED.invoke(hash, protocolVersion);
+            MessageDigest digest = (MessageDigest) HANDSHAKE_HASH_FIN_MD.get(hash);
+            digest.reset();
+            for(byte[] b : hashBytes) {
+                HANDSHAKE_HASH_UPDATE.invoke(hash, b, 0, b.length);
+            }
+        } catch (Exception e) {
+            e.printStackTrace(); //TODO: remove
+            throw new RuntimeException(e);
         }
     }
 }

@@ -189,10 +189,11 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     //ALPN Hack specific variables
     private byte[] clientHelloRecord; //needed to regenerate a handhsake
-    private boolean helloExplored = false;
+    private boolean clientHelloExplored = false;
     private boolean serverHelloSent = false;
-    private Set<String> applicationProtocols = Collections.emptySet();
-    private String selectedApplicationProtocol = "h2";
+    private ALPNHackByteArrayOutputStream alpnHackByteArrayOutputStream;
+    private Set<String> applicationProtocols = Collections.singleton("h2");
+    private String selectedApplicationProtocol;
 
     SslConduit(UndertowSslConnection connection, StreamConnection delegate, SSLEngine engine, ByteBufferPool bufferPool, Runnable handshakeCallback) {
         this.connection = connection;
@@ -717,7 +718,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     return 0;
                 }
             }
-            if(!helloExplored && !engine.getUseClientMode() && applicationProtocols != null) {
+            if(!clientHelloExplored && !engine.getUseClientMode() && applicationProtocols != null) {
                 try {
                     SSLConnectionInformation result = SSLClientHelloExplorer.exploreClientHello(dataToUnwrap.getBuffer().duplicate());
                     if(result.getAlpnProtocols() != null) {
@@ -730,7 +731,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     }
                     clientHelloRecord = new byte[dataToUnwrap.getBuffer().remaining()];
                     dataToUnwrap.getBuffer().duplicate().get(clientHelloRecord);
-                    helloExplored = true;
+                    clientHelloExplored = true;
                 } catch (BufferUnderflowException e) {
                     state &= ~FLAG_DATA_TO_UNWRAP;
                     return 0;
@@ -772,6 +773,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     bytesProduced = result.bytesProduced() > 0;
                 }
             } finally {
+                if(selectedApplicationProtocol != null && alpnHackByteArrayOutputStream == null) {
+                    alpnHackByteArrayOutputStream = SSLServerHelloALPNUpdater.replaceByteOutput(getSSLEngine(), selectedApplicationProtocol);
+                }
                 if (unwrapBufferUsed) {
                     unwrappedData.getBuffer().flip();
                     if (!unwrappedData.getBuffer().hasRemaining()) {
@@ -890,18 +894,16 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             }
             wrappedData.getBuffer().flip();
 
-            if(!engine.getUseClientMode() && selectedApplicationProtocol != null && !serverHelloSent && helloExplored) {
-                try {
-                    PooledByteBuffer modifiedResult = SSLServerHelloALPNUpdater.exploreServerHello(wrappedData.getBuffer(), selectedApplicationProtocol, getSSLEngine(), clientHelloRecord);
-                    if(modifiedResult != null) {
-                        wrappedData.close();
-                        wrappedData = modifiedResult;
-                    }
-                    serverHelloSent = true;
-                } catch (BufferUnderflowException e) {
-                    state &= ~FLAG_DATA_TO_UNWRAP;
-                    return 0;
+            if(!engine.getUseClientMode() && selectedApplicationProtocol != null && !serverHelloSent && alpnHackByteArrayOutputStream != null) {
+                byte[] newServerHello = alpnHackByteArrayOutputStream.getServerHello(); //this is the new server hello, it will be part of the first TLS plaintext record
+                if(newServerHello != null) {
+                    List<ByteBuffer> records = SSLServerHelloALPNUpdater.extractRecords(wrappedData.getBuffer());
+                    wrappedData.close();
+                    wrappedData = SSLServerHelloALPNUpdater.createNewOutputData(newServerHello, records);
                 }
+            }
+            if(wrappedData.getBuffer().hasRemaining()) {
+                serverHelloSent = true;
             }
 
             if (result.getStatus() == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
