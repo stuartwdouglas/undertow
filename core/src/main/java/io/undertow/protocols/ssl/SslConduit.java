@@ -46,11 +46,14 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.xnio.Bits.allAreClear;
@@ -158,6 +161,8 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     private boolean invokingReadListenerHandshake = false;
 
+
+
     private final Runnable runReadListenerCommand = new Runnable() {
         @Override
         public void run() {
@@ -181,6 +186,13 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             runReadListenerCommand.run();
         }
     };
+
+    //ALPN Hack specific variables
+    private byte[] clientHelloRecord; //needed to regenerate a handhsake
+    private boolean helloExplored = false;
+    private boolean serverHelloSent = false;
+    private Set<String> applicationProtocols = Collections.emptySet();
+    private String selectedApplicationProtocol = "h2";
 
     SslConduit(UndertowSslConnection connection, StreamConnection delegate, SSLEngine engine, ByteBufferPool bufferPool, Runnable handshakeCallback) {
         this.connection = connection;
@@ -705,6 +717,25 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     return 0;
                 }
             }
+            if(!helloExplored && !engine.getUseClientMode() && applicationProtocols != null) {
+                try {
+                    SSLConnectionInformation result = SSLClientHelloExplorer.exploreClientHello(dataToUnwrap.getBuffer().duplicate());
+                    if(result.getAlpnProtocols() != null) {
+                        for(String protocol : result.getAlpnProtocols()) {
+                            if(applicationProtocols.contains(protocol)) {
+                                selectedApplicationProtocol = protocol;
+                                break;
+                            }
+                        }
+                    }
+                    clientHelloRecord = new byte[dataToUnwrap.getBuffer().remaining()];
+                    dataToUnwrap.getBuffer().duplicate().get(clientHelloRecord);
+                    helloExplored = true;
+                } catch (BufferUnderflowException e) {
+                    state &= ~FLAG_DATA_TO_UNWRAP;
+                    return 0;
+                }
+            }
             dataToUnwrapLength = dataToUnwrap.getBuffer().remaining();
 
             long original = 0;
@@ -858,6 +889,20 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                 }
             }
             wrappedData.getBuffer().flip();
+
+            if(!engine.getUseClientMode() && selectedApplicationProtocol != null && !serverHelloSent && helloExplored) {
+                try {
+                    PooledByteBuffer modifiedResult = SSLServerHelloALPNUpdater.exploreServerHello(wrappedData.getBuffer(), selectedApplicationProtocol, getSSLEngine(), clientHelloRecord);
+                    if(modifiedResult != null) {
+                        wrappedData.close();
+                        wrappedData = modifiedResult;
+                    }
+                    serverHelloSent = true;
+                } catch (BufferUnderflowException e) {
+                    state &= ~FLAG_DATA_TO_UNWRAP;
+                    return 0;
+                }
+            }
 
             if (result.getStatus() == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
                 throw new IOException("underflow"); //todo: can this happen?
@@ -1064,6 +1109,34 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
      */
     public void close() {
         closed();
+    }
+
+    /**
+     * JDK8 ALPN hack support method.
+     *
+     * These methods will be removed once JDK8 ALPN support is no longer required
+     * @param applicationProtocols
+     */
+    public void setApplicationProtocols(Set<String> applicationProtocols) {
+        this.applicationProtocols = applicationProtocols;
+    }
+
+    /**
+     * JDK8 ALPN hack support method.
+     *
+     * These methods will be removed once JDK8 ALPN support is no longer required
+     */
+    public Set<String> getApplicationProtocols() {
+        return applicationProtocols;
+    }
+
+    /**
+     * JDK8 ALPN hack support method.
+     *
+     * These methods will be removed once JDK8 ALPN support is no longer required
+     */
+    public String getSelectedApplicationProtocol() {
+        return selectedApplicationProtocol;
     }
 
     /**
