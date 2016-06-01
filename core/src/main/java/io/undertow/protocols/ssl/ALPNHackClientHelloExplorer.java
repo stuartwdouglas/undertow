@@ -20,9 +20,8 @@ package io.undertow.protocols.ssl;
 
 import io.undertow.UndertowMessages;
 
-import javax.net.ssl.SNIServerName;
 import javax.net.ssl.SSLException;
-import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -30,8 +29,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Instances of this class acts as an explorer of the network data of an
- * SSL/TLS connection.
+ * This class is used to both read and write the ALPN protocol names in the ClientHello SSL message.
+ *
+ * If the out parameter is not null then the read function is being used, while if it present then it is rewriting
+ * the hello message to include ALPN.
+ *
+ * Even though this dual approach is not particularly clean it does remove the need to have two versions of each function,
+ * that do almost exactly the same thing.
+ *
  */
 final class ALPNHackClientHelloExplorer {
 
@@ -47,32 +52,10 @@ final class ALPNHackClientHelloExplorer {
     public static final int RECORD_HEADER_SIZE = 0x05;
 
     /**
-     * Launch and explore the security capabilities from byte buffer.
-     * <P>
-     * This method tries to parse as few records as possible from
-     * {@code source} byte buffer to get the capabilities
-     * of an SSL/TLS connection.
-     * <P>
-     * Please NOTE that this method must be called before any handshaking
-     * occurs.  The behavior of this method is not defined in this release
-     * if the handshake has begun, or has completed.
-     * <P>
-     * This method accesses the {@code source} parameter in read-only
-     * mode, and does not update the buffer's properties such as capacity,
-     * limit, position, and mark values.
      *
-     * @param  source
-     *         a {@link ByteBuffer} containing
-     *         inbound or outbound network data for an SSL/TLS connection.
      *
-     * @throws IOException on network data error
-     * @throws BufferUnderflowException if not enough source bytes available
-     *         to make a complete exploration.
-     *
-     * @return the explored capabilities of the SSL/TLS
-     *         connection
      */
-    public static SSLConnectionInformationImpl exploreClientHello(ByteBuffer source)
+    static List<String> exploreClientHello(ByteBuffer source)
             throws SSLException {
 
         ByteBuffer input = source.duplicate();
@@ -81,23 +64,73 @@ final class ALPNHackClientHelloExplorer {
         if (input.remaining() < RECORD_HEADER_SIZE) {
             throw new BufferUnderflowException();
         }
-
+        List<String> alpnProtocols = new ArrayList<>();
         // Is it a handshake message?
         byte firstByte = input.get();
         byte secondByte = input.get();
         byte thirdByte = input.get();
+
         if ((firstByte & 0x80) != 0 && thirdByte == 0x01) {
             // looks like a V2ClientHello, we ignore it.
             return null;
         } else if (firstByte == 22) {   // 22: handshake record
             if(secondByte == 3 && thirdByte == 3) {
                 //TLS1.2 is the only one we care about. Previous versions can't use HTTP/2, newer versions won't be backported to JDK8
-                return exploreTLSRecord(input,
-                        firstByte, secondByte, thirdByte);
+                exploreTLSRecord(input,
+                        firstByte, secondByte, thirdByte, alpnProtocols, null);
+                return alpnProtocols;
             }
             return null;
         } else {
             throw UndertowMessages.MESSAGES.notHandshakeRecord();
+        }
+    }
+
+    static byte[] rewriteClientHello(byte[] source, List<String> alpnProtocols) throws SSLException {
+        ByteBuffer input = ByteBuffer.wrap(source);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        // Do we have a complete header?
+        if (input.remaining() < RECORD_HEADER_SIZE) {
+            throw new BufferUnderflowException();
+        }
+        try {
+
+            // Is it a handshake message?
+            byte firstByte = input.get();
+            byte secondByte = input.get();
+            byte thirdByte = input.get();
+            out.write(firstByte & 0xFF);
+            out.write(secondByte & 0xFF);
+            out.write(thirdByte & 0xFF);
+            if ((firstByte & 0x80) != 0 && thirdByte == 0x01) {
+                // looks like a V2ClientHello, we ignore it.
+                return null;
+            } else if (firstByte == 22) {   // 22: handshake record
+                if (secondByte == 3 && thirdByte == 3) {
+                    //TLS1.2 is the only one we care about. Previous versions can't use HTTP/2, newer versions won't be backported to JDK8
+                    exploreTLSRecord(input,
+                            firstByte, secondByte, thirdByte, alpnProtocols, out);
+                    //we need to adjust the record length;
+                    int clientHelloLength = out.size() - 9;
+                    byte[] data = out.toByteArray();
+                    int newLength = data.length - 5;
+                    data[3] = (byte) ((newLength >> 8) & 0xFF);
+                    data[4] = (byte) (newLength & 0xFF);
+
+                    //now we need to adjust the handshake frame length
+                    data[6] = (byte) ((clientHelloLength >> 16) & 0xFF);
+                    data[7] = (byte) ((clientHelloLength >> 8) & 0xFF);
+                    data[8] = (byte) (clientHelloLength & 0xFF);
+
+                    return data;
+                }
+                return null;
+            } else {
+                throw UndertowMessages.MESSAGES.notHandshakeRecord();
+            }
+        } catch (ALPNPresentException e) {
+            return null;
         }
     }
 
@@ -119,9 +152,9 @@ final class ALPNHackClientHelloExplorer {
      *     opaque fragment[TLSPlaintext.length];
      * } TLSPlaintext;
      */
-    private static SSLConnectionInformationImpl exploreTLSRecord(
+    private static void exploreTLSRecord(
             ByteBuffer input, byte firstByte, byte secondByte,
-            byte thirdByte) throws SSLException {
+            byte thirdByte, List<String> alpnProtocols, ByteArrayOutputStream out) throws SSLException {
 
         // Is it a handshake message?
         if (firstByte != 22) {        // 22: handshake record
@@ -133,11 +166,15 @@ final class ALPNHackClientHelloExplorer {
         if (recordLength > input.remaining()) {
             throw new BufferUnderflowException();
         }
+        if(out != null) {
+            out.write(0);
+            out.write(0);
+        }
 
         // We have already had enough source bytes.
         try {
-            return exploreHandshake(input,
-                secondByte, thirdByte, recordLength);
+            exploreHandshake(input,
+                secondByte, thirdByte, recordLength, alpnProtocols, out);
         } catch (BufferUnderflowException ignored) {
             throw UndertowMessages.MESSAGES.invalidHandshakeRecord();
         }
@@ -170,18 +207,27 @@ final class ALPNHackClientHelloExplorer {
      *     } body;
      * } Handshake;
      */
-    private static SSLConnectionInformationImpl exploreHandshake(
+    private static void exploreHandshake(
             ByteBuffer input, byte recordMajorVersion,
-            byte recordMinorVersion, int recordLength) throws SSLException {
+            byte recordMinorVersion, int recordLength, List<String> alpnProtocols, ByteArrayOutputStream out) throws SSLException {
 
         // What is the handshake type?
         byte handshakeType = input.get();
         if (handshakeType != 0x01) {   // 0x01: client_hello message
             throw UndertowMessages.MESSAGES.expectedClientHello();
         }
+        if(out != null) {
+            out.write(handshakeType & 0xFF);
+        }
 
         // What is the handshake body length?
         int handshakeLength = getInt24(input);
+        if(out != null) {
+            //placeholder
+            out.write(0);
+            out.write(0);
+            out.write(0);
+        }
 
         // Theoretically, a single handshake message might span multiple
         // records, but in practice this does not occur.
@@ -191,8 +237,7 @@ final class ALPNHackClientHelloExplorer {
 
         input = input.duplicate();
         input.limit(handshakeLength + input.position());
-        return exploreClientHello(input,
-                                    recordMajorVersion, recordMinorVersion);
+        exploreClientHello(input, alpnProtocols, out);
     }
 
     /*
@@ -221,35 +266,69 @@ final class ALPNHackClientHelloExplorer {
      *     };
      * } ClientHello;
      */
-    private static SSLConnectionInformationImpl exploreClientHello(
+    private static void exploreClientHello(
             ByteBuffer input,
-            byte recordMajorVersion,
-            byte recordMinorVersion) throws SSLException {
+            List<String> alpnProtocols,
+            ByteArrayOutputStream out) throws SSLException {
 
         // client version
         byte helloMajorVersion = input.get();
         byte helloMinorVersion = input.get();
-
-        // ignore random
-        int position = input.position();
-        input.position(position + 32);  // 32: the length of Random
-
-        // ignore session id
-        ignoreByteVector8(input);
-
-        // ignore cipher_suites
-        ignoreByteVector16(input);
-
-        // ignore compression methods
-        ignoreByteVector8(input);
-        List<String> alpnNames = null;
-        if (input.remaining() > 0) {
-            alpnNames = exploreExtensions(input);
+        if(out != null) {
+            out.write(helloMajorVersion & 0xFF);
+            out.write(helloMinorVersion & 0xFF);
         }
 
-        return new SSLConnectionInformationImpl(
-                recordMajorVersion, recordMinorVersion,
-                helloMajorVersion, helloMinorVersion, alpnNames);
+        // ignore random
+        for(int i = 0; i < 32; ++i) {// 32: the length of Random
+            byte d = input.get();
+            if(out != null) {
+                out.write(d & 0xFF);
+            }
+        }
+
+        // session id
+        processByteVector8(input, out);
+
+        // cipher_suites
+        processByteVector16(input, out);
+
+        // compression methods
+        processByteVector8(input, out);
+        if (input.remaining() > 0) {
+            exploreExtensions(input, alpnProtocols, out);
+        } else if(out != null) {
+            byte[] data = generateAlpnExtension(alpnProtocols);
+            writeInt16(out, data.length);
+            out.write(data, 0, data.length);
+        }
+    }
+
+    private static void writeInt16(ByteArrayOutputStream out, int l) {
+        if(out == null) return;
+        out.write((l >> 8) & 0xFF);
+        out.write(l & 0xFF);
+    }
+
+    private static byte[] generateAlpnExtension(List<String> alpnProtocols) {
+        ByteArrayOutputStream alpnBits = new ByteArrayOutputStream();
+        alpnBits.write(0);
+        alpnBits.write(16); //ALPN type
+        int length = 2;
+        for(String p : alpnProtocols) {
+            length++;
+            length += p.length();
+        }
+        writeInt16(alpnBits, length);
+        length -= 2;
+        writeInt16(alpnBits, length);
+        for(String p : alpnProtocols) {
+            alpnBits.write(p.length() & 0xFF);
+            for (int i = 0; i < p.length(); ++i) {
+                alpnBits.write(p.charAt(i) & 0xFF);
+            }
+        }
+        return alpnBits.toByteArray();
     }
 
     /*
@@ -264,33 +343,46 @@ final class ALPNHackClientHelloExplorer {
      *     truncated_hmac(4), status_request(5), (65535)
      * } ExtensionType;
      */
-    private static List<String> exploreExtensions(ByteBuffer input)
+    private static void exploreExtensions(ByteBuffer input, List<String> alpnProtocols, ByteArrayOutputStream out)
             throws SSLException {
-        List<String> alpnNames = null;
+        ByteArrayOutputStream extensionOut = out == null ? null : new ByteArrayOutputStream();
         int length = getInt16(input);           // length of extensions
+        writeInt16(extensionOut, 0); //placeholder
         while (length > 0) {
             int extType = getInt16(input);      // extenson type
+            writeInt16(extensionOut, extType);
             int extLen = getInt16(input);       // length of extension data
-            if (extType == 16) {      // 0x00: type of server name indication
-                alpnNames = exploreALPNExt(input);
+            writeInt16(extensionOut, extLen);
+            if (extType == 16) {      // 0x00: ty
+                if(out == null) {
+                    exploreALPNExt(input, alpnProtocols);
+                } else {
+                    throw new ALPNPresentException();
+                }
             } else {                    // ignore other extensions
-                ignoreByteVector(input, extLen);
+                processByteVector(input, extLen, extensionOut);
             }
 
             length -= extLen + 4;
         }
+        if(out != null) {
+            byte[] alpnBits = generateAlpnExtension(alpnProtocols);
+            extensionOut.write(alpnBits,0 ,alpnBits.length);
+            byte[] extensionsData = extensionOut.toByteArray();
+            int newLength = extensionsData.length - 2;
+            extensionsData[0] = (byte) ((newLength >> 8) & 0xFF);
+            extensionsData[1] = (byte) (newLength & 0xFF);
+            out.write(extensionsData, 0, extensionsData.length);
+        }
 
-        return alpnNames;
     }
 
-    private static List<String> exploreALPNExt(ByteBuffer input) {
+    private static void exploreALPNExt(ByteBuffer input, List<String> alpnProtocols) {
         int length = getInt16(input);
         int end = input.position() + length;
-        List<String> ret = new ArrayList<>();
         while (input.position() < end) {
-            ret.add(readByteVector8(input));
+            alpnProtocols.add(readByteVector8(input));
         }
-        return ret;
     }
 
     private static int getInt8(ByteBuffer input) {
@@ -306,88 +398,38 @@ final class ALPNHackClientHelloExplorer {
             input.get() & 0xFF;
     }
 
-    private static void ignoreByteVector8(ByteBuffer input) {
-        ignoreByteVector(input, getInt8(input));
+    private static void processByteVector8(ByteBuffer input, ByteArrayOutputStream out) {
+        int int8 = getInt8(input);
+        if(out != null) {
+            out.write(int8 & 0xFF);
+        }
+        processByteVector(input, int8, out);
     }
-    private static String  readByteVector8(ByteBuffer input) {
+
+
+    private static void processByteVector(ByteBuffer input, int length, ByteArrayOutputStream out) {
+        for (int i = 0; i < length; ++i) {
+            byte b = input.get();
+            if(out != null) {
+                out.write(b & 0xFF);
+            }
+        }
+    }
+    private static String readByteVector8(ByteBuffer input) {
         int length = getInt8(input);
         byte[] data = new byte[length];
         input.get(data);
         return new String(data, StandardCharsets.US_ASCII);
     }
 
-    private static void ignoreByteVector16(ByteBuffer input) {
-        ignoreByteVector(input, getInt16(input));
+    private static void processByteVector16(ByteBuffer input, ByteArrayOutputStream out) {
+        int int16 = getInt16(input);
+        writeInt16(out, int16);
+        processByteVector(input, int16, out);
     }
 
-    private static void ignoreByteVector(ByteBuffer input, int length) {
-        if (length != 0) {
-            int position = input.position();
-            input.position(position + length);
-        }
-    }
+    private static final class ALPNPresentException extends RuntimeException {
 
-    static final class SSLConnectionInformationImpl {
-
-        private final String recordVersion;
-        private final String helloVersion;
-        private final List<String> alpnProtocols;
-
-
-        SSLConnectionInformationImpl(byte recordMajorVersion, byte recordMinorVersion,
-                                     byte helloMajorVersion, byte helloMinorVersion,
-                                     List<String> alpnProtocols) {
-            this.alpnProtocols = alpnProtocols;
-            this.recordVersion = getVersionString(recordMajorVersion, recordMinorVersion);
-            this.helloVersion = getVersionString(helloMajorVersion, helloMinorVersion);
-        }
-
-        private static String getVersionString(final byte helloMajorVersion, final byte helloMinorVersion) {
-            switch (helloMajorVersion) {
-                case 0x00: {
-                    switch (helloMinorVersion) {
-                        case 0x02: return "SSLv2Hello";
-                        default: return unknownVersion(helloMajorVersion, helloMinorVersion);
-                    }
-                }
-                case 0x03: {
-                    switch (helloMinorVersion) {
-                        case 0x00: return "SSLv3";
-                        case 0x01: return "TLSv1";
-                        case 0x02: return "TLSv1.1";
-                        case 0x03: return "TLSv1.2";
-                        case 0x04: return "TLSv1.3";
-                        default: return unknownVersion(helloMajorVersion, helloMinorVersion);
-                    }
-                }
-                default: return unknownVersion(helloMajorVersion, helloMinorVersion);
-            }
-        }
-
-        public String getRecordVersion() {
-            return recordVersion;
-        }
-
-        public String getHelloVersion() {
-            return helloVersion;
-        }
-
-        public List<String> getAlpnProtocols() {
-            return alpnProtocols;
-        }
-
-        private static String unknownVersion(byte major, byte minor) {
-            return "Unknown-" + (major & 0xff) + "." + (minor & 0xff);
-        }
-
-        @Override
-        public String toString() {
-            return "SSLConnectionInformationImpl{" +
-                    "recordVersion='" + recordVersion + '\'' +
-                    ", helloVersion='" + helloVersion + '\'' +
-                    ", alpnProtocols=" + alpnProtocols +
-                    '}';
-        }
     }
 }
 

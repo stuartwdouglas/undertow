@@ -29,7 +29,7 @@ import java.io.IOException;
  *
  * @author Stuart Douglas
  */
-class ALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
+class ServerALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
 
     private final SSLEngine sslEngine;
 
@@ -38,7 +38,7 @@ class ALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
     private boolean ready = false;
 
 
-    ALPNHackByteArrayOutputStream(SSLEngine sslEngine, byte[] bytes, String alpnProtocol) {
+    ServerALPNHackByteArrayOutputStream(SSLEngine sslEngine, byte[] bytes, String alpnProtocol) {
         this.sslEngine = sslEngine;
         this.alpnProtocol = alpnProtocol;
         try {
@@ -58,18 +58,18 @@ class ALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
                 serverHello = new byte[len]; //TODO: actual ALPN
                 System.arraycopy(b, off, serverHello, 0, len);
                 try {
-                    serverHello = SSLServerHelloALPNUpdater.addAlpnExtensionsToServerHello(serverHello, alpnProtocol);
+                    serverHello = ALPNHackServerHelloExplorer.addAlpnExtensionsToServerHello(serverHello, alpnProtocol);
                 } catch (SSLException e) {
                     throw new RuntimeException(e);
                 }
-                SSLServerHelloALPNUpdater.regenerateHashes(sslEngine, this, toByteArray(), serverHello);
+                ALPNSSLEngine.regenerateHashes(sslEngine, this, toByteArray(), serverHello);
                 return;
             }
         }
         super.write(b, off, len);
     }
 
-    public byte[] getServerHello() {
+    byte[] getServerHello() {
         return serverHello;
     }
 }
