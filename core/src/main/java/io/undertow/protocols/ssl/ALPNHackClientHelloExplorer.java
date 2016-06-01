@@ -20,28 +20,23 @@ package io.undertow.protocols.ssl;
 
 import io.undertow.UndertowMessages;
 
-import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;
 import javax.net.ssl.SSLException;
-import javax.net.ssl.StandardConstants;
 import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Instances of this class acts as an explorer of the network data of an
  * SSL/TLS connection.
  */
-final class SSLClientHelloExplorer {
+final class ALPNHackClientHelloExplorer {
 
     // Private constructor prevents construction outside this class.
-    private SSLClientHelloExplorer() {
+    private ALPNHackClientHelloExplorer() {
     }
 
     /**
@@ -77,7 +72,7 @@ final class SSLClientHelloExplorer {
      * @return the explored capabilities of the SSL/TLS
      *         connection
      */
-    public static SSLConnectionInformation exploreClientHello(ByteBuffer source)
+    public static SSLConnectionInformationImpl exploreClientHello(ByteBuffer source)
             throws SSLException {
 
         ByteBuffer input = source.duplicate();
@@ -92,59 +87,17 @@ final class SSLClientHelloExplorer {
         byte secondByte = input.get();
         byte thirdByte = input.get();
         if ((firstByte & 0x80) != 0 && thirdByte == 0x01) {
-            // looks like a V2ClientHello
-            return exploreV2HelloRecord(input,
-                    thirdByte);
+            // looks like a V2ClientHello, we ignore it.
+            return null;
         } else if (firstByte == 22) {   // 22: handshake record
-            return exploreTLSRecord(input,
-                                    firstByte, secondByte, thirdByte);
+            if(secondByte == 3 && thirdByte == 3) {
+                //TLS1.2 is the only one we care about. Previous versions can't use HTTP/2, newer versions won't be backported to JDK8
+                return exploreTLSRecord(input,
+                        firstByte, secondByte, thirdByte);
+            }
+            return null;
         } else {
             throw UndertowMessages.MESSAGES.notHandshakeRecord();
-        }
-    }
-
-    /*
-     * uint8 V2CipherSpec[3];
-     * struct {
-     *     uint16 msg_length;         // The highest bit MUST be 1;
-     *                                // the remaining bits contain the length
-     *                                // of the following data in bytes.
-     *     uint8 msg_type;            // MUST be 1
-     *     Version version;
-     *     uint16 cipher_spec_length; // It cannot be zero and MUST be a
-     *                                // multiple of the V2CipherSpec length.
-     *     uint16 session_id_length;  // This field MUST be empty.
-     *     uint16 challenge_length;   // SHOULD use a 32-byte challenge
-     *     V2CipherSpec cipher_specs[V2ClientHello.cipher_spec_length];
-     *     opaque session_id[V2ClientHello.session_id_length];
-     *     opaque challenge[V2ClientHello.challenge_length;
-     * } V2ClientHello;
-     */
-    private static SSLConnectionInformationImpl exploreV2HelloRecord(
-            ByteBuffer input,
-            byte thirdByte) throws SSLException {
-
-        // We only need the header. We have already had enough source bytes.
-        // int recordLength = (firstByte & 0x7F) << 8) | (secondByte & 0xFF);
-        try {
-            // Is it a V2ClientHello?
-            if (thirdByte != 0x01) {
-                throw UndertowMessages.MESSAGES.unsupportedSslRecord();
-            }
-
-            // What's the hello version?
-            byte helloVersionMajor = input.get();
-            byte helloVersionMinor = input.get();
-
-            // 0x00: major version of SSLv20
-            // 0x02: minor version of SSLv20
-            //
-            // SNIServerName is an extension, SSLv20 doesn't support extension.
-            return new SSLConnectionInformationImpl((byte)0x00, (byte)0x02,
-                        helloVersionMajor, helloVersionMinor,
-                        Collections.emptyList(), null);
-        } catch (BufferUnderflowException ignored) {
-            throw UndertowMessages.MESSAGES.invalidHandshakeRecord();
         }
     }
 
@@ -273,8 +226,6 @@ final class SSLClientHelloExplorer {
             byte recordMajorVersion,
             byte recordMinorVersion) throws SSLException {
 
-        Holder extensionInfo = new Holder(Collections.emptyList(), Collections.emptyList());
-
         // client version
         byte helloMajorVersion = input.get();
         byte helloMinorVersion = input.get();
@@ -291,14 +242,14 @@ final class SSLClientHelloExplorer {
 
         // ignore compression methods
         ignoreByteVector8(input);
-
+        List<String> alpnNames = null;
         if (input.remaining() > 0) {
-            extensionInfo = exploreExtensions(input);
+            alpnNames = exploreExtensions(input);
         }
 
         return new SSLConnectionInformationImpl(
                 recordMajorVersion, recordMinorVersion,
-                helloMajorVersion, helloMinorVersion, extensionInfo.serverNames, extensionInfo.alpnNames);
+                helloMajorVersion, helloMinorVersion, alpnNames);
     }
 
     /*
@@ -313,19 +264,15 @@ final class SSLClientHelloExplorer {
      *     truncated_hmac(4), status_request(5), (65535)
      * } ExtensionType;
      */
-    private static Holder exploreExtensions(ByteBuffer input)
+    private static List<String> exploreExtensions(ByteBuffer input)
             throws SSLException {
-        List<SNIServerName> serverNames = Collections.emptyList();
         List<String> alpnNames = null;
         int length = getInt16(input);           // length of extensions
         while (length > 0) {
             int extType = getInt16(input);      // extenson type
             int extLen = getInt16(input);       // length of extension data
-
-            if (extType == 0x00) {      // 0x00: type of server name indication
-                serverNames = exploreSNIExt(input, extLen);
-            } else if (extType == 16) {      // 0x00: type of server name indication
-                alpnNames = exploreALPNExt(input, extLen);
+            if (extType == 16) {      // 0x00: type of server name indication
+                alpnNames = exploreALPNExt(input);
             } else {                    // ignore other extensions
                 ignoreByteVector(input, extLen);
             }
@@ -333,10 +280,10 @@ final class SSLClientHelloExplorer {
             length -= extLen + 4;
         }
 
-        return new Holder(serverNames, alpnNames);
+        return alpnNames;
     }
 
-    private static List<String> exploreALPNExt(ByteBuffer input, int extLen) {
+    private static List<String> exploreALPNExt(ByteBuffer input) {
         int length = getInt16(input);
         int end = input.position() + length;
         List<String> ret = new ArrayList<>();
@@ -344,76 +291,6 @@ final class SSLClientHelloExplorer {
             ret.add(readByteVector8(input));
         }
         return ret;
-    }
-
-    /*
-     * struct {
-     *     NameType name_type;
-     *     select (name_type) {
-     *         case host_name: HostName;
-     *     } name;
-     * } ServerName;
-     *
-     * enum {
-     *     host_name(0), (255)
-     * } NameType;
-     *
-     * opaque HostName<1..2^16-1>;
-     *
-     * struct {
-     *     ServerName server_name_list<1..2^16-1>
-     * } ServerNameList;
-     */
-    private static List<SNIServerName> exploreSNIExt(ByteBuffer input,
-            int extLen) throws SSLException {
-
-        Map<Integer, SNIServerName> sniMap = new LinkedHashMap<>();
-
-        int remains = extLen;
-        if (extLen >= 2) {     // "server_name" extension in ClientHello
-            int listLen = getInt16(input);     // length of server_name_list
-            if (listLen == 0 || listLen + 2 != extLen) {
-                throw UndertowMessages.MESSAGES.invalidSniExt();
-            }
-
-            remains -= 2;     // 0x02: the length field of server_name_list
-            while (remains > 0) {
-                int code = getInt8(input);      // name_type
-                int snLen = getInt16(input);    // length field of server name
-                if (snLen > remains) {
-                    throw UndertowMessages.MESSAGES.notEnoughData();
-                }
-                byte[] encoded = new byte[snLen];
-                input.get(encoded);
-
-                SNIServerName serverName;
-                switch (code) {
-                    case StandardConstants.SNI_HOST_NAME:
-                        if (encoded.length == 0) {
-                            throw UndertowMessages.MESSAGES.emptyHostNameSni();
-                        }
-                        serverName = new SNIHostName(encoded);
-                        break;
-                    default:
-                        serverName = new UnknownServerName(code, encoded);
-                }
-                // check for duplicated server name type
-                if (sniMap.put(serverName.getType(), serverName) != null) {
-                    throw UndertowMessages.MESSAGES.duplicatedSniServerName(serverName.getType());
-                }
-
-                remains -= encoded.length + 3;  // NameType: 1 byte
-                                                // HostName length: 2 bytes
-            }
-        } else if (extLen == 0) {     // "server_name" extension in ServerHello
-            throw UndertowMessages.MESSAGES.invalidSniExt();
-        }
-
-        if (remains != 0) {
-            throw UndertowMessages.MESSAGES.invalidSniExt();
-        }
-
-        return Collections.unmodifiableList(new ArrayList<>(sniMap.values()));
     }
 
     private static int getInt8(ByteBuffer input) {
@@ -450,28 +327,19 @@ final class SSLClientHelloExplorer {
         }
     }
 
-    private static class UnknownServerName extends SNIServerName {
-        UnknownServerName(int code, byte[] encoded) {
-            super(code, encoded);
-        }
-    }
-
-    private static final class SSLConnectionInformationImpl implements SSLConnectionInformation {
+    static final class SSLConnectionInformationImpl {
 
         private final String recordVersion;
         private final String helloVersion;
-        private final List<SNIServerName> sniNames;
         private final List<String> alpnProtocols;
 
 
         SSLConnectionInformationImpl(byte recordMajorVersion, byte recordMinorVersion,
                                      byte helloMajorVersion, byte helloMinorVersion,
-                                     List<SNIServerName> sniNames, List<String> alpnProtocols) {
+                                     List<String> alpnProtocols) {
             this.alpnProtocols = alpnProtocols;
-
             this.recordVersion = getVersionString(recordMajorVersion, recordMinorVersion);
             this.helloVersion = getVersionString(helloMajorVersion, helloMinorVersion);
-            this.sniNames = sniNames;
         }
 
         private static String getVersionString(final byte helloMajorVersion, final byte helloMinorVersion) {
@@ -496,22 +364,14 @@ final class SSLClientHelloExplorer {
             }
         }
 
-        @Override
         public String getRecordVersion() {
             return recordVersion;
         }
 
-        @Override
         public String getHelloVersion() {
             return helloVersion;
         }
 
-        @Override
-        public List<SNIServerName> getSNIServerNames() {
-            return Collections.unmodifiableList(sniNames);
-        }
-
-        @Override
         public List<String> getAlpnProtocols() {
             return alpnProtocols;
         }
@@ -525,19 +385,8 @@ final class SSLClientHelloExplorer {
             return "SSLConnectionInformationImpl{" +
                     "recordVersion='" + recordVersion + '\'' +
                     ", helloVersion='" + helloVersion + '\'' +
-                    ", sniNames=" + sniNames +
                     ", alpnProtocols=" + alpnProtocols +
                     '}';
-        }
-    }
-
-    private static class Holder {
-        final List<SNIServerName> serverNames;
-        final List<String> alpnNames;
-
-        private Holder(List<SNIServerName> serverNames, List<String> alpnNames) {
-            this.serverNames = serverNames;
-            this.alpnNames = alpnNames;
         }
     }
 }

@@ -41,10 +41,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Open listener adaptor for ALPN connections that uses the SSLExplorer based approach and hack into the JDK8
@@ -52,7 +50,7 @@ import java.util.Set;
  *
  * @author Stuart Douglas
  */
-public class JDK8ExplorerAlpnOpenListener implements ChannelListener<StreamConnection>, AlpnOpenListener.AlpnDelegateListener {
+public class JDK8HackAlpnOpenListener implements ChannelListener<StreamConnection>, AlpnOpenListener.AlpnDelegateListener {
 
     private final ByteBufferPool bufferPool;
 
@@ -65,13 +63,13 @@ public class JDK8ExplorerAlpnOpenListener implements ChannelListener<StreamConne
     public static boolean ENABLED = ALPNSSLEngine.ENABLED;
 
 
-    public JDK8ExplorerAlpnOpenListener(ByteBufferPool bufferPool, OptionMap undertowOptions, String fallbackProtocol, DelegateOpenListener fallbackListener) {
+    public JDK8HackAlpnOpenListener(ByteBufferPool bufferPool, OptionMap undertowOptions, String fallbackProtocol, DelegateOpenListener fallbackListener) {
         this.bufferPool = bufferPool;
         this.fallbackProtocol = fallbackProtocol;
         if(fallbackProtocol != null && fallbackListener != null) {
             addProtocol(fallbackProtocol, fallbackListener, 0);
         }
-        statisticsEnabled = undertowOptions.get(UndertowOptions.ENABLE_CONNECTOR_STATISTICS, false);
+        statisticsEnabled = undertowOptions.get(UndertowOptions.ENABLE_STATISTICS, false);
         this.undertowOptions = undertowOptions;
     }
 
@@ -158,7 +156,7 @@ public class JDK8ExplorerAlpnOpenListener implements ChannelListener<StreamConne
 
         final AlpnConnectionListener potentialConnection = new AlpnConnectionListener(channel, engine);
         channel.getSourceChannel().setReadListener(potentialConnection);
-        Set<String> protocols = new HashSet<>();
+        List<String> protocols = new ArrayList<>();
         List<ListenerEntry> entries = new ArrayList<>(listeners.values());
         Collections.sort(entries);
         for(int i = 0; i < entries.size(); ++i) {

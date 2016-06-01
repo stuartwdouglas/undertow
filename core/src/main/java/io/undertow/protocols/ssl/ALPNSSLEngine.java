@@ -25,7 +25,6 @@ import javax.net.ssl.SSLSession;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.Set;
 
 /**
  * SSLEngine wrapper that provides some super hacky ALPN support on JDK8.
@@ -50,7 +49,7 @@ public class ALPNSSLEngine extends SSLEngine {
     private boolean clientHelloExplored = false;
     private boolean serverHelloSent = false;
     private ALPNHackByteArrayOutputStream alpnHackByteArrayOutputStream;
-    private Set<String> applicationProtocols;
+    private List<String> applicationProtocols;
     private String selectedApplicationProtocol;
     private ByteBuffer bufferedWrapData;
 
@@ -100,8 +99,8 @@ public class ALPNSSLEngine extends SSLEngine {
     public SSLEngineResult unwrap(ByteBuffer dataToUnwrap, ByteBuffer[] byteBuffers, int i, int i1) throws SSLException {
         if(!clientHelloExplored && !delegate.getUseClientMode() && applicationProtocols != null) {
             try {
-                SSLConnectionInformation result = SSLClientHelloExplorer.exploreClientHello(dataToUnwrap.duplicate());
-                if(result.getAlpnProtocols() != null) {
+                ALPNHackClientHelloExplorer.SSLConnectionInformationImpl result = ALPNHackClientHelloExplorer.exploreClientHello(dataToUnwrap.duplicate());
+                if(result != null && result.getAlpnProtocols() != null) {
                     for(String protocol : result.getAlpnProtocols()) {
                         if(applicationProtocols.contains(protocol)) {
                             selectedApplicationProtocol = protocol;
@@ -239,7 +238,7 @@ public class ALPNSSLEngine extends SSLEngine {
      * These methods will be removed once JDK8 ALPN support is no longer required
      * @param applicationProtocols
      */
-    public void setApplicationProtocols(Set<String> applicationProtocols) {
+    public void setApplicationProtocols(List<String> applicationProtocols) {
         this.applicationProtocols = applicationProtocols;
     }
 
@@ -248,7 +247,7 @@ public class ALPNSSLEngine extends SSLEngine {
      *
      * These methods will be removed once JDK8 ALPN support is no longer required
      */
-    public Set<String> getApplicationProtocols() {
+    public List<String> getApplicationProtocols() {
         return applicationProtocols;
     }
 
