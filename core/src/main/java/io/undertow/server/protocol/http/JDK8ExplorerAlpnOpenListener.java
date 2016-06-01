@@ -23,6 +23,7 @@ import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.connector.ByteBufferPool;
 import io.undertow.connector.PooledByteBuffer;
+import io.undertow.protocols.ssl.ALPNSSLEngine;
 import io.undertow.protocols.ssl.SslConduit;
 import io.undertow.protocols.ssl.UndertowXnioSsl;
 import io.undertow.server.AggregateConnectorStatistics;
@@ -61,7 +62,7 @@ public class JDK8ExplorerAlpnOpenListener implements ChannelListener<StreamConne
     private volatile OptionMap undertowOptions;
     private volatile boolean statisticsEnabled;
 
-    public static boolean ENABLED = true;
+    public static boolean ENABLED = ALPNSSLEngine.ENABLED;
 
 
     public JDK8ExplorerAlpnOpenListener(ByteBufferPool bufferPool, OptionMap undertowOptions, String fallbackProtocol, DelegateOpenListener fallbackListener) {
@@ -152,7 +153,10 @@ public class JDK8ExplorerAlpnOpenListener implements ChannelListener<StreamConne
             UndertowLogger.REQUEST_LOGGER.tracef("Opened connection with %s", channel.getPeerAddress());
         }
         final SslConduit sslConduit = UndertowXnioSsl.getSslConduit((SslConnection) channel);
-        final AlpnConnectionListener potentialConnection = new AlpnConnectionListener(channel, sslConduit);
+        ALPNSSLEngine engine = new ALPNSSLEngine(sslConduit.getSSLEngine());
+        sslConduit.setSslEngine(engine);
+
+        final AlpnConnectionListener potentialConnection = new AlpnConnectionListener(channel, engine);
         channel.getSourceChannel().setReadListener(potentialConnection);
         Set<String> protocols = new HashSet<>();
         List<ListenerEntry> entries = new ArrayList<>(listeners.values());
@@ -160,18 +164,18 @@ public class JDK8ExplorerAlpnOpenListener implements ChannelListener<StreamConne
         for(int i = 0; i < entries.size(); ++i) {
             protocols.add(entries.get(i).protocol);
         }
-        sslConduit.setApplicationProtocols(protocols);
+        engine.setApplicationProtocols(protocols);
         potentialConnection.handleEvent(channel.getSourceChannel());
 
     }
 
     private class AlpnConnectionListener implements ChannelListener<StreamSourceChannel> {
         private final StreamConnection channel;
-        private final SslConduit sslConduit;
+        private final ALPNSSLEngine alpnsslEngine;
 
-        private AlpnConnectionListener(StreamConnection channel, SslConduit sslConduit) {
+        private AlpnConnectionListener(StreamConnection channel, ALPNSSLEngine alpnsslEngine) {
             this.channel = channel;
-            this.sslConduit = sslConduit;
+            this.alpnsslEngine = alpnsslEngine;
         }
 
         @Override
@@ -186,7 +190,7 @@ public class JDK8ExplorerAlpnOpenListener implements ChannelListener<StreamConne
                         return;
                     }
                     buffer.getBuffer().flip();
-                    final String selected = sslConduit.getSelectedApplicationProtocol();
+                    final String selected = alpnsslEngine.getSelectedApplicationProtocol();
                     if(selected != null) {
                         DelegateOpenListener listener;
                         if(selected.isEmpty()) {

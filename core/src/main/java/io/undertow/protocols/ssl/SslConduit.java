@@ -46,14 +46,11 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.xnio.Bits.allAreClear;
@@ -123,7 +120,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     private final UndertowSslConnection connection;
     private final StreamConnection delegate;
-    private final SSLEngine engine;
+    private SSLEngine engine;
     private final StreamSinkConduit sink;
     private final StreamSourceConduit source;
     private final ByteBufferPool bufferPool;
@@ -186,14 +183,6 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             runReadListenerCommand.run();
         }
     };
-
-    //ALPN Hack specific variables
-    private byte[] clientHelloRecord; //needed to regenerate a handhsake
-    private boolean clientHelloExplored = false;
-    private boolean serverHelloSent = false;
-    private ALPNHackByteArrayOutputStream alpnHackByteArrayOutputStream;
-    private Set<String> applicationProtocols = Collections.singleton("h2");
-    private String selectedApplicationProtocol;
 
     SslConduit(UndertowSslConnection connection, StreamConnection delegate, SSLEngine engine, ByteBufferPool bufferPool, Runnable handshakeCallback) {
         this.connection = connection;
@@ -718,25 +707,6 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     return 0;
                 }
             }
-            if(!clientHelloExplored && !engine.getUseClientMode() && applicationProtocols != null) {
-                try {
-                    SSLConnectionInformation result = SSLClientHelloExplorer.exploreClientHello(dataToUnwrap.getBuffer().duplicate());
-                    if(result.getAlpnProtocols() != null) {
-                        for(String protocol : result.getAlpnProtocols()) {
-                            if(applicationProtocols.contains(protocol)) {
-                                selectedApplicationProtocol = protocol;
-                                break;
-                            }
-                        }
-                    }
-                    clientHelloRecord = new byte[dataToUnwrap.getBuffer().remaining()];
-                    dataToUnwrap.getBuffer().duplicate().get(clientHelloRecord);
-                    clientHelloExplored = true;
-                } catch (BufferUnderflowException e) {
-                    state &= ~FLAG_DATA_TO_UNWRAP;
-                    return 0;
-                }
-            }
             dataToUnwrapLength = dataToUnwrap.getBuffer().remaining();
 
             long original = 0;
@@ -773,9 +743,6 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     bytesProduced = result.bytesProduced() > 0;
                 }
             } finally {
-                if(selectedApplicationProtocol != null && alpnHackByteArrayOutputStream == null) {
-                    alpnHackByteArrayOutputStream = SSLServerHelloALPNUpdater.replaceByteOutput(getSSLEngine(), selectedApplicationProtocol);
-                }
                 if (unwrapBufferUsed) {
                     unwrappedData.getBuffer().flip();
                     if (!unwrappedData.getBuffer().hasRemaining()) {
@@ -893,18 +860,6 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                 }
             }
             wrappedData.getBuffer().flip();
-
-            if(!engine.getUseClientMode() && selectedApplicationProtocol != null && !serverHelloSent && alpnHackByteArrayOutputStream != null) {
-                byte[] newServerHello = alpnHackByteArrayOutputStream.getServerHello(); //this is the new server hello, it will be part of the first TLS plaintext record
-                if(newServerHello != null) {
-                    List<ByteBuffer> records = SSLServerHelloALPNUpdater.extractRecords(wrappedData.getBuffer());
-                    wrappedData.close();
-                    wrappedData = SSLServerHelloALPNUpdater.createNewOutputData(newServerHello, records);
-                }
-            }
-            if(wrappedData.getBuffer().hasRemaining()) {
-                serverHelloSent = true;
-            }
 
             if (result.getStatus() == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
                 throw new IOException("underflow"); //todo: can this happen?
@@ -1114,34 +1069,6 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
     }
 
     /**
-     * JDK8 ALPN hack support method.
-     *
-     * These methods will be removed once JDK8 ALPN support is no longer required
-     * @param applicationProtocols
-     */
-    public void setApplicationProtocols(Set<String> applicationProtocols) {
-        this.applicationProtocols = applicationProtocols;
-    }
-
-    /**
-     * JDK8 ALPN hack support method.
-     *
-     * These methods will be removed once JDK8 ALPN support is no longer required
-     */
-    public Set<String> getApplicationProtocols() {
-        return applicationProtocols;
-    }
-
-    /**
-     * JDK8 ALPN hack support method.
-     *
-     * These methods will be removed once JDK8 ALPN support is no longer required
-     */
-    public String getSelectedApplicationProtocol() {
-        return selectedApplicationProtocol;
-    }
-
-    /**
      * Read ready handler that deals with read-requires-write semantics
      */
     private class SslReadReadyHandler implements ReadReadyHandler {
@@ -1291,6 +1218,10 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                 delegate.getSinkChannel().suspendWrites();
             }
         }
+    }
+
+    public void setSslEngine(SSLEngine engine) {
+        this.engine = engine;
     }
 
     @Override

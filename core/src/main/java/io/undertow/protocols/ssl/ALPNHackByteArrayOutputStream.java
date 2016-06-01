@@ -29,7 +29,7 @@ import java.io.IOException;
  *
  * @author Stuart Douglas
  */
-public class ALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
+class ALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
 
     private final SSLEngine sslEngine;
 
@@ -38,7 +38,7 @@ public class ALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
     private boolean ready = false;
 
 
-    public ALPNHackByteArrayOutputStream(SSLEngine sslEngine, byte[] bytes, String alpnProtocol) {
+    ALPNHackByteArrayOutputStream(SSLEngine sslEngine, byte[] bytes, String alpnProtocol) {
         this.sslEngine = sslEngine;
         this.alpnProtocol = alpnProtocol;
         try {

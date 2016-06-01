@@ -52,76 +52,6 @@ final class SSLClientHelloExplorer {
     public static final int RECORD_HEADER_SIZE = 0x05;
 
     /**
-     * Returns the required number of bytes in the {@code source}
-     * {@link ByteBuffer} necessary to explore SSL/TLS connection.
-     * <P>
-     * This method tries to parse as few bytes as possible from
-     * {@code source} byte buffer to get the length of an
-     * SSL/TLS record.
-     * <P>
-     * This method accesses the {@code source} parameter in read-only
-     * mode, and does not update the buffer's properties such as capacity,
-     * limit, position, and mark values.
-     *
-     * @param  source
-     *         a {@link ByteBuffer} containing
-     *         inbound or outbound network data for an SSL/TLS connection.
-     * @throws BufferUnderflowException if less than {@code RECORD_HEADER_SIZE}
-     *         bytes remaining in {@code source}
-     * @return the required size in byte to explore an SSL/TLS connection
-     */
-    public static int getRequiredSize(ByteBuffer source) {
-
-        ByteBuffer input = source.duplicate();
-
-        // Do we have a complete header?
-        if (input.remaining() < RECORD_HEADER_SIZE) {
-            throw new BufferUnderflowException();
-        }
-
-        // Is it a handshake message?
-        byte firstByte = input.get();
-        byte secondByte = input.get();
-        byte thirdByte = input.get();
-        if ((firstByte & 0x80) != 0 && thirdByte == 0x01) {
-            // looks like a V2ClientHello
-            // return (((firstByte & 0x7F) << 8) | (secondByte & 0xFF)) + 2;
-            return RECORD_HEADER_SIZE;   // Only need the header fields
-        } else {
-            return ((input.get() & 0xFF) << 8 | input.get() & 0xFF) + 5;
-        }
-    }
-
-    /**
-     * Returns the required number of bytes in the {@code source} byte array
-     * necessary to explore SSL/TLS connection.
-     * <P>
-     * This method tries to parse as few bytes as possible from
-     * {@code source} byte array to get the length of an
-     * SSL/TLS record.
-     *
-     * @param  source
-     *         a byte array containing inbound or outbound network data for
-     *         an SSL/TLS connection.
-     * @param  offset
-     *         the start offset in array {@code source} at which the
-     *         network data is read from.
-     * @param  length
-     *         the maximum number of bytes to read.
-     *
-     * @throws BufferUnderflowException if less than {@code RECORD_HEADER_SIZE}
-     *         bytes remaining in {@code source}
-     * @return the required size in byte to explore an SSL/TLS connection
-     */
-    public static int getRequiredSize(byte[] source,
-            int offset, int length) throws IOException {
-
-        ByteBuffer byteBuffer =
-            ByteBuffer.wrap(source, offset, length).asReadOnlyBuffer();
-        return getRequiredSize(byteBuffer);
-    }
-
-    /**
      * Launch and explore the security capabilities from byte buffer.
      * <P>
      * This method tries to parse as few records as possible from
@@ -164,46 +94,13 @@ final class SSLClientHelloExplorer {
         if ((firstByte & 0x80) != 0 && thirdByte == 0x01) {
             // looks like a V2ClientHello
             return exploreV2HelloRecord(input,
-                                    firstByte, secondByte, thirdByte);
+                    thirdByte);
         } else if (firstByte == 22) {   // 22: handshake record
             return exploreTLSRecord(input,
                                     firstByte, secondByte, thirdByte);
         } else {
             throw UndertowMessages.MESSAGES.notHandshakeRecord();
         }
-    }
-
-    /**
-     * Launch and explore the security capabilities from byte array.
-     * <P>
-     * Please NOTE that this method must be called before any handshaking
-     * occurs.  The behavior of this method is not defined in this release
-     * if the handshake has begun, or has completed.  Once handshake has
-     * begun, or has completed, the security capabilities can not and
-     * should not be launched with this method.
-     *
-     * @param  source
-     *         a byte array containing inbound or outbound network data for
-     *         an SSL/TLS connection.
-     * @param  offset
-     *         the start offset in array {@code source} at which the
-     *         network data is read from.
-     * @param  length
-     *         the maximum number of bytes to read.
-     *
-     * @throws IOException on network data error
-     * @throws BufferUnderflowException if not enough source bytes available
-     *         to make a complete exploration.
-     * @return the explored capabilities of the SSL/TLS
-     *         connection
-     *
-     * @see #exploreClientHello(ByteBuffer)
-     */
-    public static SSLConnectionInformation exploreClientHello(byte[] source,
-                                                              int offset, int length) throws IOException {
-        ByteBuffer byteBuffer =
-            ByteBuffer.wrap(source, offset, length).asReadOnlyBuffer();
-        return exploreClientHello(byteBuffer);
     }
 
     /*
@@ -224,7 +121,7 @@ final class SSLClientHelloExplorer {
      * } V2ClientHello;
      */
     private static SSLConnectionInformationImpl exploreV2HelloRecord(
-            ByteBuffer input, byte firstByte, byte secondByte,
+            ByteBuffer input,
             byte thirdByte) throws SSLException {
 
         // We only need the header. We have already had enough source bytes.
@@ -544,10 +441,6 @@ final class SSLClientHelloExplorer {
 
     private static void ignoreByteVector16(ByteBuffer input) {
         ignoreByteVector(input, getInt16(input));
-    }
-
-    private static void ignoreByteVector24(ByteBuffer input) {
-        ignoreByteVector(input, getInt24(input));
     }
 
     private static void ignoreByteVector(ByteBuffer input, int length) {

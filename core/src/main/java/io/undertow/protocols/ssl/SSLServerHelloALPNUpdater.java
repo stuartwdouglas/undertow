@@ -20,8 +20,6 @@ package io.undertow.protocols.ssl;
 
 import io.undertow.UndertowLogger;
 import io.undertow.UndertowMessages;
-import io.undertow.connector.PooledByteBuffer;
-import io.undertow.util.ImmediatePooledByteBuffer;
 import sun.security.ssl.ProtocolVersion;
 import sun.security.ssl.SSLEngineImpl;
 
@@ -32,7 +30,6 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +47,7 @@ final class SSLServerHelloALPNUpdater {
     private SSLServerHelloALPNUpdater() {
     }
 
-    public static final boolean ENABLED;
+    static final boolean ENABLED;
     private static final Field HANDSHAKER;
     private static final Field HANDSHAKER_PROTOCOL_VERSION;
     private static final Field HANDSHAKE_HASH;
@@ -210,19 +207,6 @@ final class SSLServerHelloALPNUpdater {
      * enum { null(0), (255) } CompressionMethod;
      *
      * struct {
-     *     ProtocolVersion client_version;
-     *     Random random;
-     *     SessionID session_id;
-     *     CipherSuite cipher_suites<2..2^16-2>;
-     *     CompressionMethod compression_methods<1..2^8-1>;
-     *     select (extensions_present) {
-     *         case false:
-     *             struct {};
-     *         case true:
-     *             Extension extensions<0..2^16-1>;
-     *     };
-     * } ClientHello;
-     * struct {
      *    ProtocolVersion server_version;
      *    Random random;
      *    SessionID session_id;
@@ -374,30 +358,10 @@ final class SSLServerHelloALPNUpdater {
         return (input.get() & 0xFF) << 16 | (input.get() & 0xFF) << 8 |
                 input.get() & 0xFF;
     }
-
-    private static void ignoreByteVector8(ByteBuffer input) {
-        ignoreByteVector(input, getInt8(input));
-    }
-
     private static void processByteVector8(ByteBuffer input, ByteArrayOutputStream out) {
         int int8 = getInt8(input);
         out.write(int8 & 0xFF);
         processByteVector(input, int8, out);
-    }
-
-    private static String readByteVector8(ByteBuffer input) {
-        int length = getInt8(input);
-        byte[] data = new byte[length];
-        input.get(data);
-        return new String(data, StandardCharsets.US_ASCII);
-    }
-
-    private static void ignoreByteVector16(ByteBuffer input) {
-        ignoreByteVector(input, getInt16(input));
-    }
-
-    private static void ignoreByteVector24(ByteBuffer input) {
-        ignoreByteVector(input, getInt24(input));
     }
 
     private static void ignoreByteVector(ByteBuffer input, int length) {
@@ -428,7 +392,7 @@ final class SSLServerHelloALPNUpdater {
         }
     }
 
-    public static PooledByteBuffer createNewOutputData(byte[] newServerHello, List<ByteBuffer> records) {
+    public static ByteBuffer createNewOutputData(byte[] newServerHello, List<ByteBuffer> records) {
         int length = newServerHello.length;
         length += 5; //Framing layer
         for (int i = 1; i < records.size(); ++i) {
@@ -450,7 +414,7 @@ final class SSLServerHelloALPNUpdater {
             ret.put(rec);
         }
         ret.flip();
-        return new ImmediatePooledByteBuffer(ret);
+        return ret;
     }
 
     public static void regenerateHashes(SSLEngine sslEngineToHack, ByteArrayOutputStream data, byte[]... hashBytes) {
