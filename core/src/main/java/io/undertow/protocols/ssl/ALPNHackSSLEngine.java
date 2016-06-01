@@ -47,7 +47,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * @author Stuart Douglas
  */
-public class ALPNSSLEngine extends SSLEngine {
+public class ALPNHackSSLEngine extends SSLEngine {
 
     public static final boolean ENABLED;
 
@@ -118,13 +118,13 @@ public class ALPNSSLEngine extends SSLEngine {
     //ALPN Hack specific variables
     private boolean unwrapHelloSeen = false;
     private boolean ourHelloSent = false;
-    private ServerALPNHackByteArrayOutputStream serverAlpnHackByteArrayOutputStream;
-    private ClientALPNHackByteArrayOutputStream clientALPNHackByteArrayOutputStream;
+    private ALPNHackServerByteArrayOutputStream alpnHackServerByteArrayOutputStream;
+    private ALPNHackClientByteArrayOutputStream ALPNHackClientByteArrayOutputStream;
     private List<String> applicationProtocols;
     private String selectedApplicationProtocol;
     private ByteBuffer bufferedWrapData;
 
-    public ALPNSSLEngine(SSLEngine delegate) {
+    public ALPNHackSSLEngine(SSLEngine delegate) {
         this.delegate = delegate;
     }
 
@@ -142,24 +142,26 @@ public class ALPNSSLEngine extends SSLEngine {
         if(!ourHelloSent && res.bytesProduced() > 0) {
             if(delegate.getUseClientMode() && applicationProtocols != null && !applicationProtocols.isEmpty()) {
                 ourHelloSent = true;
-                clientALPNHackByteArrayOutputStream = replaceClientByteOutput(delegate);
+                ALPNHackClientByteArrayOutputStream = replaceClientByteOutput(delegate);
                 ByteBuffer newBuf = byteBuffer.duplicate();
                 newBuf.flip();
                 byte[] data = new byte[newBuf.remaining()];
                 newBuf.get(data);
                 byte[] newData = ALPNHackClientHelloExplorer.rewriteClientHello(data, applicationProtocols);
                 if(newData != null) {
-                    clientALPNHackByteArrayOutputStream.setSentClientHello(newData);
+                    byte[] clientHelloMesage = new byte[newData.length - 5];
+                    System.arraycopy(newData, 5, clientHelloMesage, 0 , clientHelloMesage.length);
+                    ALPNHackClientByteArrayOutputStream.setSentClientHello(clientHelloMesage);
                     byteBuffer.clear();
                     byteBuffer.put(newData);
                 }
-            } else {
-                if(selectedApplicationProtocol != null && serverAlpnHackByteArrayOutputStream != null) {
-                    byte[] newServerHello = serverAlpnHackByteArrayOutputStream.getServerHello(); //this is the new server hello, it will be part of the first TLS plaintext record
+            } else if (!getUseClientMode()) {
+                if(selectedApplicationProtocol != null && alpnHackServerByteArrayOutputStream != null) {
+                    byte[] newServerHello = alpnHackServerByteArrayOutputStream.getServerHello(); //this is the new server hello, it will be part of the first TLS plaintext record
                     if (newServerHello != null) {
                         byteBuffer.flip();
                         List<ByteBuffer> records = ALPNHackServerHelloExplorer.extractRecords(byteBuffer);
-                        ByteBuffer newData = ALPNHackServerHelloExplorer.createNewOutputData(newServerHello, records);
+                        ByteBuffer newData = ALPNHackServerHelloExplorer.createNewOutputRecords(newServerHello, records);
                         byteBuffer.position(pos); //erase the data
                         byteBuffer.limit(limit);
                         if (newData.remaining() > byteBuffer.remaining()) {
@@ -201,26 +203,53 @@ public class ALPNSSLEngine extends SSLEngine {
                 } catch (BufferUnderflowException e) {
                     return new SSLEngineResult(SSLEngineResult.Status.BUFFER_UNDERFLOW, SSLEngineResult.HandshakeStatus.NEED_UNWRAP, 0, 0);
                 }
-            } else if(delegate.getUseClientMode() && clientALPNHackByteArrayOutputStream != null) {
-                final AtomicReference<String> alpnResult = null;
-                ByteBuffer dup = dataToUnwrap.duplicate();
-                int type = dup.get(); //22
-                int major = dup.get();
-                int minor = dup.get();
-                if(type == 22 && major == 3 && minor == 3) {
-                    byte[] source = new byte[dataToUnwrap.remaining()];
-                    dup.get(source);
-                    byte[] result = ALPNHackServerHelloExplorer.removeAlpnExtensionsFromServerHello(source, alpnResult);
-                    if (result != null) {
-                        dataToUnwrap = ByteBuffer.wrap(result);
-                        clientALPNHackByteArrayOutputStream.setReceivedServerHello(source);
+            } else if(delegate.getUseClientMode() && ALPNHackClientByteArrayOutputStream != null) {
+                if(!dataToUnwrap.hasRemaining()) {
+                    return new SSLEngineResult(SSLEngineResult.Status.BUFFER_UNDERFLOW, SSLEngineResult.HandshakeStatus.NEED_UNWRAP, 0, 0);
+                }
+                try {
+                    ByteBuffer dup = dataToUnwrap.duplicate();
+                    int type = dup.get();
+                    int major = dup.get();
+                    int minor = dup.get();
+                    if(type == 22 && major == 3 && minor == 3) {
+                        //we only care about TLS 1.2
+                        //split up the records, there may be multiple when doing a fast session resume
+                        List<ByteBuffer> records = ALPNHackServerHelloExplorer.extractRecords(dataToUnwrap.duplicate());
+
+                        ByteBuffer firstRecord = records.get(0); //this will be the handshake record
+
+                        final AtomicReference<String> alpnResult = new AtomicReference<>();
+                        ByteBuffer dupFirst = firstRecord.duplicate();
+                        dupFirst.position(firstRecord.position() + 5);
+                        ByteBuffer firstLessFraming = dupFirst.duplicate();
+
+                        byte[] result = ALPNHackServerHelloExplorer.removeAlpnExtensionsFromServerHello(dupFirst, alpnResult);
+                        firstLessFraming.limit(dupFirst.position());
+                        unwrapHelloSeen = true;
+                        if (result != null) {
+                            selectedApplicationProtocol = alpnResult.get();
+                            int newFirstRecordLength = result.length + dupFirst.remaining();
+                            byte[] newFirstRecord = new byte[newFirstRecordLength];
+                            System.arraycopy(result, 0, newFirstRecord, 0, result.length);
+                            dupFirst.get(newFirstRecord, result.length, dupFirst.remaining());
+                            dataToUnwrap.position(dataToUnwrap.limit());
+
+                            byte[] originalFirstRecord = new byte[firstLessFraming.remaining()];
+                            firstLessFraming.get(originalFirstRecord);
+
+                            dataToUnwrap = ALPNHackServerHelloExplorer.createNewOutputRecords(newFirstRecord, records);
+                            ALPNHackClientByteArrayOutputStream.setReceivedServerHello(originalFirstRecord);
+                        }
                     }
+                } catch (BufferUnderflowException e) {
+                    return new SSLEngineResult(SSLEngineResult.Status.BUFFER_UNDERFLOW, SSLEngineResult.HandshakeStatus.NEED_UNWRAP, 0, 0);
                 }
             }
         }
         SSLEngineResult res = delegate.unwrap(dataToUnwrap, byteBuffers, i, i1);
-        if(!delegate.getUseClientMode() && selectedApplicationProtocol != null && serverAlpnHackByteArrayOutputStream == null) {
-            serverAlpnHackByteArrayOutputStream = replaceServerByteOutput(delegate, selectedApplicationProtocol);
+        if(!delegate.getUseClientMode() && selectedApplicationProtocol != null && alpnHackServerByteArrayOutputStream == null) {
+            alpnHackServerByteArrayOutputStream = replaceServerByteOutput(delegate, selectedApplicationProtocol);
         }
         return res;
     }
@@ -364,13 +393,13 @@ public class ALPNSSLEngine extends SSLEngine {
     }
 
 
-    static ServerALPNHackByteArrayOutputStream replaceServerByteOutput(SSLEngine sslEngine, String selectedAlpnProtocol) {
+    static ALPNHackServerByteArrayOutputStream replaceServerByteOutput(SSLEngine sslEngine, String selectedAlpnProtocol) {
         try {
             Object handshaker = HANDSHAKER.get(sslEngine);
             Object hash = HANDSHAKE_HASH.get(handshaker);
             ByteArrayOutputStream existing = (ByteArrayOutputStream) HANDSHAKE_HASH_DATA.get(hash);
 
-            ServerALPNHackByteArrayOutputStream out = new ServerALPNHackByteArrayOutputStream(sslEngine, existing.toByteArray(), selectedAlpnProtocol);
+            ALPNHackServerByteArrayOutputStream out = new ALPNHackServerByteArrayOutputStream(sslEngine, existing.toByteArray(), selectedAlpnProtocol);
             HANDSHAKE_HASH_DATA.set(hash, out);
             return out;
         } catch (Exception e) {
@@ -379,13 +408,13 @@ public class ALPNSSLEngine extends SSLEngine {
         }
     }
 
-    static ClientALPNHackByteArrayOutputStream replaceClientByteOutput(SSLEngine sslEngine) {
+    static ALPNHackClientByteArrayOutputStream replaceClientByteOutput(SSLEngine sslEngine) {
         try {
             Object handshaker = HANDSHAKER.get(sslEngine);
             Object hash = HANDSHAKE_HASH.get(handshaker);
             ByteArrayOutputStream existing = (ByteArrayOutputStream) HANDSHAKE_HASH_DATA.get(hash);
 
-            ClientALPNHackByteArrayOutputStream out = new ClientALPNHackByteArrayOutputStream(sslEngine);
+            ALPNHackClientByteArrayOutputStream out = new ALPNHackClientByteArrayOutputStream(sslEngine);
             HANDSHAKE_HASH_DATA.set(hash, out);
             return out;
         } catch (Exception e) {

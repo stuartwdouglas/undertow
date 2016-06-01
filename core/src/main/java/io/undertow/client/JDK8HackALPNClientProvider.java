@@ -18,7 +18,7 @@
 
 package io.undertow.client;
 
-import io.undertow.protocols.ssl.ALPNSSLEngine;
+import io.undertow.protocols.ssl.ALPNHackSSLEngine;
 import io.undertow.protocols.ssl.SslConduit;
 import io.undertow.protocols.ssl.UndertowXnioSsl;
 import io.undertow.util.ImmediatePooled;
@@ -29,6 +29,7 @@ import org.xnio.ssl.SslConnection;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +48,7 @@ public class JDK8HackALPNClientProvider implements ALPNClientSelector.ClientSele
 
         final SslConnection sslConnection = connection;
         final SslConduit conduit = UndertowXnioSsl.getSslConduit(sslConnection);
-        final ALPNSSLEngine sslEngine = new ALPNSSLEngine(conduit.getSSLEngine());
+        final ALPNHackSSLEngine sslEngine = new ALPNHackSSLEngine(conduit.getSSLEngine());
         conduit.setSslEngine(sslEngine);
 
         final Map<String, ALPNClientSelector.ALPNProtocol> protocolMap = new HashMap<>();
@@ -75,6 +76,8 @@ public class JDK8HackALPNClientProvider implements ALPNClientSelector.ClientSele
                                 PushBackStreamSourceConduit pb = new PushBackStreamSourceConduit(connection.getSourceChannel().getConduit());
                                 pb.pushBack(new ImmediatePooled<>(buf));
                                 connection.getSourceChannel().setConduit(pb);
+                            } else if (read == -1) {
+                                failedListener.failed(new ClosedChannelException());
                             }
                             if(sslEngine.getSelectedApplicationProtocol() != null) {
                                 handleSelected(sslEngine.getSelectedApplicationProtocol());
@@ -118,7 +121,7 @@ public class JDK8HackALPNClientProvider implements ALPNClientSelector.ClientSele
     }
 
     public boolean isEnabled() {
-        return ALPNSSLEngine.ENABLED;
+        return ALPNHackSSLEngine.ENABLED;
     }
 
 }

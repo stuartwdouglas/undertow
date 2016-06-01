@@ -28,17 +28,17 @@ import java.io.ByteArrayOutputStream;
  *
  * @author Stuart Douglas
  */
-class ClientALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
+class ALPNHackClientByteArrayOutputStream extends ByteArrayOutputStream {
 
     private final SSLEngine sslEngine;
-    private boolean ready;
+    private boolean ready = true;
     /**
      * the server hello that was sent over the wire, before we messed with it
      */
     private byte[] receivedServerHello;
     private byte[] sentClientHello;
 
-    ClientALPNHackByteArrayOutputStream(SSLEngine sslEngine) {
+    ALPNHackClientByteArrayOutputStream(SSLEngine sslEngine) {
         this.sslEngine = sslEngine;
     }
 
@@ -64,7 +64,7 @@ class ClientALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
                     newData = new byte[len];
                     System.arraycopy(b, 0, newData, 0, len);
                 }
-                ALPNSSLEngine.regenerateHashes(sslEngine, this, sentClientHello, newData);
+                ALPNHackSSLEngine.regenerateHashes(sslEngine, this, sentClientHello, newData);
                 return;
             }
         }

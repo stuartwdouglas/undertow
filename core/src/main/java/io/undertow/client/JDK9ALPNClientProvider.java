@@ -31,6 +31,7 @@ import javax.net.ssl.SSLParameters;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -80,6 +81,8 @@ public class JDK9ALPNClientProvider implements ALPNClientSelector.ClientSelector
                                 PushBackStreamSourceConduit pb = new PushBackStreamSourceConduit(connection.getSourceChannel().getConduit());
                                 pb.pushBack(new ImmediatePooled<>(buf));
                                 connection.getSourceChannel().setConduit(pb);
+                            } else if (read == -1) {
+                                failedListener.failed(new ClosedChannelException());
                             }
                             selected = (String) ALPN.JDK_9_ALPN_METHODS.getApplicationProtocol().invoke(sslEngine);
                             if(selected != null) {

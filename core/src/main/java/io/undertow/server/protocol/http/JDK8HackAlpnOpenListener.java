@@ -23,7 +23,7 @@ import io.undertow.UndertowMessages;
 import io.undertow.UndertowOptions;
 import io.undertow.connector.ByteBufferPool;
 import io.undertow.connector.PooledByteBuffer;
-import io.undertow.protocols.ssl.ALPNSSLEngine;
+import io.undertow.protocols.ssl.ALPNHackSSLEngine;
 import io.undertow.protocols.ssl.SslConduit;
 import io.undertow.protocols.ssl.UndertowXnioSsl;
 import io.undertow.server.AggregateConnectorStatistics;
@@ -60,7 +60,7 @@ public class JDK8HackAlpnOpenListener implements ChannelListener<StreamConnectio
     private volatile OptionMap undertowOptions;
     private volatile boolean statisticsEnabled;
 
-    public static boolean ENABLED = ALPNSSLEngine.ENABLED;
+    public static boolean ENABLED = ALPNHackSSLEngine.ENABLED;
 
 
     public JDK8HackAlpnOpenListener(ByteBufferPool bufferPool, OptionMap undertowOptions, String fallbackProtocol, DelegateOpenListener fallbackListener) {
@@ -151,7 +151,7 @@ public class JDK8HackAlpnOpenListener implements ChannelListener<StreamConnectio
             UndertowLogger.REQUEST_LOGGER.tracef("Opened connection with %s", channel.getPeerAddress());
         }
         final SslConduit sslConduit = UndertowXnioSsl.getSslConduit((SslConnection) channel);
-        ALPNSSLEngine engine = new ALPNSSLEngine(sslConduit.getSSLEngine());
+        ALPNHackSSLEngine engine = new ALPNHackSSLEngine(sslConduit.getSSLEngine());
         sslConduit.setSslEngine(engine);
 
         final AlpnConnectionListener potentialConnection = new AlpnConnectionListener(channel, engine);
@@ -169,9 +169,9 @@ public class JDK8HackAlpnOpenListener implements ChannelListener<StreamConnectio
 
     private class AlpnConnectionListener implements ChannelListener<StreamSourceChannel> {
         private final StreamConnection channel;
-        private final ALPNSSLEngine alpnsslEngine;
+        private final ALPNHackSSLEngine alpnsslEngine;
 
-        private AlpnConnectionListener(StreamConnection channel, ALPNSSLEngine alpnsslEngine) {
+        private AlpnConnectionListener(StreamConnection channel, ALPNHackSSLEngine alpnsslEngine) {
             this.channel = channel;
             this.alpnsslEngine = alpnsslEngine;
         }

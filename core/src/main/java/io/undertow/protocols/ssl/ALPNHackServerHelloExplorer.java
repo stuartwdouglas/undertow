@@ -78,18 +78,15 @@ final class ALPNHackServerHelloExplorer {
      * @return
      * @throws SSLException
      */
-    static byte[] removeAlpnExtensionsFromServerHello(byte[] source, final AtomicReference<String> selectedAlpnProtocol)
+    static byte[] removeAlpnExtensionsFromServerHello(ByteBuffer source, final AtomicReference<String> selectedAlpnProtocol)
             throws SSLException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ByteBuffer input = ByteBuffer.wrap(source);
+
         try {
 
-            exploreHandshake(input, source.length, selectedAlpnProtocol, out);
+            exploreHandshake(source, source.remaining(), selectedAlpnProtocol, out);
             //we need to adjust the record length;
             int serverHelloLength = out.size() - 4;
-            if(input.remaining() > 0) {
-                throw new AssertionError(); //should never happen
-            }
             byte[] data = out.toByteArray();
 
             //now we need to adjust the handshake frame length
@@ -101,8 +98,7 @@ final class ALPNHackServerHelloExplorer {
             return null;
         }
     }
-    private static void exploreHandshake(
-            ByteBuffer input, int recordLength, AtomicReference<String> selectedAlpnProtocol, ByteArrayOutputStream out) throws SSLException {
+    private static void exploreHandshake(ByteBuffer input, int recordLength, AtomicReference<String> selectedAlpnProtocol, ByteArrayOutputStream out) throws SSLException {
 
         // What is the handshake type?
         byte handshakeType = input.get();
@@ -229,12 +225,14 @@ final class ALPNHackServerHelloExplorer {
         return ret;
     }
 
-    private static String exploreExtensions(ByteBuffer input, ByteArrayOutputStream out, boolean removeAlpn)
+    private static String exploreExtensions(ByteBuffer input, ByteArrayOutputStream extensionOut, boolean removeAlpn)
             throws SSLException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
         String ret = null;
         int length = getInt16(input);           // length of extensions
         out.write((length >> 8) & 0xFF);
         out.write(length & 0xFF);
+        int originalLength = length;
         while (length > 0) {
             int extType = getInt16(input);      // extenson type
             int extLen = getInt16(input);       // length of extension data
@@ -253,6 +251,9 @@ final class ALPNHackServerHelloExplorer {
                     for(int i = 0; i < ret.length(); ++i) {
                         out.write(ret.charAt(i) & 0xFF);
                     }
+                } else {
+                    originalLength -= 6;
+                    originalLength -= vlen;
                 }
             } else {
                 out.write((extType >> 8) & 0xFF);
@@ -267,6 +268,10 @@ final class ALPNHackServerHelloExplorer {
             //there was not ALPN to remove, so this whole thing is unnecessary, throw an exception to abort
             throw new AlpnProcessingException();
         }
+        byte[] data = out.toByteArray();
+        data[0] = (byte) ((originalLength >> 8) & 0xFF);
+        data[1] = (byte) (originalLength  & 0xFF);
+        extensionOut.write(data, 0, data.length);
         return ret;
     }
 
@@ -301,8 +306,8 @@ final class ALPNHackServerHelloExplorer {
         }
     }
 
-    public static ByteBuffer createNewOutputData(byte[] newServerHello, List<ByteBuffer> records) {
-        int length = newServerHello.length;
+    static ByteBuffer createNewOutputRecords(byte[] newFirstMessage, List<ByteBuffer> records) {
+        int length = newFirstMessage.length;
         length += 5; //Framing layer
         for (int i = 1; i < records.size(); ++i) {
             //the first record is the old server hello, so we start at 1 rather than zero
@@ -315,9 +320,9 @@ final class ALPNHackServerHelloExplorer {
         ret.put(oldHello.get()); //type
         ret.put(oldHello.get()); //major
         ret.put(oldHello.get()); //minor
-        ret.put((byte) ((newServerHello.length >> 8) & 0xFF));
-        ret.put((byte) (newServerHello.length & 0xFF));
-        ret.put(newServerHello);
+        ret.put((byte) ((newFirstMessage.length >> 8) & 0xFF));
+        ret.put((byte) (newFirstMessage.length & 0xFF));
+        ret.put(newFirstMessage);
         for (int i = 1; i < records.size(); ++i) {
             ByteBuffer rec = records.get(i);
             ret.put(rec);

@@ -780,7 +780,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             } else {
                 long res = original - Buffers.remaining(userBuffers);
                 if(res > 0) {
-                    //if data has been sucessfully returned this is not a read loop
+                    //if data has been successfully returned this is not a read loop
                     readListenerInvocationCount = 0;
                 }
                 return res;
