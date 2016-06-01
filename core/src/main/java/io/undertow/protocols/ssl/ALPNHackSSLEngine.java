@@ -205,7 +205,7 @@ public class ALPNHackSSLEngine extends SSLEngine {
                 }
             } else if(delegate.getUseClientMode() && ALPNHackClientByteArrayOutputStream != null) {
                 if(!dataToUnwrap.hasRemaining()) {
-                    return new SSLEngineResult(SSLEngineResult.Status.BUFFER_UNDERFLOW, SSLEngineResult.HandshakeStatus.NEED_UNWRAP, 0, 0);
+                    return delegate.unwrap(dataToUnwrap, byteBuffers, i, i1);
                 }
                 try {
                     ByteBuffer dup = dataToUnwrap.duplicate();
@@ -238,7 +238,10 @@ public class ALPNHackSSLEngine extends SSLEngine {
                             byte[] originalFirstRecord = new byte[firstLessFraming.remaining()];
                             firstLessFraming.get(originalFirstRecord);
 
-                            dataToUnwrap = ALPNHackServerHelloExplorer.createNewOutputRecords(newFirstRecord, records);
+                            ByteBuffer newData = ALPNHackServerHelloExplorer.createNewOutputRecords(newFirstRecord, records);
+                            dataToUnwrap.clear();
+                            dataToUnwrap.put(newData);
+                            dataToUnwrap.flip();
                             ALPNHackClientByteArrayOutputStream.setReceivedServerHello(originalFirstRecord);
                         }
                     }
