@@ -19,6 +19,7 @@
 package io.undertow.protocols.ssl;
 
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
@@ -56,7 +57,11 @@ public class ALPNHackByteArrayOutputStream extends ByteArrayOutputStream {
 
                 serverHello = new byte[len]; //TODO: actual ALPN
                 System.arraycopy(b, off, serverHello, 0, len);
-
+                try {
+                    serverHello = SSLServerHelloALPNUpdater.addAlpnExtensionsToServerHello(serverHello, alpnProtocol);
+                } catch (SSLException e) {
+                    throw new RuntimeException(e);
+                }
                 SSLServerHelloALPNUpdater.regenerateHashes(sslEngine, this, toByteArray(), serverHello);
                 return;
             }

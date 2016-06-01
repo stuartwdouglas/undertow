@@ -61,7 +61,7 @@ public class JDK8ExplorerAlpnOpenListener implements ChannelListener<StreamConne
     private volatile OptionMap undertowOptions;
     private volatile boolean statisticsEnabled;
 
-    public static boolean ENABLED = false;
+    public static boolean ENABLED = true;
 
 
     public JDK8ExplorerAlpnOpenListener(ByteBufferPool bufferPool, OptionMap undertowOptions, String fallbackProtocol, DelegateOpenListener fallbackListener) {

@@ -28,9 +28,9 @@ import sun.security.ssl.SSLEngineImpl;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -39,9 +39,9 @@ import java.util.List;
 
 /**
  * Hacks up ALPN support into the server hello message, then munges the SSLEngine internal state to make this work the way you would expect.
- *
+ * <p>
  * We only care about TLS 1.2, as TLS 1.1 is not allowed to use ALPN.
- *
+ * <p>
  * Super hacky, but slightly less hacky than modifying the boot class path
  */
 final class SSLServerHelloALPNUpdater {
@@ -114,113 +114,32 @@ final class SSLServerHelloALPNUpdater {
 
     /**
      * The header size of TLS/SSL records.
-     * <P>
+     * <p>
      * The value of this constant is {@value}.
      */
     public static final int RECORD_HEADER_SIZE = 0x05;
 
-    /**
-     * Returns the required number of bytes in the {@code source}
-     * {@link ByteBuffer} necessary to explore SSL/TLS connection.
-     * <P>
-     * This method tries to parse as few bytes as possible from
-     * {@code source} byte buffer to get the length of an
-     * SSL/TLS record.
-     * <P>
-     * This method accesses the {@code source} parameter in read-only
-     * mode, and does not update the buffer's properties such as capacity,
-     * limit, position, and mark values.
-     *
-     * @param  source
-     *         a {@link ByteBuffer} containing
-     *         inbound or outbound network data for an SSL/TLS connection.
-     * @throws BufferUnderflowException if less than {@code RECORD_HEADER_SIZE}
-     *         bytes remaining in {@code source}
-     * @return the required size in byte to explore an SSL/TLS connection
-     */
-    public static int getRequiredSize(ByteBuffer source) {
-
-        ByteBuffer input = source.duplicate();
-
-        // Do we have a complete header?
-        if (input.remaining() < RECORD_HEADER_SIZE) {
-            throw new BufferUnderflowException();
-        }
-
-        // Is it a handshake message?
-        byte firstByte = input.get();
-        byte secondByte = input.get();
-        byte thirdByte = input.get();
-        if ((firstByte & 0x80) != 0 && thirdByte == 0x01) {
-            // looks like a V2ClientHello
-            // return (((firstByte & 0x7F) << 8) | (secondByte & 0xFF)) + 2;
-            return RECORD_HEADER_SIZE;   // Only need the header fields
-        } else {
-            return ((input.get() & 0xFF) << 8 | input.get() & 0xFF) + 5;
-        }
-    }
-
-    public static PooledByteBuffer exploreServerHello(ByteBuffer source, String selectedAlpnProtocol, SSLEngine sslEngineToHack, byte[] clientHelloRecord, ALPNHackByteArrayOutputStream alpnHackByteArrayOutputStream)
+    public static byte[] addAlpnExtensionsToServerHello(byte[] source, String selectedAlpnProtocol)
             throws SSLException {
-
-        ByteBuffer input = source.duplicate();
-
-        // Do we have a complete header?
-        if (input.remaining() < RECORD_HEADER_SIZE) {
-            throw new BufferUnderflowException();
-        }
-
-        // Is it a handshake message?
-        byte firstByte = input.get();
-        byte secondByte = input.get();
-        byte thirdByte = input.get();
-        if (firstByte == 22) {   // 22: handshake record
-            return exploreTLSRecord(input,
-                                    firstByte, secondByte, thirdByte, selectedAlpnProtocol, sslEngineToHack, source.duplicate(), clientHelloRecord);
-        } else {
-            throw UndertowMessages.MESSAGES.notHandshakeRecord();
-        }
-    }
-
-    /*
-     * struct {
-     *     uint8 major;
-     *     uint8 minor;
-     * } ProtocolVersion;
-     *
-     * enum {
-     *     change_cipher_spec(20), alert(21), handshake(22),
-     *     application_data(23), (255)
-     * } ContentType;
-     *
-     * struct {
-     *     ContentType type;
-     *     ProtocolVersion version;
-     *     uint16 length;
-     *     opaque fragment[TLSPlaintext.length];
-     * } TLSPlaintext;
-     */
-    private static PooledByteBuffer exploreTLSRecord(
-            ByteBuffer input, byte firstByte, byte secondByte,
-            byte thirdByte, String selectedAlpnProtocol, SSLEngine sslEngineToHack, ByteBuffer original, byte[] clientHelloRecord) throws SSLException {
-
-        // Is it a handshake message?
-        if (firstByte != 22) {        // 22: handshake record
-            throw UndertowMessages.MESSAGES.notHandshakeRecord();
-        }
-
-        // Is there enough data for a full record?
-        int recordLength = getInt16(input);
-        if (recordLength > input.remaining()) {
-            throw new BufferUnderflowException();
-        }
-
-        // We have already had enough source bytes.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteBuffer input = ByteBuffer.wrap(source);
         try {
-            return exploreHandshake(input,
-                secondByte, thirdByte, recordLength, selectedAlpnProtocol, sslEngineToHack, original, clientHelloRecord);
-        } catch (BufferUnderflowException ignored) {
-            throw UndertowMessages.MESSAGES.invalidHandshakeRecord();
+
+            exploreHandshake(input, source.length, selectedAlpnProtocol, out);
+            //we need to adjust the record length;
+            int serverHelloLength = out.size() - 4;
+            out.write(source, input.position(), input.remaining()); //there may be more messages (cert etc), so we append them
+            byte[] data = out.toByteArray();
+
+            //now we need to adjust the handshake frame length
+            data[1] = (byte) ((serverHelloLength >> 16) & 0xFF);
+            data[2] = (byte) ((serverHelloLength >> 8) & 0xFF);
+            data[3] = (byte) (serverHelloLength & 0xFF);
+
+
+            return data;
+        } catch (AlpnPresentException e) {
+            return source;
         }
     }
 
@@ -251,29 +170,31 @@ final class SSLServerHelloALPNUpdater {
      *     } body;
      * } Handshake;
      */
-    private static PooledByteBuffer exploreHandshake(
-            ByteBuffer input, byte recordMajorVersion,
-            byte recordMinorVersion, int recordLength, String selectedAlpnProtocol, SSLEngine sslEngineToHack, ByteBuffer original, byte[] clientHelloRecord) throws SSLException {
+    private static void exploreHandshake(
+            ByteBuffer input, int recordLength, String selectedAlpnProtocol, ByteArrayOutputStream out) throws SSLException {
 
         // What is the handshake type?
         byte handshakeType = input.get();
         if (handshakeType != 0x02) {   // 0x01: server_hello message
-            throw UndertowMessages.MESSAGES.expectedClientHello();
+            throw UndertowMessages.MESSAGES.expectedServerHello();
         }
+        out.write(handshakeType);
 
         // What is the handshake body length?
         int handshakeLength = getInt24(input);
+        out.write(0); //placeholders
+        out.write(0);
+        out.write(0);
 
         // Theoretically, a single handshake message might span multiple
         // records, but in practice this does not occur.
         if (handshakeLength > recordLength - 4) { // 4: handshake header size
             throw UndertowMessages.MESSAGES.multiRecordSSLHandshake();
         }
-
-        input = input.duplicate();
+        int old = input.limit();
         input.limit(handshakeLength + input.position());
-        return exploreServerHello(input,
-                                    recordMajorVersion, recordMinorVersion, selectedAlpnProtocol, sslEngineToHack, original, clientHelloRecord);
+        exploreServerHello(input, selectedAlpnProtocol, out);
+        input.limit(old);
     }
 
     /*
@@ -315,38 +236,74 @@ final class SSLServerHelloALPNUpdater {
      *    };
      *} ServerHello;
      */
-    private static PooledByteBuffer exploreServerHello(
-            ByteBuffer input,
-            byte recordMajorVersion,
-            byte recordMinorVersion, String selectedAlpnProtocol, SSLEngine sslEngineToHack, ByteBuffer original, byte[] clientHelloRecord) throws SSLException {
+    private static void exploreServerHello(
+            ByteBuffer input, String selectedAlpnProtocol, ByteArrayOutputStream out) throws SSLException {
 
         // server version
         byte helloMajorVersion = input.get();
         byte helloMinorVersion = input.get();
+        out.write(helloMajorVersion);
+        out.write(helloMinorVersion);
 
-        // ignore random
-        int position = input.position();
-        input.position(position + 32);  // 32: the length of Random
+        for (int i = 0; i < 32; ++i) { //the Random is 32 bytes
+            out.write(input.get() & 0xFF);
+        }
 
         // ignore session id
-        ignoreByteVector8(input);
+        processByteVector8(input, out);
 
         // ignore cipher_suite
-        getInt16(input);
+        out.write(input.get() & 0xFF);
+        out.write(input.get() & 0xFF);
 
         // ignore compression methods
-        getInt8(input);
+        out.write(input.get() & 0xFF);
 
         boolean alpnPresent = false;
+        ByteArrayOutputStream extensionsOutput = null;
         if (input.remaining() > 0) {
-            alpnPresent = exploreExtensions(input);
+            extensionsOutput = new ByteArrayOutputStream();
+            alpnPresent = exploreExtensions(input, extensionsOutput);
         }
-        if(!alpnPresent) {
-
+        if (alpnPresent) {
+            throw new AlpnPresentException();
         }
-        List<ByteBuffer> outgoingRecords = extractRecords(original);
 
-        return null;
+        ByteArrayOutputStream alpnBits = new ByteArrayOutputStream();
+        alpnBits.write(0);
+        alpnBits.write(16); //ALPN type
+        int length = 3 + selectedAlpnProtocol.length(); //length of extension data
+        alpnBits.write((length >> 8) & 0xFF);
+        alpnBits.write(length & 0xFF);
+        length -= 2;
+        alpnBits.write((length >> 8) & 0xFF);
+        alpnBits.write(length & 0xFF);
+        alpnBits.write(selectedAlpnProtocol.length() & 0xFF);
+        for (int i = 0; i < selectedAlpnProtocol.length(); ++i) {
+            alpnBits.write(selectedAlpnProtocol.charAt(i) & 0xFF);
+        }
+
+        if (extensionsOutput != null) {
+            byte[] existing = extensionsOutput.toByteArray();
+            int newLength = existing.length - 2 + alpnBits.size();
+            existing[0] = (byte) ((newLength >> 8) & 0xFF);
+            existing[1] = (byte) (newLength & 0xFF);
+            try {
+                out.write(existing);
+                out.write(alpnBits.toByteArray());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            int al = alpnBits.size();
+            out.write((al >> 8) & 0xFF);
+            out.write(al & 0xFF);
+            try {
+                out.write(alpnBits.toByteArray());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     public static List<ByteBuffer> extractRecords(ByteBuffer data) {
@@ -382,18 +339,24 @@ final class SSLServerHelloALPNUpdater {
      *     truncated_hmac(4), status_request(5), (65535)
      * } ExtensionType;
      */
-    private static boolean exploreExtensions(ByteBuffer input)
+    private static boolean exploreExtensions(ByteBuffer input, ByteArrayOutputStream out)
             throws SSLException {
         boolean alpnPresent = false;
 
         int length = getInt16(input);           // length of extensions
+        out.write((length >> 8) & 0xFF);
+        out.write(length & 0xFF);
         while (length > 0) {
             int extType = getInt16(input);      // extenson type
+            out.write((extType >> 8) & 0xFF);
+            out.write(extType & 0xFF);
             int extLen = getInt16(input);       // length of extension data
+            out.write((extLen >> 8) & 0xFF);
+            out.write(extLen & 0xFF);
             if (extType == 16) {      // 0x00: type of server name indication
                 alpnPresent = true;
             }
-            ignoreByteVector(input, extLen);
+            processByteVector(input, extLen, out);
             length -= extLen + 4;
         }
         return alpnPresent;
@@ -409,13 +372,20 @@ final class SSLServerHelloALPNUpdater {
 
     private static int getInt24(ByteBuffer input) {
         return (input.get() & 0xFF) << 16 | (input.get() & 0xFF) << 8 |
-            input.get() & 0xFF;
+                input.get() & 0xFF;
     }
 
     private static void ignoreByteVector8(ByteBuffer input) {
         ignoreByteVector(input, getInt8(input));
     }
-    private static String  readByteVector8(ByteBuffer input) {
+
+    private static void processByteVector8(ByteBuffer input, ByteArrayOutputStream out) {
+        int int8 = getInt8(input);
+        out.write(int8 & 0xFF);
+        processByteVector(input, int8, out);
+    }
+
+    private static String readByteVector8(ByteBuffer input) {
         int length = getInt8(input);
         byte[] data = new byte[length];
         input.get(data);
@@ -437,6 +407,12 @@ final class SSLServerHelloALPNUpdater {
         }
     }
 
+    private static void processByteVector(ByteBuffer input, int length, ByteArrayOutputStream out) {
+        for (int i = 0; i < length; ++i) {
+            out.write(input.get() & 0xFF);
+        }
+    }
+
     public static ALPNHackByteArrayOutputStream replaceByteOutput(SSLEngine sslEngine, String selectedAlpnProtocol) {
         try {
             Object handshaker = HANDSHAKER.get(sslEngine);
@@ -447,7 +423,7 @@ final class SSLServerHelloALPNUpdater {
             HANDSHAKE_HASH_DATA.set(hash, out);
             return out;
         } catch (Exception e) {
-            UndertowLogger.ROOT_LOGGER.debug("Failed to replace hash output stream ",e);
+            UndertowLogger.ROOT_LOGGER.debug("Failed to replace hash output stream ", e);
             return null;
         }
     }
@@ -455,7 +431,7 @@ final class SSLServerHelloALPNUpdater {
     public static PooledByteBuffer createNewOutputData(byte[] newServerHello, List<ByteBuffer> records) {
         int length = newServerHello.length;
         length += 5; //Framing layer
-        for(int i = 1; i < records.size(); ++i) {
+        for (int i = 1; i < records.size(); ++i) {
             //the first record is the old server hello, so we start at 1 rather than zero
             ByteBuffer rec = records.get(i);
             length += rec.remaining();
@@ -469,7 +445,7 @@ final class SSLServerHelloALPNUpdater {
         ret.put((byte) ((newServerHello.length >> 8) & 0xFF));
         ret.put((byte) (newServerHello.length & 0xFF));
         ret.put(newServerHello);
-        for(int i = 1; i < records.size(); ++i) {
+        for (int i = 1; i < records.size(); ++i) {
             ByteBuffer rec = records.get(i);
             ret.put(rec);
         }
@@ -477,7 +453,7 @@ final class SSLServerHelloALPNUpdater {
         return new ImmediatePooledByteBuffer(ret);
     }
 
-    public static void regenerateHashes(SSLEngine sslEngineToHack, ByteArrayOutputStream data, byte[] ... hashBytes) {
+    public static void regenerateHashes(SSLEngine sslEngineToHack, ByteArrayOutputStream data, byte[]... hashBytes) {
         //hack up the SSL engine internal state
         try {
             Object handshaker = HANDSHAKER.get(sslEngineToHack);
@@ -488,13 +464,17 @@ final class SSLServerHelloALPNUpdater {
             HANDSHAKE_HASH_PROTOCOL_DETERMINED.invoke(hash, protocolVersion);
             MessageDigest digest = (MessageDigest) HANDSHAKE_HASH_FIN_MD.get(hash);
             digest.reset();
-            for(byte[] b : hashBytes) {
+            for (byte[] b : hashBytes) {
                 HANDSHAKE_HASH_UPDATE.invoke(hash, b, 0, b.length);
             }
         } catch (Exception e) {
             e.printStackTrace(); //TODO: remove
             throw new RuntimeException(e);
         }
+    }
+
+    private static final class AlpnPresentException extends RuntimeException {
+
     }
 }
 

@@ -475,4 +475,7 @@ public interface UndertowMessages {
 
     @Message(id = 147, value = "Duplicated SNI server name of type %d")
     SSLProtocolException duplicatedSniServerName(int type);
+
+    @Message(id = 148, value = "Expected server hello")
+    SSLHandshakeException expectedServerHello();
 }
