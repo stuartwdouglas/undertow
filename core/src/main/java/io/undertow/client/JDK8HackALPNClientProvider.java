@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Jetty ALPN client provider
+ * JDK8 hack based ALPN client provider
  *
  * @author Stuart Douglas
  */
