@@ -1110,9 +1110,14 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             int initialUnwrapped = -1;
             if (anyAreSet(state, FLAG_READS_RESUMED)) {
                 if (delegateHandler == null) {
-                    final ChannelListener<? super ConduitStreamSourceChannel> readListener = connection.getSourceChannel().getReadListener();
+                    ChannelListener<? super ConduitStreamSourceChannel> readListener = connection.getSourceChannel().getReadListener();
                     if (readListener == null) {
                         suspendReads();
+                        readListener = connection.getSourceChannel().getReadListener();
+                        if(readListener != null) {
+                            //make sure another thread was not in the process of resuming
+                            resumeReads();
+                        }
                     } else {
                         if(anyAreSet(state, FLAG_DATA_TO_UNWRAP)) {
                             initialDataToUnwrap = dataToUnwrap.getBuffer().remaining();
@@ -1133,6 +1138,10 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
             }
             if(!anyAreSet(state, FLAG_READS_RESUMED) && !allAreSet(state, FLAG_WRITE_REQUIRES_READ | FLAG_WRITES_RESUMED)) {
                 delegate.getSourceChannel().suspendReads();
+                if(anyAreSet(state, FLAG_READS_RESUMED)) {
+                    //make sure another thread was not in the process of resuming
+                    delegate.getSourceChannel().resumeReads();
+                }
             } else if(anyAreSet(state, FLAG_READS_RESUMED) && (unwrappedData != null || anyAreSet(state, FLAG_DATA_TO_UNWRAP))) {
                 if(anyAreSet(state, FLAG_READ_CLOSED)) {
                     if(unwrappedData != null) {
