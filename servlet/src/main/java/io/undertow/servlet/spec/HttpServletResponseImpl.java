@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -41,10 +42,14 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 import io.undertow.UndertowLogger;
+import io.undertow.server.Connectors;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.ResponseCommitListener;
 import io.undertow.server.protocol.http.HttpAttachments;
 import io.undertow.servlet.UndertowServletMessages;
 import io.undertow.servlet.handlers.ServletRequestContext;
+import io.undertow.util.AttachmentKey;
+import io.undertow.util.AttachmentList;
 import io.undertow.util.CanonicalPathUtils;
 import io.undertow.util.DateUtils;
 import io.undertow.util.HeaderMap;
@@ -62,6 +67,8 @@ import static io.undertow.util.URLUtils.isAbsoluteUrl;
  * @author Stuart Douglas
  */
 public final class HttpServletResponseImpl implements HttpServletResponse {
+
+    private static final AttachmentKey<AttachmentList<io.undertow.server.handlers.Cookie>> ADDITIONAL_COOKIES = AttachmentKey.createList(io.undertow.server.handlers.Cookie.class);
 
     private final HttpServerExchange exchange;
     private final ServletContextImpl originalServletContext;
@@ -104,7 +111,23 @@ public final class HttpServletResponseImpl implements HttpServletResponse {
         if (cookie.getVersion() == 0) {
             servletCookieAdaptor.setVersion(servletContext.getDeployment().getDeploymentInfo().getDefaultCookieVersion());
         }
-        exchange.setResponseCookie(servletCookieAdaptor);
+        boolean existing = exchange.getResponseCookies().containsKey(cookie.getName());
+        if(!existing) {
+            exchange.setResponseCookie(servletCookieAdaptor);
+        } else {
+            List<io.undertow.server.handlers.Cookie> attachmentList = exchange.getAttachmentList(ADDITIONAL_COOKIES);
+            if(attachmentList.isEmpty()) {
+                exchange.addResponseCommitListener(new ResponseCommitListener() {
+                    @Override
+                    public void beforeCommit(HttpServerExchange exchange) {
+                        for(io.undertow.server.handlers.Cookie i : exchange.getAttachmentList(ADDITIONAL_COOKIES)) {
+                            Connectors.flattenCookie(exchange, i);
+                        }
+                    }
+                });
+            }
+            exchange.addToAttachmentList(ADDITIONAL_COOKIES, servletCookieAdaptor);
+        }
     }
 
     @Override
