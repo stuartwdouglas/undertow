@@ -158,7 +158,7 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     private boolean invokingReadListenerHandshake = false;
 
-
+    private volatile SSLException brokenReason;
 
     private final Runnable runReadListenerCommand = new Runnable() {
         @Override
@@ -289,6 +289,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public void awaitReadable() throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         synchronized (this) {
             if(outstandingTasks > 0) {
                 try {
@@ -314,6 +317,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public void awaitReadable(long time, TimeUnit timeUnit) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         synchronized (this) {
             if(outstandingTasks > 0) {
                 try {
@@ -349,6 +355,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public long transferFrom(FileChannel src, long position, long count) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_WRITE_SHUTDOWN)) {
             throw new ClosedChannelException();
         }
@@ -357,6 +366,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public long transferFrom(StreamSourceChannel source, long count, ByteBuffer throughBuffer) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_WRITE_SHUTDOWN)) {
             throw new ClosedChannelException();
         }
@@ -365,6 +377,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public int write(ByteBuffer src) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_WRITE_SHUTDOWN)) {
             throw new ClosedChannelException();
         }
@@ -373,6 +388,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public long write(ByteBuffer[] srcs, int offs, int len) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_WRITE_SHUTDOWN)) {
             throw new ClosedChannelException();
         }
@@ -381,6 +399,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public int writeFinal(ByteBuffer src) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_WRITE_SHUTDOWN)) {
             throw new ClosedChannelException();
         }
@@ -389,6 +410,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public long writeFinal(ByteBuffer[] srcs, int offset, int length) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         return Conduits.writeFinalBasic(this, srcs, offset, length);
     }
 
@@ -506,6 +530,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public boolean flush() throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_DELEGATE_SINK_SHUTDOWN)) {
             return sink.flush();
         }
@@ -545,6 +572,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public long transferTo(long position, long count, FileChannel target) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_READ_SHUTDOWN)) {
             return -1;
         }
@@ -553,6 +583,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public long transferTo(long count, ByteBuffer throughBuffer, StreamSinkChannel target) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_READ_SHUTDOWN)) {
             return -1;
         }
@@ -561,6 +594,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public int read(ByteBuffer dst) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_READ_SHUTDOWN)) {
             return -1;
         }
@@ -569,6 +605,9 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
 
     @Override
     public long read(ByteBuffer[] dsts, int offs, int len) throws IOException {
+        if(brokenReason != null) {
+            throw new SSLException(brokenReason);
+        }
         if(anyAreSet(state, FLAG_READ_SHUTDOWN)) {
             return -1;
         }
@@ -1083,6 +1122,11 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                                                 try {
                                                     doHandshake();
                                                 } catch (IOException | RuntimeException | Error e) {
+                                                    if(e instanceof SSLException) {
+                                                        brokenReason = (SSLException) e;
+                                                    } else {
+                                                        brokenReason = new SSLException(e);
+                                                    }
                                                     IoUtils.safeClose(connection);
                                                 }
                                                 if (anyAreSet(state, FLAG_READS_RESUMED)) {
@@ -1136,8 +1180,14 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     doHandshake();
                 } catch (IOException e) {
                     UndertowLogger.REQUEST_LOGGER.ioException(e);
+                    if(e instanceof SSLException) {
+                        brokenReason = (SSLException) e;
+                    } else {
+                        brokenReason = new SSLException(e);
+                    }
                     IoUtils.safeClose(delegate);
                 } catch (Throwable t) {
+                    brokenReason = new SSLException(t);
                     UndertowLogger.REQUEST_IO_LOGGER.handleUnexpectedFailure(t);
                     IoUtils.safeClose(delegate);
                 } finally {
@@ -1252,9 +1302,15 @@ public class SslConduit implements StreamSourceConduit, StreamSinkConduit {
                     try {
                         doHandshake();
                     } catch (IOException e) {
+                        if(e instanceof SSLException) {
+                            brokenReason = (SSLException) e;
+                        } else {
+                            brokenReason = new SSLException(e);
+                        }
                         UndertowLogger.REQUEST_LOGGER.ioException(e);
                         IoUtils.safeClose(delegate);
                     } catch (Throwable t) {
+                        brokenReason = new SSLException(t);
                         UndertowLogger.REQUEST_LOGGER.handleUnexpectedFailure(t);
                         IoUtils.safeClose(delegate);
                     }
