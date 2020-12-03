@@ -417,6 +417,9 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
                     }
 
                 }
+                if (loadBalancingProxyClient != null) {
+                    loadBalancingProxyClient.setConnectionsPerThread(100);
+                }
                 if (h2cUpgrade) {
                     openListener.setRootHandler(new Http2UpgradeHandler(rootHandler));
                 } else {
@@ -717,6 +720,12 @@ public class DefaultServer extends BlockJUnit4ClassRunner {
             proxyOpenListener.closeConnections();
         } else {
             openListener.closeConnections();
+        }
+        //some environments seem to need a small delay to re-bind the socket
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            //ignore
         }
     }
 

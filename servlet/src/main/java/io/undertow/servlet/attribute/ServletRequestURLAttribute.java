@@ -49,11 +49,11 @@ public class ServletRequestURLAttribute implements ExchangeAttribute {
         if (src == null) {
             return RequestURLAttribute.INSTANCE.readAttribute(exchange);
         }
-        String uri = (String) src.getServletRequest().getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
+        String uri = (String) src.getServletRequest().getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
         if (uri != null) {
             return uri;
         }
-        uri = (String) src.getServletRequest().getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
+        uri = (String) src.getServletRequest().getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
         if (uri != null) {
             return uri;
         }
@@ -63,6 +63,11 @@ public class ServletRequestURLAttribute implements ExchangeAttribute {
     @Override
     public void writeAttribute(final HttpServerExchange exchange, final String newValue) throws ReadOnlyAttributeException {
         RequestURLAttribute.INSTANCE.writeAttribute(exchange, newValue);
+    }
+
+    @Override
+    public String toString() {
+        return REQUEST_URL;
     }
 
     public static final class Builder implements ExchangeAttributeBuilder {

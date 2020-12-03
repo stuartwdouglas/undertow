@@ -72,6 +72,7 @@ import io.undertow.servlet.api.ThreadSetupHandler;
 import io.undertow.servlet.api.WebResourceCollection;
 import io.undertow.servlet.handlers.CrawlerSessionManagerHandler;
 import io.undertow.servlet.handlers.RedirectDirHandler;
+import io.undertow.servlet.handlers.SendErrorPageHandler;
 import io.undertow.servlet.handlers.ServletDispatchingHandler;
 import io.undertow.servlet.handlers.ServletHandler;
 import io.undertow.servlet.handlers.ServletInitialHandler;
@@ -187,7 +188,6 @@ public class DeploymentManagerImpl implements DeploymentManager {
                 @Override
                 public Void call(HttpServerExchange exchange, Object ignore) throws Exception {
                     final ApplicationListeners listeners = createListeners();
-                    listeners.start();
 
                     deployment.setApplicationListeners(listeners);
 
@@ -207,6 +207,8 @@ public class DeploymentManagerImpl implements DeploymentManager {
                         }
                     }
 
+                    listeners.start();
+
                     deployment.getSessionManager().registerSessionListener(new SessionListenerBridge(deployment, listeners, servletContext));
                     for(SessionListener listener : deploymentInfo.getSessionListeners()) {
                         deployment.getSessionManager().registerSessionListener(listener);
@@ -225,6 +227,7 @@ public class DeploymentManagerImpl implements DeploymentManager {
                         wrappedHandlers = new PredicateHandler(DispatcherTypePredicate.REQUEST, securityHandler, wrappedHandlers);
                     }
                     HttpHandler outerHandlers = wrapHandlers(wrappedHandlers, deploymentInfo.getOuterHandlerChainWrappers());
+                    outerHandlers = new SendErrorPageHandler(outerHandlers);
                     wrappedHandlers = new PredicateHandler(DispatcherTypePredicate.REQUEST, outerHandlers, wrappedHandlers);
                     wrappedHandlers = handleDevelopmentModePersistentSessions(wrappedHandlers, deploymentInfo, deployment.getSessionManager(), servletContext);
 

@@ -24,12 +24,12 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.Channel;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.Certificate;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.security.cert.CertificateEncodingException;
-import javax.security.cert.X509Certificate;
+import java.security.cert.CertificateEncodingException;
 
 import io.undertow.UndertowMessages;
 import io.undertow.server.handlers.ResponseCodeHandler;
@@ -77,6 +77,8 @@ import io.undertow.util.SameThreadExecutor;
 import io.undertow.util.StatusCodes;
 import io.undertow.util.Transfer;
 import io.undertow.util.WorkerUtils;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * An HTTP handler which proxies content to a remote server.
@@ -133,8 +135,8 @@ public final class ProxyHandler implements HttpHandler {
      */
     @Deprecated
     public ProxyHandler(ProxyClient proxyClient, int maxRequestTime, HttpHandler next, boolean rewriteHostHeader, boolean reuseXForwarded) {
-          this(proxyClient, maxRequestTime, next, rewriteHostHeader, reuseXForwarded, DEFAULT_MAX_RETRY_ATTEMPTS);
-      }
+        this(proxyClient, maxRequestTime, next, rewriteHostHeader, reuseXForwarded, DEFAULT_MAX_RETRY_ATTEMPTS);
+    }
 
     /**
      * @param proxyClient the client to use to make the proxy call
@@ -287,6 +289,23 @@ public final class ProxyHandler implements HttpHandler {
         return proxyClient;
     }
 
+    @Override
+    public String toString() {
+        List<ProxyClient.ProxyTarget> proxyTargets = proxyClient.getAllTargets();
+        if (proxyTargets.isEmpty()){
+            return "ProxyHandler - "+proxyClient.getClass().getSimpleName();
+        }
+        if(proxyTargets.size()==1 && !rewriteHostHeader){
+            return "reverse-proxy( '" + proxyTargets.get(0).toString() + "' )";
+        } else {
+            String outputResult = "reverse-proxy( { '" + proxyTargets.stream().map(s -> s.toString()).collect(Collectors.joining("', '")) + "' }";
+            if(rewriteHostHeader){
+                outputResult += ", rewrite-host-header=true";
+            }
+            return outputResult+" )";
+        }
+    }
+
     private final class ProxyClientHandler implements ProxyCallback<ProxyConnection>, Runnable {
 
         private int tries;
@@ -380,7 +399,7 @@ public final class ProxyHandler implements HttpHandler {
         private final Predicate idempotentPredicate;
 
         ProxyAction(final ProxyConnection clientConnection, final HttpServerExchange exchange, Map<HttpString, ExchangeAttribute> requestHeaders,
-                    boolean rewriteHostHeader, boolean reuseXForwarded, ProxyClientHandler proxyClientHandler, Predicate idempotentPredicate) {
+                boolean rewriteHostHeader, boolean reuseXForwarded, ProxyClientHandler proxyClientHandler, Predicate idempotentPredicate) {
             this.clientConnection = clientConnection;
             this.exchange = exchange;
             this.requestHeaders = requestHeaders;
@@ -527,9 +546,9 @@ public final class ProxyHandler implements HttpHandler {
 
             SSLSessionInfo sslSessionInfo = exchange.getConnection().getSslSessionInfo();
             if (sslSessionInfo != null) {
-                X509Certificate[] peerCertificates;
+                Certificate[] peerCertificates;
                 try {
-                    peerCertificates = sslSessionInfo.getPeerCertificateChain();
+                    peerCertificates = sslSessionInfo.getPeerCertificates();
                     if (peerCertificates.length > 0) {
                         request.putAttachment(ProxiedRequestAttachments.SSL_CERT, Certificates.toPem(peerCertificates[0]));
                     }

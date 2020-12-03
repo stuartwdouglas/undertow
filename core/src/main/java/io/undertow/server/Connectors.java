@@ -37,7 +37,6 @@ import org.xnio.conduits.ConduitStreamSinkChannel;
 
 import java.io.IOException;
 import java.util.Date;
-import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -48,10 +47,12 @@ import java.util.concurrent.RejectedExecutionException;
  * by connector implementations.
  *
  * @author Stuart Douglas
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public class Connectors {
 
     private static final boolean[] ALLOWED_TOKEN_CHARACTERS = new boolean[256];
+    private static final boolean[] ALLOWED_SCHEME_CHARACTERS = new boolean[256];
 
     static {
         for(int i = 0; i < ALLOWED_TOKEN_CHARACTERS.length; ++i) {
@@ -84,6 +85,25 @@ public class Connectors {
                 }
             }
         }
+
+        for(int i = 0; i < ALLOWED_SCHEME_CHARACTERS.length; ++i) {
+            if((i >='0' && i <= '9') ||
+                    (i >='a' && i <= 'z') ||
+                    (i >='A' && i <= 'Z')) {
+                ALLOWED_SCHEME_CHARACTERS[i] = true;
+            } else {
+                switch (i) {
+                    case '+':
+                    case '-':
+                    case '.': {
+                        ALLOWED_SCHEME_CHARACTERS[i] = true;
+                        break;
+                    }
+                    default:
+                        ALLOWED_SCHEME_CHARACTERS[i] = false;
+                }
+            }
+        }
     }
     /**
      * Flattens the exchange cookie map into the response header map. This should be called by a
@@ -92,12 +112,9 @@ public class Connectors {
      * @param exchange The server exchange
      */
     public static void flattenCookies(final HttpServerExchange exchange) {
-        Map<String, Cookie> cookies = exchange.getResponseCookiesInternal();
         boolean enableRfc6265Validation = exchange.getConnection().getUndertowOptions().get(UndertowOptions.ENABLE_RFC6265_COOKIE_VALIDATION, UndertowOptions.DEFAULT_ENABLE_RFC6265_COOKIE_VALIDATION);
-        if (cookies != null) {
-            for (Map.Entry<String, Cookie> entry : cookies.entrySet()) {
-                exchange.getResponseHeaders().add(Headers.SET_COOKIE, getCookieString(entry.getValue(), enableRfc6265Validation));
-            }
+        for (Cookie cookie : exchange.responseCookies()) {
+            exchange.getResponseHeaders().add(Headers.SET_COOKIE, getCookieString(cookie, enableRfc6265Validation));
         }
     }
 
@@ -539,6 +556,10 @@ public class Connectors {
      */
     public static boolean isValidTokenCharacter(byte c) {
         return ALLOWED_TOKEN_CHARACTERS[c];
+    }
+
+    public static boolean isValidSchemeCharacter(byte c) {
+        return ALLOWED_SCHEME_CHARACTERS[c];
     }
 
 

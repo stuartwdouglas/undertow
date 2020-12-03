@@ -96,6 +96,7 @@ import javax.servlet.http.PushBuilder;
  * The http servlet request implementation. This class is not thread safe
  *
  * @author Stuart Douglas
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public final class HttpServletRequestImpl implements HttpServletRequest {
 
@@ -145,15 +146,17 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
     @Override
     public Cookie[] getCookies() {
         if (cookies == null) {
-            Map<String, io.undertow.server.handlers.Cookie> cookies = exchange.getRequestCookies();
-            if (cookies.isEmpty()) {
+            Iterable<io.undertow.server.handlers.Cookie> cookies = exchange.requestCookies();
+            int count = 0;
+            for (io.undertow.server.handlers.Cookie cookie : cookies) {
+                count++;
+            }
+            if (count == 0) {
                 return null;
             }
-            int count = cookies.size();
             Cookie[] value = new Cookie[count];
             int i = 0;
-            for (Map.Entry<String, io.undertow.server.handlers.Cookie> entry : cookies.entrySet()) {
-                io.undertow.server.handlers.Cookie cookie = entry.getValue();
+            for (io.undertow.server.handlers.Cookie cookie : cookies) {
                 try {
                     Cookie c = new Cookie(cookie.getName(), cookie.getValue());
                     if (cookie.getDomain() != null) {
@@ -318,7 +321,7 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
             return false;
         }
         SecurityContext sc = exchange.getSecurityContext();
-        Account account = sc.getAuthenticatedAccount();
+        Account account = sc != null ? sc.getAuthenticatedAccount() : null;
         if (account == null) {
             return false;
         }
@@ -458,6 +461,10 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
         }
 
         SecurityContext sc = exchange.getSecurityContext();
+        if (sc == null) {
+            throw UndertowServletMessages.MESSAGES.noSecurityContextAvailable();
+        }
+
         sc.setAuthenticationRequired();
         // TODO: this will set the status code and headers without going through any potential
         // wrappers, is this a problem?
@@ -482,7 +489,9 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
             throw UndertowServletMessages.MESSAGES.loginFailed();
         }
         SecurityContext sc = exchange.getSecurityContext();
-        if (sc.isAuthenticated()) {
+        if (sc == null) {
+            throw UndertowServletMessages.MESSAGES.noSecurityContextAvailable();
+        } else if (sc.isAuthenticated()) {
             throw UndertowServletMessages.MESSAGES.userAlreadyLoggedIn();
         }
         boolean login = false;
@@ -502,6 +511,9 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
     @Override
     public void logout() throws ServletException {
         SecurityContext sc = exchange.getSecurityContext();
+        if (sc == null) {
+            throw UndertowServletMessages.MESSAGES.noSecurityContextAvailable();
+        }
         sc.logout();
         if(servletContext.getDeployment().getDeploymentInfo().isInvalidateSessionOnLogout()) {
             HttpSession session = getSession(false);
@@ -682,17 +694,13 @@ public final class HttpServletRequestImpl implements HttpServletRequest {
     }
 
     public void closeAndDrainRequest() throws IOException {
-        try {
-            if (reader != null) {
-                reader.close();
-            }
-            if (servletInputStream == null) {
-                servletInputStream = new ServletInputStreamImpl(this);
-            }
-            servletInputStream.close();
-        } finally {
-            clearAttributes();
+        if (reader != null) {
+            reader.close();
         }
+        if (servletInputStream == null) {
+            servletInputStream = new ServletInputStreamImpl(this);
+        }
+        servletInputStream.close();
     }
 
     /**
